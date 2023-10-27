@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -11,6 +12,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] float viewMoveSpeed;
     [SerializeField] GameObject player;
     [SerializeField] GameObject startLocationIcon;
+    [SerializeField] EventSystem es;
 
     // level editor pieces prefab refs
     [Header("Level Editor Pieces")]
@@ -25,6 +27,8 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject lastPlacedLevelObject;
+    Vector3 mousePosition;
+    bool canPlaceObjectAtMousePos = false;
 
     // Start is called before the first frame update
     void Start()
@@ -38,15 +42,6 @@ public class LevelEditor : MonoBehaviour
         HandleViewMovement();
         HandlePlacePrefab();
         HandleSwitchToPlayMode();
-
-        // temp select
-        if (Input.GetKeyDown(KeyCode.Q)) {
-            SelectPuller();
-        }
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            SelectFinish();
-        }
     }
 
     void HandleViewMovement()
@@ -59,7 +54,7 @@ public class LevelEditor : MonoBehaviour
         if (Input.GetButtonDown("Fire3"))
         {
             // hide player start location icon
-            startLocationIcon.gameObject.SetActive(false);
+            startLocationIcon.SetActive(false);
 
             player.SetActive(true);
             this.gameObject.SetActive(false);
@@ -68,19 +63,13 @@ public class LevelEditor : MonoBehaviour
 
     void HandlePlacePrefab()
     {
-        // get mosue position
-        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        // get mouse position
+        mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         mousePosition.z = 0;
 
-        // start trying to place
-        if (Input.GetButtonDown("Fire1") && prefabToPlace != null)
-        {
-            isTryingToPlace = true;
-            lastPlacedLevelObject = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
-        }
-
         // make the object the player is currently trying to place follow the mouse
-        if (isTryingToPlace && isTryingToPlace)
+        // TODO only show when not over a UI element
+        if (isTryingToPlace)
         {
             lastPlacedLevelObject.transform.position = mousePosition;
         }
@@ -89,6 +78,11 @@ public class LevelEditor : MonoBehaviour
         if (Input.GetButtonUp("Fire1") && isTryingToPlace)
         {
             isTryingToPlace = false;
+            // TODO
+            if (/*is hovering over another ui element   es.IsPointerOverGameObject()*/ false)
+            {
+                Destroy(lastPlacedLevelObject);
+            }
         }
     }
 
@@ -97,20 +91,29 @@ public class LevelEditor : MonoBehaviour
         viewMoveSpeed = cameraSpeedSlider.value;
     }
 
+    public void TryToPlace()
+    {
+        isTryingToPlace = true;
+        lastPlacedLevelObject = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
+    }
+
     // selected prefab switching with buttons
-    public void SelectPuller()
+    public void PlacePuller()
     {
         prefabToPlace = pullerPrefab;
         Debug.Log("Selected Puller");
+        TryToPlace();
     }
-    public void SelectFinish()
+    public void PlaceFinish()
     {
         prefabToPlace = finishPrefab;
         Debug.Log("Selected Finish");
+        TryToPlace();
     }
-    public void SelectKillWall()
+    public void PlaceKillWall()
     {
         prefabToPlace = killWallPrefab;
         Debug.Log("Selected Kill Wall");
+        TryToPlace();
     }
 }

@@ -55,7 +55,7 @@ public class Player : MonoBehaviour
 
             // hide start guides when not trying to start movement
             lr.enabled = false;
-            startLaunchPoint.gameObject.SetActive(false);
+            startLaunchPoint.SetActive(false);
         }
 
         HandleSwitchToLevelEditor();
@@ -78,7 +78,7 @@ public class Player : MonoBehaviour
 
             // show start guides
             lr.enabled = true;
-            startLaunchPoint.gameObject.SetActive(true);
+            startLaunchPoint.SetActive(true);
 
             // set startLaunchPoint location to mouse position
             if (Input.GetAxisRaw("Fire1") > 0f)
@@ -123,7 +123,7 @@ public class Player : MonoBehaviour
     void RetryLevel()
     {
         // reset to start location
-        this.gameObject.transform.position = startLocation.gameObject.transform.position;
+        this.gameObject.transform.position = startLocation.transform.position;
         // hide displays
         winDisplay.gameObject.SetActive(false);
         loseDisplay.gameObject.SetActive(false);
@@ -147,7 +147,7 @@ public class Player : MonoBehaviour
             this.gameObject.SetActive(false);
 
             // show player start location icon
-            startLocationIcon.gameObject.SetActive(true);
+            startLocationIcon.SetActive(true);
 
             // ensure unpause
             Time.timeScale = 1.0f;
