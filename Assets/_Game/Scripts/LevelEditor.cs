@@ -26,9 +26,9 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] Slider cameraSpeedSlider;
 
     bool isTryingToPlace = false;
-    GameObject lastPlacedLevelObject;
+    GameObject objectCurrentlyTryingToPlace = null;
     Vector3 mousePosition;
-    bool canPlaceObjectAtMousePos = false;
+    bool pointerIsOverObjectSelectionBar = false;
 
     // Start is called before the first frame update
     void Start()
@@ -63,25 +63,33 @@ public class LevelEditor : MonoBehaviour
 
     void HandlePlacePrefab()
     {
-        // get mouse position
-        mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        mousePosition.z = 0;
-
-        // make the object the player is currently trying to place follow the mouse
-        // TODO only show when not over a UI element
-        if (isTryingToPlace)
+        if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
-            lastPlacedLevelObject.transform.position = mousePosition;
-        }
+            // get mouse position
+            mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            mousePosition.z = 0;
 
-        // stop following mouse and finish placing object
-        if (Input.GetButtonUp("Fire1") && isTryingToPlace)
-        {
-            isTryingToPlace = false;
-            // TODO
-            if (/*is hovering over another ui element   es.IsPointerOverGameObject()*/ false)
+            // make the object the player is currently trying to place follow the mouse
+            objectCurrentlyTryingToPlace.transform.position = mousePosition;
+
+            // dont show object that is currently trying to be placed when over a ui element
+            if (pointerIsOverObjectSelectionBar)
+                objectCurrentlyTryingToPlace.SetActive(false);
+            else
+                objectCurrentlyTryingToPlace.SetActive(true);
+
+            // stop following mouse and finish placing object
+            if (Input.GetButtonUp("Fire1") && isTryingToPlace)
             {
-                Destroy(lastPlacedLevelObject);
+                isTryingToPlace = false;
+
+                // if player tries to place object over ui element, delete the object to cancel placement
+                if (pointerIsOverObjectSelectionBar)
+                {
+                    Destroy(objectCurrentlyTryingToPlace);
+                }
+
+                objectCurrentlyTryingToPlace = null;
             }
         }
     }
@@ -94,7 +102,7 @@ public class LevelEditor : MonoBehaviour
     public void TryToPlace()
     {
         isTryingToPlace = true;
-        lastPlacedLevelObject = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
+        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
     }
 
     // selected prefab switching with buttons
@@ -115,5 +123,15 @@ public class LevelEditor : MonoBehaviour
         prefabToPlace = killWallPrefab;
         Debug.Log("Selected Kill Wall");
         TryToPlace();
+    }
+
+    // update value of pointerIsOverObjectSelectionBar on pointer enter and exit
+    public void SetPointerIsOverObjectSelectionBarTrue()
+    {
+        pointerIsOverObjectSelectionBar = true;
+    }
+    public void SetPointerIsOverObjectSelectionBarFalse()
+    {
+        pointerIsOverObjectSelectionBar = false;
     }
 }
