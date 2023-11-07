@@ -32,8 +32,7 @@ public class Player : MonoBehaviour
     bool isTryingToStartMovement = true;
     bool isInvincible = false;
     bool isInWinState = false;
-    public bool quickRetry = false;
-    public bool quickLaunch = false;
+    bool isInLoseState = false;
 
 
     // Start is called before the first frame update
@@ -46,25 +45,28 @@ public class Player : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        StartMovement();
-
-        UpdateLineRenderer();
-
-        HandleRetryLevel();
-
-        if (!isTryingToStartMovement)
+        if (!GameManager.Instance.isPaused) // dissallowed when paused:
         {
-            // update time display
-            timeDisplay.text = (Time.time - timeAtLastRetry).ToString("F3");
-            // update speed display
-            speedDisplay.text = rb.velocity.magnitude.ToString("F2");
+            StartMovement();
 
-            // hide start guides when not trying to start movement
-            lr.enabled = false;
-            startLaunchPoint.SetActive(false);
+            UpdateLineRenderer();
+
+            HandleRetryLevel();
+
+            if (!isTryingToStartMovement)
+            {
+                // update time display
+                timeDisplay.text = (Time.time - timeAtLastRetry).ToString("F3");
+                // update speed display
+                speedDisplay.text = rb.velocity.magnitude.ToString("F2");
+
+                // hide start guides when not trying to start movement
+                lr.enabled = false;
+                startLaunchPoint.SetActive(false);
+            }
+
+            HandleSwitchToLevelEditor();
         }
-
-        HandleSwitchToLevelEditor();
     }
 
     // called when player is set to active
@@ -78,11 +80,6 @@ public class Player : MonoBehaviour
     void OnLevelLoadFinished()
     {
         RetryLevel();    
-    }
-
-    void Pause()
-    {
-        Time.timeScale = 0.0f;
     }
 
     void StartMovement()
@@ -146,13 +143,14 @@ public class Player : MonoBehaviour
         loseDisplay.gameObject.SetActive(false);
 
         // ensure unpause
-        Time.timeScale = 1.0f;
+        GameManager.Instance.isPaused = false;
 
         // reset trail renderer
         tr.Clear();
 
         isTryingToStartMovement = true;
         isInWinState = false;
+        isInLoseState = false;
     }
 
     void HandleSwitchToLevelEditor()
@@ -168,7 +166,7 @@ public class Player : MonoBehaviour
             startLocationIcon.SetActive(true);
 
             // ensure unpause
-            Time.timeScale = 1.0f;
+            GameManager.Instance.isPaused = false;
 
             // ensure not in win state
             isInWinState = false;
@@ -195,13 +193,13 @@ public class Player : MonoBehaviour
         if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
         {
             loseDisplay.gameObject.SetActive(true);
-            Pause();
+            isInLoseState = true;
         }
         // finish area
-        if (collision.gameObject.CompareTag("Finish"))
+        if (collision.gameObject.CompareTag("Finish") && !isInLoseState)
         {
             winDisplay.gameObject.SetActive(true);
-            // Pause();
+            // GameManager.Instance.isPaused = true;
             isInWinState = true;
         }
     }

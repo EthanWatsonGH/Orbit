@@ -6,7 +6,7 @@ public class UIManager : MonoBehaviour
 {
     [SerializeField] GameObject pauseMenu;
 
-    bool isPaused = false;
+    
 
     // Start is called before the first frame update
     void Start()
@@ -22,9 +22,11 @@ public class UIManager : MonoBehaviour
 
     void HandleTogglePauseMenu()
     {
+        // toggle paused variable on pressing pause button
         if (Input.GetKeyDown(KeyCode.Escape))
-            isPaused = !isPaused;
+            GameManager.Instance.isPaused = !GameManager.Instance.isPaused;
 
-        pauseMenu.SetActive(isPaused);
+        // only show pause menu if game is paused
+        pauseMenu.SetActive(GameManager.Instance.isPaused);
     }
 }
