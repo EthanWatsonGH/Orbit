@@ -30,11 +30,17 @@ public class Player : MonoBehaviour
     Vector2 startDirection;
     float timeAtLastRetry;
     bool isTryingToStartMovement = true;
+    bool isInvincible = false;
+    bool isInWinState = false;
+    public bool quickRetry = false;
+    public bool quickLaunch = false;
+
 
     // Start is called before the first frame update
     void Start()
     {
         lr.positionCount = 2;
+        RetryLevel();
     }
 
     // Update is called once per frame
@@ -61,11 +67,22 @@ public class Player : MonoBehaviour
         HandleSwitchToLevelEditor();
     }
 
+    // called when player is set to active
+    private void OnEnable()
+    {
+        // isInWinState = false;
+        // TODO: may want to use this in the future for resetting things after coming out of level editor
+    }
+
+    // called when level is finished being laoded from a save file
+    void OnLevelLoadFinished()
+    {
+        RetryLevel();    
+    }
+
     void Pause()
     {
-        Debug.Log("pausing");
         Time.timeScale = 0.0f;
-        Debug.Log("Time.timeScale: " + Time.timeScale);
     }
 
     void StartMovement()
@@ -135,6 +152,7 @@ public class Player : MonoBehaviour
         tr.Clear();
 
         isTryingToStartMovement = true;
+        isInWinState = false;
     }
 
     void HandleSwitchToLevelEditor()
@@ -151,6 +169,9 @@ public class Player : MonoBehaviour
 
             // ensure unpause
             Time.timeScale = 1.0f;
+
+            // ensure not in win state
+            isInWinState = false;
         }
     }
 
@@ -171,7 +192,7 @@ public class Player : MonoBehaviour
     void OnTriggerEnter2D(Collider2D collision)
     {
         // kill area
-        if (collision.gameObject.CompareTag("Kill"))
+        if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
         {
             loseDisplay.gameObject.SetActive(true);
             Pause();
@@ -180,7 +201,8 @@ public class Player : MonoBehaviour
         if (collision.gameObject.CompareTag("Finish"))
         {
             winDisplay.gameObject.SetActive(true);
-            Pause();
+            // Pause();
+            isInWinState = true;
         }
     }
 }

@@ -105,23 +105,20 @@ public class LevelEditor : MonoBehaviour
         objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
     }
 
-    // selected prefab switching with buttons
+    // place events for each button
     public void PlacePuller()
     {
         prefabToPlace = pullerPrefab;
-        Debug.Log("Selected Puller");
         TryToPlace();
     }
     public void PlaceFinish()
     {
         prefabToPlace = finishPrefab;
-        Debug.Log("Selected Finish");
         TryToPlace();
     }
     public void PlaceKillWall()
     {
         prefabToPlace = killWallPrefab;
-        Debug.Log("Selected Kill Wall");
         TryToPlace();
     }
 
