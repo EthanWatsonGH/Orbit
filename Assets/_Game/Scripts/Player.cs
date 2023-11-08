@@ -84,7 +84,7 @@ public class Player : MonoBehaviour
 
     void StartMovement()
     {
-        if (isTryingToStartMovement)
+        if (isTryingToStartMovement) // TODO: improve this logic to only trigger once per retry
         {
             // reset HUD displays
             timeDisplay.text = "0";
@@ -106,8 +106,8 @@ public class Player : MonoBehaviour
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
 
-            // launch player at startLaunchPoint
-            if (Input.GetButtonDown("Jump"))
+            // launch player in direction of startLaunchPoint
+            if (Input.GetButtonDown("Jump") || GameManager.Instance.quickLaunch)
             {
                 startDirection = (startLaunchPoint.transform.position - rb.transform.position).normalized;
                 rb.velocity = startDirection * startForce;
@@ -128,7 +128,7 @@ public class Player : MonoBehaviour
 
     void HandleRetryLevel()
     {
-        if (Input.GetButtonDown("Fire2"))
+        if (Input.GetButtonDown("Fire2") || (GameManager.Instance.quickRetry && isInLoseState))
         {
             RetryLevel();
         }

@@ -40,4 +40,15 @@ public class GameManager : MonoBehaviour
         else if (!isPaused)
             Time.timeScale = 1.0f;
     }
+
+    // TODO: make it so these cant desync from what the toggle shows, if that becomes an issue
+    public void ToggleQuickRetry()
+    {
+        quickRetry = !quickRetry;
+    }
+
+    public void ToggleQuickLaunch()
+    {
+        quickLaunch = !quickLaunch;
+    }
 }
