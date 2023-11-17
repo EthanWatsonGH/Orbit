@@ -9,8 +9,7 @@ public class GameManager : MonoBehaviour
 
     //variables
     public bool isPaused = false;
-    public bool isInPlayMode = true;
-    public bool isInLevelEditor = false;
+    public string gameMode = "play";
 
     public bool quickRetry = false;
     public bool quickLaunch = false;

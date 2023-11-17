@@ -252,6 +252,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7331356259328388203, guid: 472e896a6ec5b25438305c89878629be, type: 3}
   m_PrefabInstance: {fileID: 885612311}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &491744161 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 25946343211641614, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+  m_PrefabInstance: {fileID: 1343076315}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &677869738 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2910641633473500746, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
@@ -653,6 +658,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8916877501187485870, guid: f5bdc09a4c4e08e47a729bf31bf72ce0, type: 3}
   m_PrefabInstance: {fileID: 1161199687}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1717968055 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 676243139505178059, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
+  m_PrefabInstance: {fileID: 804497419}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1918616548
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -673,6 +683,14 @@ PrefabInstance:
       propertyPath: m_IsOn
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7670920483984670509, guid: 72a44ec01605ef144a25e3a76fe124c6, type: 3}
+      propertyPath: playerHUD
+      value: 
+      objectReference: {fileID: 1717968055}
+    - target: {fileID: 7670920483984670509, guid: 72a44ec01605ef144a25e3a76fe124c6, type: 3}
+      propertyPath: levelEditorUI
+      value: 
+      objectReference: {fileID: 491744161}
     - target: {fileID: 8910558453564708198, guid: 72a44ec01605ef144a25e3a76fe124c6, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

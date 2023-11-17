@@ -5,6 +5,8 @@ using UnityEngine;
 public class UIManager : MonoBehaviour
 {
     [SerializeField] GameObject pauseMenu;
+    [SerializeField] GameObject playerHUD;
+    [SerializeField] GameObject levelEditorUI;
 
     
 
@@ -28,5 +30,30 @@ public class UIManager : MonoBehaviour
 
         // only show pause menu if game is paused
         pauseMenu.SetActive(GameManager.Instance.isPaused);
+    }
+
+    public void HideAllPanels()
+    {
+        // hide player hud
+        // hide level editor ui
+        // hide pause menu
+    }
+
+    public void ShowPauseMenu()
+    {
+
+    }
+
+    public void HidePauseMenu()
+    {
+        pauseMenu.SetActive(false);
+        switch (GameManager.Instance.gameMode)
+        {
+            case "play":
+                playerHUD.SetActive(true);
+                break;
+        }
+
+
     }
 }
