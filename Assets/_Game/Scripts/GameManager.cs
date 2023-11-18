@@ -20,27 +20,29 @@ public class GameManager : MonoBehaviour
         Instance = this;
     }
 
-    // Start is called before the first frame update
     void Start()
     {
         
     }
 
-    // Update is called once per frame
     void Update()
     {
-        HandlePauseTimeScale();
+        
     }
 
-    void HandlePauseTimeScale()
+    public void PauseTimeScale()
     {
-        if (isPaused)
-            Time.timeScale = 0.0f;
-        else if (!isPaused)
-            Time.timeScale = 1.0f;
+        Time.timeScale = 0f;
+        isPaused = true;
     }
 
-    // TODO: make it so these cant desync from what the toggle shows, if that becomes an issue
+    public void ResumeTimeScale()
+    {
+        Time.timeScale = 1f;
+        isPaused = false;
+    }
+
+    // TODO: make it so these cant desync from what the toggle shows
     public void ToggleQuickRetry()
     {
         quickRetry = !quickRetry;

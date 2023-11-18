@@ -21,7 +21,8 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject killCirclePrefab;
     [SerializeField] GameObject finishPrefab;
 
-    GameObject levelObjectsCollection;
+    [SerializeField] GameObject levelObjectsCollection;
+    [SerializeField] GameObject objectTransformControls;
 
     [SerializeField] Slider cameraSpeedSlider;
 
@@ -29,19 +30,29 @@ public class LevelEditor : MonoBehaviour
     GameObject objectCurrentlyTryingToPlace = null;
     Vector3 mousePosition;
     bool pointerIsOverObjectSelectionBar = false;
+    GameObject selectedObject = null;
 
-    // Start is called before the first frame update
-    void Start()
+
+    void Awake()
     {
-        levelObjectsCollection = GameObject.Find("LevelObjects");
+        // ensure level editor object and all of it's visuals are disabled before starting game
+        gameObject.SetActive(false);
+        objectTransformControls.SetActive(false);
     }
 
-    // Update is called once per frame
+    void Start()
+    {
+        
+    }
+
     void Update()
     {
         HandleViewMovement();
         HandlePlacePrefab();
         HandleSwitchToPlayMode();
+        GetMousePosition();
+        HandleSelectObject();
+        HandleShowObjectTransformControls();
     }
 
     void HandleViewMovement()
@@ -61,14 +72,17 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void GetMousePosition()
+    {
+        mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        // ensure no depth
+        mousePosition.z = 0;
+    }
+
     void HandlePlacePrefab()
     {
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
-            // get mouse position
-            mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            mousePosition.z = 0;
-
             // make the object the player is currently trying to place follow the mouse
             objectCurrentlyTryingToPlace.transform.position = mousePosition;
 
@@ -94,12 +108,37 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    public void ChangeCameraMoveSpeed()
+    void HandleSelectObject()
+    {
+        if (Input.GetButtonDown("Fire1"))
+        {
+            Debug.Log("Trying to select object");
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+
+            if (Physics.Raycast(ray, out hit))
+            {
+                Debug.Log("Hit" + hit);
+                selectedObject = hit.transform.gameObject;
+            }
+            else
+            {
+                selectedObject = null;
+            }
+        }
+    }
+
+    void HandleShowObjectTransformControls()
+    {
+        objectTransformControls.SetActive(selectedObject != null);
+    }
+
+    void ChangeCameraMoveSpeed()
     {
         viewMoveSpeed = cameraSpeedSlider.value;
     }
 
-    public void TryToPlace()
+    void TryToPlace()
     {
         isTryingToPlace = true;
         objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);

@@ -6,13 +6,11 @@ public class CameraZoom : MonoBehaviour
 {
     [SerializeField] Camera cam;
 
-    // Start is called before the first frame update
     void Start()
     {
         cam.orthographicSize = 10f;
     }
 
-    // Update is called once per frame
     void Update()
     {
         HandleZoom();

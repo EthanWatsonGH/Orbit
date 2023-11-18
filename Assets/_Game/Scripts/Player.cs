@@ -35,17 +35,15 @@ public class Player : MonoBehaviour
     bool isInLoseState = false;
 
 
-    // Start is called before the first frame update
     void Start()
     {
         lr.positionCount = 2;
         RetryLevel();
     }
 
-    // Update is called once per frame
     void Update()
     {
-        if (!GameManager.Instance.isPaused) // dissallowed when paused:
+        if (true) // TODO: add a check to disallow doing these things while in pause menu
         {
             StartMovement();
 
@@ -69,17 +67,10 @@ public class Player : MonoBehaviour
         }
     }
 
-    // called when player is set to active
     private void OnEnable()
     {
-        // isInWinState = false;
-        // TODO: may want to use this in the future for resetting things after coming out of level editor
-    }
-
-    // called when level is finished being laoded from a save file
-    void OnLevelLoadFinished()
-    {
-        RetryLevel();    
+        isInWinState = false;
+        RetryLevel();
     }
 
     void StartMovement()
@@ -143,7 +134,7 @@ public class Player : MonoBehaviour
         loseDisplay.gameObject.SetActive(false);
 
         // ensure unpause
-        GameManager.Instance.isPaused = false;
+        GameManager.Instance.ResumeTimeScale();
 
         // reset trail renderer
         tr.Clear();
@@ -192,6 +183,7 @@ public class Player : MonoBehaviour
         // kill area
         if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
         {
+            GameManager.Instance.PauseTimeScale();
             loseDisplay.gameObject.SetActive(true);
             isInLoseState = true;
         }
