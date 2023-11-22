@@ -31,7 +31,8 @@ public class LevelEditor : MonoBehaviour
     Vector3 mousePosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
-
+    bool isTryingToMoveSelectedObject = false;
+    Vector3 mousePositionAtClick;
 
     void Awake()
     {
@@ -52,7 +53,7 @@ public class LevelEditor : MonoBehaviour
         HandleSwitchToPlayMode();
         GetMousePosition();
         HandleSelectObject();
-        HandleShowObjectTransformControls();
+        HandleMoveSelectedObject();
     }
 
     void HandleViewMovement()
@@ -66,6 +67,9 @@ public class LevelEditor : MonoBehaviour
         {
             // hide player start location icon
             startLocationIcon.SetActive(false);
+
+            // ensure objectTransformControls are hidden
+            objectTransformControls.SetActive(false);
 
             player.SetActive(true);
             this.gameObject.SetActive(false);
@@ -112,25 +116,81 @@ public class LevelEditor : MonoBehaviour
     {
         if (Input.GetButtonDown("Fire1"))
         {
-            Debug.Log("Trying to select object");
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
+            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
-            if (Physics.Raycast(ray, out hit))
+            if (hit.collider != null)
             {
-                Debug.Log("Hit" + hit);
-                selectedObject = hit.transform.gameObject;
+                if (!hit.collider.gameObject.transform.parent.name.Equals("Scale") && !hit.collider.gameObject.transform.parent.name.Equals("ObjectTransformControls")) // don't allow object transform controls to be set as selected object
+                {
+                    selectedObject = hit.collider.gameObject;
+                    objectTransformControls.transform.position = hit.transform.position;
+                }
             }
             else
             {
                 selectedObject = null;
             }
+
+            // only show controls if something is selected
+            objectTransformControls.SetActive(selectedObject != null);
         }
     }
 
-    void HandleShowObjectTransformControls()
+    void HandleMoveSelectedObject()
     {
-        objectTransformControls.SetActive(selectedObject != null);
+        // start trying to move selected object when the player presses on move control
+        if (Input.GetButtonDown("Fire1"))
+        {
+            Debug.Log("1");
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
+
+            if (hit.transform.gameObject.name.Equals("Move"))
+            {
+                isTryingToMoveSelectedObject = true;
+
+                // set position of mouse at click for calculating offset for movement
+                mousePositionAtClick = mousePosition;
+            }
+        }
+
+        // stop trying to move selected object when player releases
+        if (Input.GetButtonUp("Fire1"))
+        {
+            Debug.Log("2");
+            isTryingToMoveSelectedObject = false;
+        }
+
+        if (Input.GetAxisRaw("Fire1") > 0 && selectedObject != null)
+        {
+            if (isTryingToMoveSelectedObject)
+            {
+                GameObject moveControl = objectTransformControls.transform.GetChild(0).gameObject; // TODO: make this a serialized field variable instead
+
+                Vector3 objectTransformControlsPosition = objectTransformControls.transform.position;
+                Vector3 moveControlPosition = moveControl.transform.position;
+                Vector3 childOffset = objectTransformControlsPosition - moveControlPosition;
+
+                // TODO: this stuff is jank and there's probably way of doing it
+
+                // calculate offset from where exactly the player clicked to the position of the move control when they click on it to ensure the object only moves relative to how much they move the cursor
+                Vector3 moveOffset = moveControlPosition - mousePositionAtClick;
+
+                // set position of move control
+                moveControl.transform.position = mousePosition;
+                // apply offest to only move with cursor
+                moveControl.transform.position += moveOffset;
+                // move parent to child position
+                objectTransformControlsPosition = moveControl.transform.position;
+                // offset to keep relative distance
+                objectTransformControlsPosition += childOffset;
+                // make selectedObject follow objectTransformControls
+                selectedObject.transform.position = objectTransformControlsPosition;
+                // make parent follow selected object
+                objectTransformControls.transform.position = selectedObject.transform.position;
+            }
+        }
     }
 
     void ChangeCameraMoveSpeed()
