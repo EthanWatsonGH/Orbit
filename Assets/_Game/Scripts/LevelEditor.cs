@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -23,6 +24,7 @@ public class LevelEditor : MonoBehaviour
 
     [SerializeField] GameObject levelObjectsCollection;
     [SerializeField] GameObject objectTransformControls;
+    [SerializeField] GameObject moveControl;
 
     [SerializeField] Slider cameraSpeedSlider;
 
@@ -160,14 +162,18 @@ public class LevelEditor : MonoBehaviour
         {
             Debug.Log("2");
             isTryingToMoveSelectedObject = false;
+            if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+            {
+                Destroy(selectedObject);
+                selectedObject = null;
+                objectTransformControls.SetActive(false);
+            }
         }
 
         if (Input.GetAxisRaw("Fire1") > 0 && selectedObject != null)
         {
             if (isTryingToMoveSelectedObject)
             {
-                GameObject moveControl = objectTransformControls.transform.GetChild(0).gameObject; // TODO: make this a serialized field variable instead
-
                 Vector3 objectTransformControlsPosition = objectTransformControls.transform.position;
                 Vector3 moveControlPosition = moveControl.transform.position;
                 Vector3 childOffset = objectTransformControlsPosition - moveControlPosition;
@@ -175,20 +181,29 @@ public class LevelEditor : MonoBehaviour
                 // TODO: this stuff is jank and there's probably way of doing it
 
                 // calculate offset from where exactly the player clicked to the position of the move control when they click on it to ensure the object only moves relative to how much they move the cursor
-                Vector3 moveOffset = moveControlPosition - mousePositionAtClick;
+                //Vector3 moveOffset = moveControlPosition - mousePositionAtClick;
 
                 // set position of move control
                 moveControl.transform.position = mousePosition;
                 // apply offest to only move with cursor
-                moveControl.transform.position += moveOffset;
+                //moveControl.transform.position += moveOffset;
                 // move parent to child position
                 objectTransformControlsPosition = moveControl.transform.position;
                 // offset to keep relative distance
-                objectTransformControlsPosition += childOffset;
+                //objectTransformControlsPosition += childOffset;
                 // make selectedObject follow objectTransformControls
                 selectedObject.transform.position = objectTransformControlsPosition;
                 // make parent follow selected object
                 objectTransformControls.transform.position = selectedObject.transform.position;
+
+                if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+                {
+                    selectedObject.SetActive(false);
+                }
+                else
+                {
+                    selectedObject.SetActive(true);
+                }
             }
         }
     }
