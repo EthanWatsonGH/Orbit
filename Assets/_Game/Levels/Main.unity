@@ -674,6 +674,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 849191386}
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+      propertyPath: moveControl
+      value: 
+      objectReference: {fileID: 1858382818}
+    - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: startLocationIcon
       value: 
       objectReference: {fileID: 1231841329}
@@ -699,6 +703,11 @@ Transform:
 GameObject:
   m_CorrespondingSourceObject: {fileID: 676243139505178059, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
   m_PrefabInstance: {fileID: 804497419}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1858382818 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1745493773686904271, guid: ff437deca4d40c54f8558385786f9464, type: 3}
+  m_PrefabInstance: {fileID: 1151352848}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1918616548
 PrefabInstance:
