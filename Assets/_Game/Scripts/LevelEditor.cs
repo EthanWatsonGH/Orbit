@@ -34,7 +34,10 @@ public class LevelEditor : MonoBehaviour
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
     bool isTryingToMoveSelectedObject = false;
-    Vector3 mousePositionAtClick;
+
+    // object movement
+    Vector3 moveControlOffsetFromParent;
+    Vector3 moveOffset;
 
     void Awake()
     {
@@ -45,7 +48,7 @@ public class LevelEditor : MonoBehaviour
 
     void Start()
     {
-        
+        moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
     }
 
     void Update()
@@ -56,6 +59,7 @@ public class LevelEditor : MonoBehaviour
         GetMousePosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
+        HandleCloseObjectTransformControls();
     }
 
     void HandleViewMovement()
@@ -144,24 +148,25 @@ public class LevelEditor : MonoBehaviour
         // start trying to move selected object when the player presses on move control
         if (Input.GetButtonDown("Fire1"))
         {
-            Debug.Log("1");
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
-            if (hit.transform.gameObject.name.Equals("Move"))
+            if (hit.transform != null && hit.transform.gameObject.name.Equals("Move"))
             {
                 isTryingToMoveSelectedObject = true;
 
                 // set position of mouse at click for calculating offset for movement
-                mousePositionAtClick = mousePosition;
+                moveOffset = moveControl.transform.position - mousePosition;
             }
         }
 
         // stop trying to move selected object when player releases
+        // TODO: handle if they pause or exit edit mode while moving object, if that's still an issue later
         if (Input.GetButtonUp("Fire1"))
         {
-            Debug.Log("2");
             isTryingToMoveSelectedObject = false;
+
+            // if object is dropped over selection bar, destroy it
             if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
             {
                 Destroy(selectedObject);
@@ -174,43 +179,40 @@ public class LevelEditor : MonoBehaviour
         {
             if (isTryingToMoveSelectedObject)
             {
-                Vector3 objectTransformControlsPosition = objectTransformControls.transform.position;
-                Vector3 moveControlPosition = moveControl.transform.position;
-                Vector3 childOffset = objectTransformControlsPosition - moveControlPosition;
-
-                // TODO: this stuff is jank and there's probably way of doing it
-
-                // calculate offset from where exactly the player clicked to the position of the move control when they click on it to ensure the object only moves relative to how much they move the cursor
-                //Vector3 moveOffset = moveControlPosition - mousePositionAtClick;
-
-                // set position of move control
-                moveControl.transform.position = mousePosition;
-                // apply offest to only move with cursor
-                //moveControl.transform.position += moveOffset;
-                // move parent to child position
-                objectTransformControlsPosition = moveControl.transform.position;
-                // offset to keep relative distance
-                //objectTransformControlsPosition += childOffset;
+                // make moveControl follow mouse, with the offset from the exact location on click
+                moveControl.transform.position = mousePosition + moveOffset;
+                // make objectTransformControls follow moveControl while keeping offset
+                objectTransformControls.transform.position = moveControl.transform.position - moveControlOffsetFromParent;
                 // make selectedObject follow objectTransformControls
-                selectedObject.transform.position = objectTransformControlsPosition;
-                // make parent follow selected object
-                objectTransformControls.transform.position = selectedObject.transform.position;
+                selectedObject.transform.position = objectTransformControls.transform.position;
 
-                if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+                // if hovering over object selection bar, hide object placement preview and transform controls
+                if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint")) // TODO: make it so you can remove player start point, but must have one before you can play the level?
                 {
                     selectedObject.SetActive(false);
+                    objectTransformControls.SetActive(false);
                 }
                 else
                 {
                     selectedObject.SetActive(true);
+                    objectTransformControls.SetActive(true);
                 }
             }
         }
     }
 
-    void ChangeCameraMoveSpeed()
+    void HandleCloseObjectTransformControls()
     {
-        viewMoveSpeed = cameraSpeedSlider.value;
+        if (Input.GetButtonDown("Fire1"))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
+
+            if (hit.transform != null && hit.transform.gameObject.name.Equals("Close"))
+            {
+                objectTransformControls.SetActive(false);
+            }
+        }
     }
 
     void TryToPlace()
