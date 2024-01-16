@@ -8,6 +8,7 @@ using UnityEngine.UI;
 
 public class LevelEditor : MonoBehaviour
 {
+    // self object references
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
     [SerializeField] float viewMoveSpeed;
@@ -15,18 +16,24 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] EventSystem es;
 
-    // level editor pieces prefab refs
-    [Header("Level Editor Pieces")]
-    [SerializeField] GameObject pullerPrefab;
-    [SerializeField] GameObject killWallPrefab;
-    [SerializeField] GameObject killCirclePrefab;
+    // level editor placeable objects references
+    [Header("Level Editor Placable Objects")]
+    [SerializeField] GameObject boosterPrefab;
+    [SerializeField] GameObject bouncyWallPrefab;
+    [SerializeField] GameObject constantPullerPrefab;
+    [SerializeField] GameObject constantPusherPrefab;
     [SerializeField] GameObject finishPrefab;
+    [SerializeField] GameObject killCirclePrefab;
+    [SerializeField] GameObject killWallPrefab;
+    [SerializeField] GameObject pullerPrefab;
+    [SerializeField] GameObject pusherPrefab;
+    [SerializeField] GameObject slipperyWallPrefab;
 
+    // world object references
+    [Header("World Objects")]
     [SerializeField] GameObject levelObjectsCollection;
     [SerializeField] GameObject objectTransformControls;
     [SerializeField] GameObject moveControl;
-
-    [SerializeField] Slider cameraSpeedSlider;
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
@@ -39,6 +46,8 @@ public class LevelEditor : MonoBehaviour
     Vector3 moveControlOffsetFromParent;
     Vector3 moveOffset;
 
+    float cameraZoomAtStart;
+
     void Awake()
     {
         // ensure level editor object and all of it's visuals are disabled before starting game
@@ -49,6 +58,7 @@ public class LevelEditor : MonoBehaviour
     void Start()
     {
         moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
+        cameraZoomAtStart = Camera.main.orthographicSize;
     }
 
     void Update()
@@ -60,6 +70,7 @@ public class LevelEditor : MonoBehaviour
         HandleSelectObject();
         HandleMoveSelectedObject();
         HandleCloseObjectTransformControls();
+        HandleScaleObjectTransformControlsWithZoom();
     }
 
     void HandleViewMovement()
@@ -167,7 +178,7 @@ public class LevelEditor : MonoBehaviour
             isTryingToMoveSelectedObject = false;
 
             // if object is dropped over selection bar, destroy it
-            if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+            if (selectedObject != null && pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
             {
                 Destroy(selectedObject);
                 selectedObject = null;
@@ -215,27 +226,15 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void HandleScaleObjectTransformControlsWithZoom()
+    {
+        objectTransformControls.transform.localScale = objectTransformControls.transform.localScale * (Camera.main.orthographicSize / cameraZoomAtStart);
+    }
+
     void TryToPlace()
     {
         isTryingToPlace = true;
         objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
-    }
-
-    // place events for each button
-    public void PlacePuller()
-    {
-        prefabToPlace = pullerPrefab;
-        TryToPlace();
-    }
-    public void PlaceFinish()
-    {
-        prefabToPlace = finishPrefab;
-        TryToPlace();
-    }
-    public void PlaceKillWall()
-    {
-        prefabToPlace = killWallPrefab;
-        TryToPlace();
     }
 
     // update value of pointerIsOverObjectSelectionBar on pointer enter and exit
@@ -247,4 +246,57 @@ public class LevelEditor : MonoBehaviour
     {
         pointerIsOverObjectSelectionBar = false;
     }
+
+    // place events for each button
+    public void PlaceBooster()
+    {
+        prefabToPlace = boosterPrefab;
+        TryToPlace();
+    }
+    public void PlaceBouncyWall()
+    {
+        prefabToPlace = bouncyWallPrefab;
+        TryToPlace();
+    }
+    public void PlaceConstantPuller()
+    {
+        prefabToPlace = constantPullerPrefab;
+        TryToPlace();
+    }
+    public void PlaceConstantPusher()
+    {
+        prefabToPlace = constantPusherPrefab;
+        TryToPlace();
+    }
+    public void PlaceFinish()
+    {
+        prefabToPlace = finishPrefab;
+        TryToPlace();
+    }
+    public void PlaceKillCircle()
+    {
+        prefabToPlace = killCirclePrefab;
+        TryToPlace();
+    }
+    public void PlaceKillWall()
+    {
+        prefabToPlace = killWallPrefab;
+        TryToPlace();
+    }
+    public void PlacePuller()
+    {
+        prefabToPlace = pullerPrefab;
+        TryToPlace();
+    }
+    public void PlacePusher()
+    {
+        prefabToPlace = pusherPrefab;
+        TryToPlace();
+    }
+    public void PlaceSlipperyWall()
+    {
+        prefabToPlace = slipperyWallPrefab;
+        TryToPlace();
+    }
+
 }
