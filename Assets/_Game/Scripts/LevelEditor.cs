@@ -57,7 +57,6 @@ public class LevelEditor : MonoBehaviour
 
     void Start()
     {
-        moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
         cameraZoomAtStart = Camera.main.orthographicSize;
     }
 
@@ -168,6 +167,8 @@ public class LevelEditor : MonoBehaviour
             {
                 isTryingToMoveSelectedObject = true;
 
+                // set offset from parent to keep relative offset at all scales
+                moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
                 // set position of mouse at click for calculating offset for movement
                 moveOffset = moveControl.transform.position - mousePosition;
             }
