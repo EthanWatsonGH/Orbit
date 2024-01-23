@@ -71,6 +71,7 @@ public class LevelEditor : MonoBehaviour
         HandleMoveSelectedObject();
         HandleCloseObjectTransformControls();
         HandleScaleObjectTransformControlsWithZoom();
+        EnsureObjectTransformControlsAlwaysInFront();
     }
 
     void HandleViewMovement()
@@ -129,6 +130,7 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    // select the object the player clicks on
     void HandleSelectObject()
     {
         if (Input.GetButtonDown("Fire1"))
@@ -138,7 +140,7 @@ public class LevelEditor : MonoBehaviour
 
             if (hit.collider != null)
             {
-                if (!hit.collider.gameObject.transform.parent.name.Equals("Scale") && !hit.collider.gameObject.transform.parent.name.Equals("ObjectTransformControls")) // don't allow object transform controls to be set as selected object
+                if (!hit.collider.gameObject.transform.parent.name.Equals("Scale") && !hit.collider.gameObject.transform.parent.name.Equals("ObjectTransformControls")) // don't allow any object transform controls to be set as selected object
                 {
                     selectedObject = hit.collider.gameObject;
                     objectTransformControls.transform.position = hit.transform.position;
@@ -222,13 +224,26 @@ public class LevelEditor : MonoBehaviour
             if (hit.transform != null && hit.transform.gameObject.name.Equals("Close"))
             {
                 objectTransformControls.SetActive(false);
+                selectedObject = null;
             }
         }
     }
 
     void HandleScaleObjectTransformControlsWithZoom()
     {
-        objectTransformControls.transform.localScale = objectTransformControls.transform.localScale * (Camera.main.orthographicSize / cameraZoomAtStart);
+        float currentCameraSize = Camera.main.orthographicSize;
+        float cameraScaleRatio = cameraZoomAtStart / currentCameraSize;
+        // invert so its bigger when zoomed out instead of smaller
+        cameraScaleRatio = 1 / cameraScaleRatio;
+
+        Vector3 newObjectTransformControlsScale = new Vector3(1 * cameraScaleRatio, 1 * cameraScaleRatio, 1);
+        objectTransformControls.transform.localScale = newObjectTransformControlsScale;
+    }
+
+    void EnsureObjectTransformControlsAlwaysInFront()
+    {
+        Vector3 objectTransformControlsPosition = new Vector3(objectTransformControls.transform.position.x, objectTransformControls.transform.position.y, 1f);
+        objectTransformControls.transform.position = objectTransformControlsPosition;
     }
 
     void TryToPlace()
