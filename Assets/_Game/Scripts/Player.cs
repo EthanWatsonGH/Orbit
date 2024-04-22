@@ -51,8 +51,6 @@ public class Player : MonoBehaviour
 
             HandleRetryLevel();
 
-            HandleSwipeRetry();
-
             if (!isTryingToStartMovement)
             {
                 // update time display
@@ -144,45 +142,6 @@ public class Player : MonoBehaviour
         isTryingToStartMovement = true;
         isInWinState = false;
         isInLoseState = false;
-    }
-
-    void HandleSwipeRetry()
-    {
-        Vector2 touchStartPos;
-
-        // only let player swipe reset when in play state
-        if (!isTryingToStartMovement)
-        {
-            if (Input.touchCount == 1)
-            {
-                // get touch start point
-                Touch touch = Input.GetTouch(0);
-
-                // Check if the touch phase is the beginning of a touch
-                if (touch.phase == TouchPhase.Began)
-                {
-                    // Store the touch start position
-                    touchStartPos = touch.position;
-                }
-                // Check if the touch phase is the end of a touch
-                else if (touch.phase == TouchPhase.Ended)
-                {
-                    // Get the touch end position
-                    Vector2 touchEndPos = touch.position;
-
-                    // Calculate the distance between the start and end positions
-                    float touchDistance = Vector2.Distance(touchStartPos, touchEndPos);
-
-                    // Use touchDistance as needed
-                    Debug.Log("Touch distance: " + touchDistance);
-
-                    if (touchDistance >= 1000f)
-                    {
-
-                    }
-                }
-            }
-        }
     }
 
     void HandleSwitchToLevelEditor()

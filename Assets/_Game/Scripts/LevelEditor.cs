@@ -97,7 +97,7 @@ public class LevelEditor : MonoBehaviour
     {
         mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         // ensure no depth
-        mousePosition.z = 0; // TODO: may have to change this to be behind for raycasts, and then just set the z of the selected object to 0
+        mousePosition.z = 0;
     }
 
     void HandlePlacePrefab()
