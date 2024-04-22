@@ -315,4 +315,9 @@ public class LevelEditor : MonoBehaviour
         TryToPlace();
     }
 
+    // expose level save function for button events
+    public void SaveLevel()
+    {
+        LevelManager.Instance.SaveLevel();
+    }
 }
