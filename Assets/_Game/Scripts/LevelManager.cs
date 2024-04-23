@@ -111,12 +111,17 @@ public class LevelManager : MonoBehaviour
 
         string json = JsonUtility.ToJson(level, true);
 
+        string saveDirectory = Application.persistentDataPath + "/userLevels";
         // TODO: make it save the file name as the name the user inputs
-        string saveLocation = Application.persistentDataPath + "/testLevel2.json";
+        string saveLocation = Path.Combine(saveDirectory, "levelName" + ".json");
+
+        if (!Directory.Exists(saveDirectory))
+        {
+            Directory.CreateDirectory(saveDirectory);
+        }
 
         Debug.Log("Save location: " + saveLocation);
 
-        // TODO: make it save to a more user friendly folder?
         File.WriteAllText(saveLocation, json);
 
         Debug.Log("Saved level");
