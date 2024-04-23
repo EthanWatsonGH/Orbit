@@ -1,7 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using UnityEditor.PackageManager;
 using UnityEngine;
+using UnityEngine.InputSystem.iOS;
+using UnityEngine.UI;
 
 public class LevelManager : MonoBehaviour
 {
@@ -47,8 +50,23 @@ public class LevelManager : MonoBehaviour
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
     const byte LOADER_VERSION = 1;
 
+    string levelDirectory;
+
     [SerializeField] GameObject levelObjectsContainer;
 
+    // TODO: unify this in some way so i don't have to repeat it in multiple scripts
+    // level editor placeable objects references
+    [Header("Level Editor Placable Objects")]
+    [SerializeField] GameObject boosterPrefab;
+    [SerializeField] GameObject bouncyWallPrefab;
+    [SerializeField] GameObject constantPullerPrefab;
+    [SerializeField] GameObject constantPusherPrefab;
+    [SerializeField] GameObject finishPrefab;
+    [SerializeField] GameObject killCirclePrefab;
+    [SerializeField] GameObject killWallPrefab;
+    [SerializeField] GameObject pullerPrefab;
+    [SerializeField] GameObject pusherPrefab;
+    [SerializeField] GameObject slipperyWallPrefab;
 
     void Start()
     {
@@ -71,6 +89,28 @@ public class LevelManager : MonoBehaviour
         else
         {
             Destroy(gameObject);
+        }
+
+        // file path for player's levels
+        levelDirectory = Application.persistentDataPath + "/playerLevels";
+
+        EnsureLevelDirectoryExists();
+    }
+
+    void EnsureLevelDirectoryExists()
+    {
+        // create player levels folder on starup if it doesn't already exist 
+        if (!Directory.Exists(levelDirectory))
+        {
+            Directory.CreateDirectory(levelDirectory);
+        }
+    }
+
+    public void DestroyAllExistingLevelObjects()
+    {
+        foreach (Transform levelObject in levelObjectsContainer.transform)
+        {
+            Destroy(levelObject.gameObject);
         }
     }
 
@@ -100,7 +140,7 @@ public class LevelManager : MonoBehaviour
             newLevelObject.yPosition = workingLevelObjectTransform.position.y;
             newLevelObject.xScale = workingLevelObjectTransform.localScale.x;
             newLevelObject.yScale = workingLevelObjectTransform.localScale.y;
-            newLevelObject.rotation = workingLevelObjectTransform.rotation.z;
+            newLevelObject.rotation = workingLevelObjectTransform.rotation.eulerAngles.z;
             level.levelObjects.Add(newLevelObject);
 
             levelObjectIndex++;
@@ -111,19 +151,84 @@ public class LevelManager : MonoBehaviour
 
         string json = JsonUtility.ToJson(level, true);
 
-        string saveDirectory = Application.persistentDataPath + "/userLevels";
-        // TODO: make it save the file name as the name the user inputs
-        string saveLocation = Path.Combine(saveDirectory, "levelName" + ".json");
-
-        if (!Directory.Exists(saveDirectory))
-        {
-            Directory.CreateDirectory(saveDirectory);
-        }
+        EnsureLevelDirectoryExists();
+        
+        // TODO: make it save the file name as the name the player inputs
+        string saveLocation = Path.Combine(levelDirectory, "levelName" + ".json");
 
         Debug.Log("Save location: " + saveLocation);
 
         File.WriteAllText(saveLocation, json);
 
         Debug.Log("Saved level");
+    }
+
+    public void LoadLevel(string levelFileName)
+    {
+        levelFileName = levelFileName + ".json";
+
+        switch (LOADER_VERSION)
+        {
+            case 1:
+
+                // TODO: add ability to load from different folders
+                string loadLocation = Path.Combine(levelDirectory, levelFileName);
+
+                Debug.Log("Load location: " + loadLocation);
+
+                // if level file is not found, send a message and exit
+                if (!File.Exists(loadLocation))
+                {
+                    // TODO: display a message in game
+                    Debug.Log("ERROR: file not found");
+                    break;
+                }
+
+                string json = File.ReadAllText(loadLocation);
+
+                Level loadedLevel = JsonUtility.FromJson<Level>(json);
+
+                Debug.Log(loadedLevel.levelAuthor);
+
+                DestroyAllExistingLevelObjects();
+
+                // loop through level objects, instantiating a new object in game for each object in the file, with the transforms of each
+                foreach (Level.LevelObject levelObject in loadedLevel.levelObjects)
+                {
+                    GameObject prefabToInstantiate = null;
+                    switch(levelObject.type)
+                    {
+                        case "Puller":
+                            prefabToInstantiate = pullerPrefab;
+                            break;
+                        case "Finish":
+                            prefabToInstantiate = finishPrefab; 
+                            break;
+                        case "KillWall":
+                            prefabToInstantiate = killWallPrefab; 
+                            break;
+                        default:
+                            // TODO: display in game
+                            Debug.Log("ERROR: type not valid");
+                            break;
+                    }
+
+                    if (prefabToInstantiate != null)
+                    {
+                        Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition);
+                        Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
+
+                        GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, levelObjectsContainer.transform);
+
+                        lastPlacedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale);
+                    }
+                }
+
+
+
+
+                Debug.Log("Loaded level");
+                break;
+        }
     }
 }

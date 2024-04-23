@@ -348,7 +348,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1359302081106657919, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.92897767
       objectReference: {fileID: 0}
     - target: {fileID: 1359302081106657919, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
       propertyPath: m_LocalRotation.x
@@ -360,7 +360,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1359302081106657919, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0
+      value: -0.37013575
       objectReference: {fileID: 0}
     - target: {fileID: 1359302081106657919, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -372,7 +372,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1359302081106657919, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
+      value: -43.448
       objectReference: {fileID: 0}
     - target: {fileID: 3231205412921919817, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
       propertyPath: m_Name
@@ -397,7 +397,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 991179240}
-  - component: {fileID: 991179242}
   - component: {fileID: 991179241}
   m_Layer: 0
   m_Name: PassiveScriptContainer
@@ -430,22 +429,20 @@ MonoBehaviour:
   m_GameObject: {fileID: 991179239}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ea192f8fd4a259468175a5b21abcdf5, type: 3}
+  m_Script: {fileID: 11500000, guid: 5955a9ecf4700f24b88ccd952ac3b96e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &991179242
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 991179239}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 28e636aa162892c4eb8e16757af2616f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  levelObjects: {fileID: 2036476585}
+  levelObjectsContainer: {fileID: 2036476585}
+  boosterPrefab: {fileID: 7371955477703335682, guid: cd605178f3c2e734881068ec440535dd, type: 3}
+  bouncyWallPrefab: {fileID: 7549290468294039972, guid: db9d16062871595409ac535a12e30be0, type: 3}
+  constantPullerPrefab: {fileID: 8500869918223004119, guid: 8ecc632b1c3e68241b5c67a1928f9c04, type: 3}
+  constantPusherPrefab: {fileID: 4880512832065971193, guid: 9d69bd946f801044eaa939afc6b7b9f8, type: 3}
+  finishPrefab: {fileID: 3231205412921919817, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
+  killCirclePrefab: {fileID: 2952796283550983220, guid: fe8b2a89c57c15045813d735df89050b, type: 3}
+  killWallPrefab: {fileID: 8283440178916715866, guid: f5bdc09a4c4e08e47a729bf31bf72ce0, type: 3}
+  pullerPrefab: {fileID: 2236309935672863175, guid: cf2f67d76c865724eb34a6deb08b8c3c, type: 3}
+  pusherPrefab: {fileID: 7489718817050453436, guid: e2c6db9d465087e4c9a962883f32f757, type: 3}
+  slipperyWallPrefab: {fileID: 2937096629368336599, guid: 32947706aaa175342b005f7307661d01, type: 3}
 --- !u!1001 &1151352848
 PrefabInstance:
   m_ObjectHideFlags: 0

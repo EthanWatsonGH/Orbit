@@ -315,9 +315,20 @@ public class LevelEditor : MonoBehaviour
         TryToPlace();
     }
 
-    // expose level save function for button events
+    // expose level manager functions for level editor UI button events
     public void SaveLevel()
     {
         LevelManager.Instance.SaveLevel();
+    }
+
+    public void LoadLevel()
+    {
+        // TODO: get level name from player input
+        LevelManager.Instance.LoadLevel("levelName");
+    }
+
+    public void DeleteAllLevelObjects()
+    {
+        LevelManager.Instance.DestroyAllExistingLevelObjects();
     }
 }
