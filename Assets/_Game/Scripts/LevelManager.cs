@@ -33,6 +33,8 @@ public class LevelManager : MonoBehaviour
         public string levelName;
         public string levelAuthor;
         public byte loaderVersion;
+        public float playerStartPointXPosition;
+        public float playerStartPointYPosition;
         public List<LevelObject> levelObjects;
 
         [System.Serializable]
@@ -53,6 +55,7 @@ public class LevelManager : MonoBehaviour
     string levelDirectory;
 
     [SerializeField] GameObject levelObjectsContainer;
+    [SerializeField] GameObject playerStartPoint;
 
     // TODO: unify this in some way so i don't have to repeat it in multiple scripts
     // level editor placeable objects references
@@ -108,6 +111,9 @@ public class LevelManager : MonoBehaviour
 
     public void DestroyAllExistingLevelObjects()
     {
+        // reset player start point position
+        playerStartPoint.transform.position = Vector3.zero;
+
         foreach (Transform levelObject in levelObjectsContainer.transform)
         {
             Destroy(levelObject.gameObject);
@@ -119,9 +125,12 @@ public class LevelManager : MonoBehaviour
         Level level = new Level();
         level.levelObjects = new List<Level.LevelObject>();
 
+        // set values to save
         level.levelName = "hardcoded level name 2";
         level.levelAuthor = "hardcoded level author 2";
         level.loaderVersion = LOADER_VERSION;
+        level.playerStartPointXPosition = playerStartPoint.transform.position.x;
+        level.playerStartPointYPosition = playerStartPoint.transform.position.y;
 
         bool endOfLevelObjects = false;
         int levelObjectIndex = 0;
@@ -129,6 +138,7 @@ public class LevelManager : MonoBehaviour
         if (levelObjectsContainer.transform.childCount <= 0)
             endOfLevelObjects = true;
 
+        // save level objects
         while (!endOfLevelObjects)
         {
             Transform workingLevelObjectTransform = levelObjectsContainer.transform.GetChild(levelObjectIndex);
@@ -165,11 +175,11 @@ public class LevelManager : MonoBehaviour
 
     public void LoadLevel(string levelFileName)
     {
-        levelFileName = levelFileName + ".json";
-
+        // should probably have the loader verion be selected at the root of where i call the load level function in case i ever change the parameters, but whatever
         switch (LOADER_VERSION)
         {
             case 1:
+                levelFileName = levelFileName + ".json";
 
                 // TODO: add ability to load from different folders
                 string loadLocation = Path.Combine(levelDirectory, levelFileName);
@@ -192,20 +202,44 @@ public class LevelManager : MonoBehaviour
 
                 DestroyAllExistingLevelObjects();
 
+                // set the player start point position
+                playerStartPoint.transform.position = new Vector3(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
+
                 // loop through level objects, instantiating a new object in game for each object in the file, with the transforms of each
                 foreach (Level.LevelObject levelObject in loadedLevel.levelObjects)
                 {
                     GameObject prefabToInstantiate = null;
                     switch(levelObject.type)
                     {
+                        case "Booster":
+                            prefabToInstantiate = boosterPrefab;
+                            break;
+                        case "BouncyWall":
+                            prefabToInstantiate = bouncyWallPrefab;
+                            break;
+                        case "ConstantPuller":
+                            prefabToInstantiate = constantPullerPrefab;
+                            break;
+                        case "ConstantPusher":
+                            prefabToInstantiate = constantPusherPrefab;
+                            break;
+                        case "Finish":
+                            prefabToInstantiate = finishPrefab;
+                            break;
+                        case "KillCircle":
+                            prefabToInstantiate = killCirclePrefab;
+                            break;
+                        case "KillWall":
+                            prefabToInstantiate = killWallPrefab;
+                            break;
                         case "Puller":
                             prefabToInstantiate = pullerPrefab;
                             break;
-                        case "Finish":
-                            prefabToInstantiate = finishPrefab; 
+                        case "Pusher":
+                            prefabToInstantiate = pusherPrefab;
                             break;
-                        case "KillWall":
-                            prefabToInstantiate = killWallPrefab; 
+                        case "SlipperyWall":
+                            prefabToInstantiate = slipperyWallPrefab;
                             break;
                         default:
                             // TODO: display in game
@@ -223,9 +257,6 @@ public class LevelManager : MonoBehaviour
                         lastPlacedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale);
                     }
                 }
-
-
-
 
                 Debug.Log("Loaded level");
                 break;
