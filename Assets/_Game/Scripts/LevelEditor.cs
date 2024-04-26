@@ -323,8 +323,7 @@ public class LevelEditor : MonoBehaviour
 
     public void LoadLevel()
     {
-        // TODO: get level name from player input
-        LevelManager.Instance.LoadLevel("levelName");
+        LevelManager.Instance.LoadLevel();
     }
 
     public void DeleteAllLevelObjects()

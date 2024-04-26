@@ -1,6 +1,8 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.InputSystem.iOS;
@@ -56,8 +58,10 @@ public class LevelManager : MonoBehaviour
 
     [SerializeField] GameObject levelObjectsContainer;
     [SerializeField] GameObject playerStartPoint;
+    [SerializeField] TMP_InputField levelSaveNameInput;
+    [SerializeField] TMP_InputField levelLoadNameInput;
 
-    // TODO: unify this in some way so i don't have to repeat it in multiple scripts
+    // TODO: unify this in some way so i don't have to repeat it in multiple scripts, maybe just merge this whole script with LevelEditor
     // level editor placeable objects references
     [Header("Level Editor Placable Objects")]
     [SerializeField] GameObject boosterPrefab;
@@ -87,7 +91,7 @@ public class LevelManager : MonoBehaviour
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
+            DontDestroyOnLoad(gameObject); // TODO: do i need this?
         }
         else
         {
@@ -162,9 +166,13 @@ public class LevelManager : MonoBehaviour
         string json = JsonUtility.ToJson(level, true);
 
         EnsureLevelDirectoryExists();
-        
-        // TODO: make it save the file name as the name the player inputs
-        string saveLocation = Path.Combine(levelDirectory, "levelName" + ".json");
+
+        // get level name, or just create one if nothing was input
+        string levelName = "Level " + DateTime.Now.ToString();
+        if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
+            levelName = levelSaveNameInput.text.Trim();
+
+        string saveLocation = Path.Combine(levelDirectory, levelName + ".json");
 
         Debug.Log("Save location: " + saveLocation);
 
@@ -173,13 +181,21 @@ public class LevelManager : MonoBehaviour
         Debug.Log("Saved level");
     }
 
-    public void LoadLevel(string levelFileName)
+    public void LoadLevel()
     {
-        // should probably have the loader verion be selected at the root of where i call the load level function in case i ever change the parameters, but whatever
+        // should probably have the loader version be selected at the root of where i call this function in case i ever change the parameters, but whatever
         switch (LOADER_VERSION)
         {
             case 1:
-                levelFileName = levelFileName + ".json";
+                // TODO: make a level selection menu instead of it being through a text input
+                if (levelLoadNameInput.text.Trim() == string.Empty)
+                {
+                    // TODO: display a message in game
+                    Debug.Log("ERROR: select a level to load");
+                    break;
+                }
+
+                string levelFileName = levelLoadNameInput.text.Trim() + ".json";
 
                 // TODO: add ability to load from different folders
                 string loadLocation = Path.Combine(levelDirectory, levelFileName);
@@ -190,7 +206,7 @@ public class LevelManager : MonoBehaviour
                 if (!File.Exists(loadLocation))
                 {
                     // TODO: display a message in game
-                    Debug.Log("ERROR: file not found");
+                    Debug.Log("ERROR: level not found");
                     break;
                 }
 
