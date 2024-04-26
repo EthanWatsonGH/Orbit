@@ -107,7 +107,7 @@ public class LevelEditor : MonoBehaviour
             // make the object the player is currently trying to place follow the mouse
             objectCurrentlyTryingToPlace.transform.position = mousePosition;
 
-            // dont show object that is currently trying to be placed when over a ui element
+            // dont show object that is currently trying to be placed when over object selection bar
             if (pointerIsOverObjectSelectionBar)
                 objectCurrentlyTryingToPlace.SetActive(false);
             else
@@ -118,7 +118,7 @@ public class LevelEditor : MonoBehaviour
             {
                 isTryingToPlace = false;
 
-                // if player tries to place object over ui element, delete the object to cancel placement
+                // if player tries to place object over object selection bar, delete the object to cancel placement
                 if (pointerIsOverObjectSelectionBar)
                 {
                     Destroy(objectCurrentlyTryingToPlace);
@@ -263,7 +263,7 @@ public class LevelEditor : MonoBehaviour
         pointerIsOverObjectSelectionBar = false;
     }
 
-    // place events for each button
+    // place events for each level object button
     public void PlaceBooster()
     {
         prefabToPlace = boosterPrefab;
@@ -329,5 +329,10 @@ public class LevelEditor : MonoBehaviour
     public void DeleteAllLevelObjects()
     {
         LevelManager.Instance.DestroyAllExistingLevelObjects();
+    }
+
+    public void RecenterCamera()
+    {
+        Camera.main.transform.position = new Vector3(0f,0f, -1f);
     }
 }

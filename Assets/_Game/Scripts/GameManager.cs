@@ -5,7 +5,23 @@ using UnityEngine;
 public class GameManager : MonoBehaviour
 {
     // singleton setup
-    public static GameManager Instance { get; private set; }
+    private static GameManager instance;
+    public static GameManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<GameManager>();
+                if (instance == null)
+                {
+                    GameObject gameManagerObject = new GameObject("GameManager");
+                    instance = gameManagerObject.AddComponent<GameManager>();
+                }
+            }
+            return instance;
+        }
+    }
 
     //variables
     public bool isPaused = false;
@@ -17,7 +33,14 @@ public class GameManager : MonoBehaviour
     private void Awake()
     {
         // singleton setup
-        Instance = this;
+        if (instance == null)
+        {
+            instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     void Start()

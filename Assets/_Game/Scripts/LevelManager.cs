@@ -91,7 +91,6 @@ public class LevelManager : MonoBehaviour
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject); // TODO: do i need this?
         }
         else
         {
@@ -167,8 +166,8 @@ public class LevelManager : MonoBehaviour
 
         EnsureLevelDirectoryExists();
 
-        // get level name, or just create one if nothing was input
-        string levelName = "Level " + DateTime.Now.ToString();
+        // get level name input, or just create one if nothing was input
+        string levelName = "Custom Level " + DateTime.Now.ToString("yyyyMMdd HHmmss");
         if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
             levelName = levelSaveNameInput.text.Trim();
 
@@ -178,6 +177,7 @@ public class LevelManager : MonoBehaviour
 
         File.WriteAllText(saveLocation, json);
 
+        // TODO: display a message in game
         Debug.Log("Saved level");
     }
 
@@ -274,6 +274,7 @@ public class LevelManager : MonoBehaviour
                     }
                 }
 
+                // TODO: display a message in game
                 Debug.Log("Loaded level");
                 break;
         }
