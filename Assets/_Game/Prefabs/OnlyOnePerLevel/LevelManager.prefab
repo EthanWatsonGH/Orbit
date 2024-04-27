@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &531745233395612125
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1746616735342268817}
+  - component: {fileID: 4224550792364514184}
+  m_Layer: 0
+  m_Name: LevelManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1746616735342268817
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 531745233395612125}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4224550792364514184
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 531745233395612125}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5955a9ecf4700f24b88ccd952ac3b96e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  levelObjectsContainer: {fileID: 0}
+  playerStartPoint: {fileID: 0}
+  levelSaveNameInput: {fileID: 0}
+  levelLoadNameInput: {fileID: 0}
+  boosterPrefab: {fileID: 7371955477703335682, guid: cd605178f3c2e734881068ec440535dd, type: 3}
+  bouncyWallPrefab: {fileID: 7549290468294039972, guid: db9d16062871595409ac535a12e30be0, type: 3}
+  constantPullerPrefab: {fileID: 8500869918223004119, guid: 8ecc632b1c3e68241b5c67a1928f9c04, type: 3}
+  constantPusherPrefab: {fileID: 4880512832065971193, guid: 9d69bd946f801044eaa939afc6b7b9f8, type: 3}
+  finishPrefab: {fileID: 3231205412921919817, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
+  killCirclePrefab: {fileID: 2952796283550983220, guid: fe8b2a89c57c15045813d735df89050b, type: 3}
+  killWallPrefab: {fileID: 8283440178916715866, guid: f5bdc09a4c4e08e47a729bf31bf72ce0, type: 3}
+  pullerPrefab: {fileID: 2236309935672863175, guid: cf2f67d76c865724eb34a6deb08b8c3c, type: 3}
+  pusherPrefab: {fileID: 7489718817050453436, guid: e2c6db9d465087e4c9a962883f32f757, type: 3}
+  slipperyWallPrefab: {fileID: 2937096629368336599, guid: 32947706aaa175342b005f7307661d01, type: 3}

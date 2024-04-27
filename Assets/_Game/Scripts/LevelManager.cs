@@ -48,7 +48,7 @@ public class LevelManager : MonoBehaviour
     }
 
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
-    const byte LOADER_VERSION = 1;
+    public const byte LOADER_VERSION = 1;
 
     string levelDirectory;
 
@@ -179,7 +179,6 @@ public class LevelManager : MonoBehaviour
 
     public void LoadLevel()
     {
-        // should probably have the loader version be selected at the root of where i call this function in case i ever change the parameters, but whatever
         switch (LOADER_VERSION)
         {
             case 1:

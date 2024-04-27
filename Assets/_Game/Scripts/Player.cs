@@ -98,7 +98,7 @@ public class Player : MonoBehaviour
             rb.velocity = Vector2.zero;
 
             // launch player in direction of startLaunchPoint
-            if (Input.GetButtonDown("Jump") || GameManager.Instance.quickLaunch)
+            if (Input.GetButtonDown("Jump"))
             {
                 startDirection = (startLaunchPoint.transform.position - rb.transform.position).normalized;
                 rb.velocity = startDirection * startForce;
@@ -119,7 +119,7 @@ public class Player : MonoBehaviour
 
     void HandleRetryLevel()
     {
-        if (Input.GetButtonDown("Fire2") || (GameManager.Instance.quickRetry && isInLoseState))
+        if (Input.GetButtonDown("Fire2"))
         {
             RetryLevel();
         }
@@ -134,7 +134,7 @@ public class Player : MonoBehaviour
         loseDisplay.gameObject.SetActive(false);
 
         // ensure unpause
-        GameManager.Instance.ResumeTimeScale();
+        Time.timeScale = 1f;
 
         // reset trail renderer
         tr.Clear();
@@ -157,7 +157,7 @@ public class Player : MonoBehaviour
             startLocationIcon.SetActive(true);
 
             // ensure unpause
-            GameManager.Instance.isPaused = false;
+            Time.timeScale = 1f;
 
             // ensure not in win state
             isInWinState = false;
@@ -183,7 +183,7 @@ public class Player : MonoBehaviour
         // kill area
         if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
         {
-            GameManager.Instance.PauseTimeScale();
+            Time.timeScale = 0f;
             loseDisplay.gameObject.SetActive(true);
             isInLoseState = true;
         }
@@ -191,7 +191,6 @@ public class Player : MonoBehaviour
         if (collision.gameObject.CompareTag("Finish") && !isInLoseState)
         {
             winDisplay.gameObject.SetActive(true);
-            // GameManager.Instance.isPaused = true;
             isInWinState = true;
         }
     }
