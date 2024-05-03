@@ -53,8 +53,12 @@ public class Player : MonoBehaviour
 
             if (!isTryingToStartMovement)
             {
-                // update time display
-                timeDisplay.text = (Time.time - timeAtLastRetry).ToString("F3");
+                if (!isInWinState)
+                {
+                    // update time display
+                    timeDisplay.text = (Time.time - timeAtLastRetry).ToString("F3");
+                }
+
                 // update speed display
                 speedDisplay.text = rb.velocity.magnitude.ToString("F2");
 
