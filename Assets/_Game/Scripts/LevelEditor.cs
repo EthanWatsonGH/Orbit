@@ -16,19 +16,6 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] EventSystem es;
 
-    // level editor placeable objects references
-    [Header("Level Editor Placable Objects")]
-    [SerializeField] GameObject boosterPrefab;
-    [SerializeField] GameObject bouncyWallPrefab;
-    [SerializeField] GameObject constantPullerPrefab;
-    [SerializeField] GameObject constantPusherPrefab;
-    [SerializeField] GameObject finishPrefab;
-    [SerializeField] GameObject killCirclePrefab;
-    [SerializeField] GameObject killWallPrefab;
-    [SerializeField] GameObject pullerPrefab;
-    [SerializeField] GameObject pusherPrefab;
-    [SerializeField] GameObject slipperyWallPrefab;
-
     // world object references
     [Header("World Objects")]
     [SerializeField] GameObject levelObjectsCollection;
@@ -37,7 +24,7 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
-    Vector3 mousePosition;
+    Vector3 touchPosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
     bool isTryingToMoveSelectedObject = false;
@@ -65,7 +52,7 @@ public class LevelEditor : MonoBehaviour
         HandleViewMovement();
         HandlePlacePrefab();
         HandleSwitchToPlayMode();
-        GetMousePosition();
+        GetTouchPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
         HandleCloseObjectTransformControls();
@@ -93,11 +80,14 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    void GetMousePosition()
+    void GetTouchPosition()
     {
-        mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        // ensure no depth
-        mousePosition.z = 0;
+        if (Input.touchCount >= 1)
+        {
+            touchPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
+            // ensure no depth
+            touchPosition.z = 0;
+        }
     }
 
     void HandlePlacePrefab()
@@ -105,7 +95,7 @@ public class LevelEditor : MonoBehaviour
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
             // make the object the player is currently trying to place follow the mouse
-            objectCurrentlyTryingToPlace.transform.position = mousePosition;
+            objectCurrentlyTryingToPlace.transform.position = touchPosition;
 
             // dont show object that is currently trying to be placed when over object selection bar
             if (pointerIsOverObjectSelectionBar)
@@ -170,7 +160,7 @@ public class LevelEditor : MonoBehaviour
                 // set offset from parent to keep relative offset at all scales
                 moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
                 // set position of mouse at click for calculating offset for movement
-                moveOffset = moveControl.transform.position - mousePosition;
+                moveOffset = moveControl.transform.position - touchPosition;
             }
         }
 
@@ -194,7 +184,7 @@ public class LevelEditor : MonoBehaviour
             if (isTryingToMoveSelectedObject)
             {
                 // make moveControl follow mouse, with the offset from the exact location on click
-                moveControl.transform.position = mousePosition + moveOffset;
+                moveControl.transform.position = touchPosition + moveOffset;
                 // make objectTransformControls follow moveControl while keeping offset
                 objectTransformControls.transform.position = moveControl.transform.position - moveControlOffsetFromParent;
                 // make selectedObject follow objectTransformControls
@@ -250,7 +240,7 @@ public class LevelEditor : MonoBehaviour
     void TryToPlace()
     {
         isTryingToPlace = true;
-        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, mousePosition, Quaternion.identity, levelObjectsCollection.transform);
+        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, touchPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
 
     // update value of pointerIsOverObjectSelectionBar on pointer enter and exit
@@ -266,52 +256,52 @@ public class LevelEditor : MonoBehaviour
     // place events for each level object button
     public void PlaceBooster()
     {
-        prefabToPlace = boosterPrefab;
+        prefabToPlace = GameManager.Instance.boosterPrefab;
         TryToPlace();
     }
     public void PlaceBouncyWall()
     {
-        prefabToPlace = bouncyWallPrefab;
+        prefabToPlace = GameManager.Instance.bouncyWallPrefab;
         TryToPlace();
     }
     public void PlaceConstantPuller()
     {
-        prefabToPlace = constantPullerPrefab;
+        prefabToPlace = GameManager.Instance.constantPullerPrefab;
         TryToPlace();
     }
     public void PlaceConstantPusher()
     {
-        prefabToPlace = constantPusherPrefab;
+        prefabToPlace = GameManager.Instance.constantPusherPrefab;
         TryToPlace();
     }
     public void PlaceFinish()
     {
-        prefabToPlace = finishPrefab;
+        prefabToPlace = GameManager.Instance.finishPrefab;
         TryToPlace();
     }
     public void PlaceKillCircle()
     {
-        prefabToPlace = killCirclePrefab;
+        prefabToPlace = GameManager.Instance.killCirclePrefab;
         TryToPlace();
     }
     public void PlaceKillWall()
     {
-        prefabToPlace = killWallPrefab;
+        prefabToPlace = GameManager.Instance.killWallPrefab;
         TryToPlace();
     }
     public void PlacePuller()
     {
-        prefabToPlace = pullerPrefab;
+        prefabToPlace = GameManager.Instance.pullerPrefab;
         TryToPlace();
     }
     public void PlacePusher()
     {
-        prefabToPlace = pusherPrefab;
+        prefabToPlace = GameManager.Instance.pusherPrefab;
         TryToPlace();
     }
     public void PlaceSlipperyWall()
     {
-        prefabToPlace = slipperyWallPrefab;
+        prefabToPlace = GameManager.Instance.slipperyWallPrefab;
         TryToPlace();
     }
 

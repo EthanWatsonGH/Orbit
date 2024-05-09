@@ -6,7 +6,7 @@ using UnityEngine;
 
 public class LevelManager : MonoBehaviour
 {
-    // singleton setup
+    #region Singleton Setup
     private static LevelManager instance;
     public static LevelManager Instance
     {
@@ -25,6 +25,21 @@ public class LevelManager : MonoBehaviour
         }
     }
 
+    private void Awake()
+    {
+        // singleton setup
+        if (instance == null)
+        {
+            instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+    #endregion
+
+    #region Level Struct
     [System.Serializable]
     struct Level
     {
@@ -46,6 +61,7 @@ public class LevelManager : MonoBehaviour
             public float rotation;
         }
     }
+    #endregion
 
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
     public const byte LOADER_VERSION = 1;
@@ -56,24 +72,13 @@ public class LevelManager : MonoBehaviour
     [SerializeField] GameObject playerStartPoint;
     [SerializeField] TMP_InputField levelSaveNameInput;
     [SerializeField] TMP_InputField levelLoadNameInput;
-
-    // TODO: unify this in some way so i don't have to repeat it in multiple scripts, maybe just merge this whole script with LevelEditor
-    // level editor placeable objects references
-    [Header("Level Editor Placable Objects")]
-    [SerializeField] GameObject boosterPrefab;
-    [SerializeField] GameObject bouncyWallPrefab;
-    [SerializeField] GameObject constantPullerPrefab;
-    [SerializeField] GameObject constantPusherPrefab;
-    [SerializeField] GameObject finishPrefab;
-    [SerializeField] GameObject killCirclePrefab;
-    [SerializeField] GameObject killWallPrefab;
-    [SerializeField] GameObject pullerPrefab;
-    [SerializeField] GameObject pusherPrefab;
-    [SerializeField] GameObject slipperyWallPrefab;
+    
 
     void Start()
     {
-        
+        // get directory for player's levels
+        levelDirectory = Application.persistentDataPath + "/playerLevels";
+        EnsureLevelDirectoryExists();
     }
 
     void Update()
@@ -81,27 +86,9 @@ public class LevelManager : MonoBehaviour
         
     }
 
-    private void Awake()
-    {
-        // singleton setup
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-
-        // file path for player's levels
-        levelDirectory = Application.persistentDataPath + "/playerLevels";
-
-        EnsureLevelDirectoryExists();
-    }
-
     void EnsureLevelDirectoryExists()
     {
-        // create player levels folder on starup if it doesn't already exist 
+        // create player levels directory if it doesn't already exist 
         if (!Directory.Exists(levelDirectory))
         {
             Directory.CreateDirectory(levelDirectory);
@@ -124,6 +111,7 @@ public class LevelManager : MonoBehaviour
         Level level = new Level();
         level.levelObjects = new List<Level.LevelObject>();
 
+        // TODO: add input fields for these values
         // set values to save
         level.levelName = "hardcoded level name 2";
         level.levelAuthor = "hardcoded level author 2";
@@ -169,12 +157,10 @@ public class LevelManager : MonoBehaviour
 
         string saveLocation = Path.Combine(levelDirectory, levelName + ".json");
 
-        Debug.Log("Save location: " + saveLocation);
-
         File.WriteAllText(saveLocation, json);
 
         // TODO: display a message in game
-        Debug.Log("Saved level");
+        Debug.Log("Saved level.");
     }
 
     public void LoadLevel()
@@ -185,31 +171,25 @@ public class LevelManager : MonoBehaviour
                 // TODO: make a level selection menu instead of it being through a text input
                 if (levelLoadNameInput.text.Trim() == string.Empty)
                 {
-                    // TODO: display a message in game
-                    Debug.Log("ERROR: select a level to load");
+                    Debug.Log("ERROR: Enter a level to load.");
                     break;
                 }
 
                 string levelFileName = levelLoadNameInput.text.Trim() + ".json";
 
-                // TODO: add ability to load from different folders
                 string loadLocation = Path.Combine(levelDirectory, levelFileName);
 
-                Debug.Log("Load location: " + loadLocation);
-
-                // if level file is not found, send a message and exit
+                // if level file is not found, send a message and cancel loading
                 if (!File.Exists(loadLocation))
                 {
                     // TODO: display a message in game
-                    Debug.Log("ERROR: level not found");
+                    Debug.Log("ERROR: Level not found.");
                     break;
                 }
 
                 string json = File.ReadAllText(loadLocation);
 
                 Level loadedLevel = JsonUtility.FromJson<Level>(json);
-
-                Debug.Log(loadedLevel.levelAuthor);
 
                 DestroyAllExistingLevelObjects();
 
@@ -223,43 +203,44 @@ public class LevelManager : MonoBehaviour
                     switch(levelObject.type)
                     {
                         case "Booster":
-                            prefabToInstantiate = boosterPrefab;
+                            prefabToInstantiate = GameManager.Instance.boosterPrefab;
                             break;
                         case "BouncyWall":
-                            prefabToInstantiate = bouncyWallPrefab;
+                            prefabToInstantiate = GameManager.Instance.bouncyWallPrefab;
                             break;
                         case "ConstantPuller":
-                            prefabToInstantiate = constantPullerPrefab;
+                            prefabToInstantiate = GameManager.Instance.constantPullerPrefab;
                             break;
                         case "ConstantPusher":
-                            prefabToInstantiate = constantPusherPrefab;
+                            prefabToInstantiate = GameManager.Instance.constantPusherPrefab;
                             break;
                         case "Finish":
-                            prefabToInstantiate = finishPrefab;
+                            prefabToInstantiate = GameManager.Instance.finishPrefab;
                             break;
                         case "KillCircle":
-                            prefabToInstantiate = killCirclePrefab;
+                            prefabToInstantiate = GameManager.Instance.killCirclePrefab;
                             break;
                         case "KillWall":
-                            prefabToInstantiate = killWallPrefab;
+                            prefabToInstantiate = GameManager.Instance.killWallPrefab;
                             break;
                         case "Puller":
-                            prefabToInstantiate = pullerPrefab;
+                            prefabToInstantiate = GameManager.Instance.pullerPrefab;
                             break;
                         case "Pusher":
-                            prefabToInstantiate = pusherPrefab;
+                            prefabToInstantiate = GameManager.Instance.pusherPrefab;
                             break;
                         case "SlipperyWall":
-                            prefabToInstantiate = slipperyWallPrefab;
+                            prefabToInstantiate = GameManager.Instance.slipperyWallPrefab;
                             break;
                         default:
                             // TODO: display in game
-                            Debug.Log("ERROR: type not valid");
+                            Debug.Log("ERROR: An object could not be loaded because its type is not valid.");
                             break;
                     }
 
                     if (prefabToInstantiate != null)
                     {
+                        // TODO: ensure it's placed at Z 0
                         Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition);
                         Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
 
@@ -270,7 +251,7 @@ public class LevelManager : MonoBehaviour
                 }
 
                 // TODO: display a message in game
-                Debug.Log("Loaded level");
+                Debug.Log("Loaded level.");
                 break;
         }
     }

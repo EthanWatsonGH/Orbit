@@ -29,11 +29,11 @@ public class Player : MonoBehaviour
     [SerializeField] float startForce;
     Vector2 startDirection;
     float timeAtLastRetry;
-    bool isTryingToStartMovement = true;
+    bool isTryingToStartMovement = true; // TODO: change this to use states like inStartMovementMode, inPlayMode etc. or just rename to isInAimingMode
+    bool playerPressedStart = false; // TODO: change to events
     bool isInvincible = false;
     bool isInWinState = false;
     bool isInLoseState = false;
-
 
     void Start()
     {
@@ -45,11 +45,9 @@ public class Player : MonoBehaviour
     {
         if (true) // TODO: add a check to disallow doing these things while in pause menu
         {
-            StartMovement();
+            TryStartMovement();
 
             UpdateLineRenderer();
-
-            HandleRetryLevel();
 
             if (!isTryingToStartMovement)
             {
@@ -77,7 +75,7 @@ public class Player : MonoBehaviour
         RetryLevel();
     }
 
-    void StartMovement()
+    void TryStartMovement()
     {
         if (isTryingToStartMovement) // TODO: improve this logic to only trigger once per retry
         {
@@ -89,8 +87,8 @@ public class Player : MonoBehaviour
             lr.enabled = true;
             startLaunchPoint.SetActive(true);
 
-            // set startLaunchPoint location to mouse position
-            if (Input.GetAxisRaw("Fire1") > 0f)
+            // set startLaunchPoint location to touch position
+            if (Input.GetAxisRaw("Fire1") > 0f && !GameManager.Instance.touchPointIsOverButton && Input.touchCount < 2)
             {
                 Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 mousePosition.z = 0;
@@ -102,7 +100,7 @@ public class Player : MonoBehaviour
             rb.velocity = Vector2.zero;
 
             // launch player in direction of startLaunchPoint
-            if (Input.GetButtonDown("Jump"))
+            if (Input.GetButtonDown("Jump") || playerPressedStart)
             {
                 startDirection = (startLaunchPoint.transform.position - rb.transform.position).normalized;
                 rb.velocity = startDirection * startForce;
@@ -111,6 +109,7 @@ public class Player : MonoBehaviour
                 timeAtLastRetry = Time.time;
 
                 isTryingToStartMovement = false;
+                playerPressedStart = false;
             }
         }
     }
@@ -119,14 +118,6 @@ public class Player : MonoBehaviour
     {
         lr.SetPosition(0, this.gameObject.transform.position);
         lr.SetPosition(1, startLaunchPoint.transform.position);
-    }
-
-    void HandleRetryLevel()
-    {
-        if (Input.GetButtonDown("Fire2"))
-        {
-            RetryLevel();
-        }
     }
 
     void RetryLevel()
@@ -198,4 +189,13 @@ public class Player : MonoBehaviour
             isInWinState = true;
         }
     }
+
+    public void PressedStart()
+    {
+        playerPressedStart = true;
+    }
+    public void PressedRetry()
+    {
+        RetryLevel();
+    }    
 }
