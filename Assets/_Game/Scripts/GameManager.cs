@@ -52,7 +52,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] public GameObject pusherPrefab;
     [SerializeField] public GameObject slipperyWallPrefab;
 
-    public bool touchPointIsOverButton = false;
+    public bool touchPointIsOverButton = false ;
 
     void Start()
     {
@@ -64,6 +64,7 @@ public class GameManager : MonoBehaviour
         
     }
 
+    // TODO: may not need this
     // buttons will use these to say if the touch point is over any button
     public void SetTouchPointIsOverButtonTrue()
     {
