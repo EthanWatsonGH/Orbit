@@ -13,6 +13,7 @@ public class CameraPan : MonoBehaviour
 
     void Update()
     {
+        // touchscreen
         if (Input.touchCount == 2)
         {
             Touch touch0 = Input.GetTouch(0);
@@ -32,5 +33,8 @@ public class CameraPan : MonoBehaviour
                 transform.position -= touchPositionDelta;
             }
         }
+
+        // keyboard
+
     }
 }

@@ -8,7 +8,10 @@ public class Player : MonoBehaviour
     [SerializeField] TrailRenderer tr;
     [SerializeField] LineRenderer lr;
     // self object references
-    [SerializeField] GameObject startLaunchPoint;
+    [SerializeField] GameObject launchDirectionPoint;
+    [SerializeField] GameObject canvas;
+    [SerializeField] GameObject launchButton;
+    [SerializeField] GameObject retryButton;
     // HUD
     [SerializeField] TMP_Text timeDisplay;
     [SerializeField] TMP_Text speedDisplay;
@@ -28,12 +31,15 @@ public class Player : MonoBehaviour
     bool isInvincible = false;
     bool isInWinState = false;
     bool isInLoseState = false;
-    bool canMoveStartLaunchPoint = false;
+    bool canMoveLaunchDirectionPoint = false;
 
     void Start()
     {
         lr.positionCount = 2;
         RetryLevel();
+
+        // ensure player UI is enabled
+        canvas.gameObject.SetActive(true);
     }
 
     void Update()
@@ -57,10 +63,8 @@ public class Player : MonoBehaviour
 
                 // hide start guides when not trying to start movement
                 lr.enabled = false;
-                startLaunchPoint.SetActive(false);
+                launchDirectionPoint.SetActive(false);
             }
-
-            HandleSwitchToLevelEditor();
         }
     }
 
@@ -75,19 +79,23 @@ public class Player : MonoBehaviour
         // TODO: improve this logic to only trigger once per retry
         if (isInAimingMode)
         {
+            // show launch button instead of retry button
+            launchButton.SetActive(true);
+            retryButton.SetActive(false);
+
             // reset HUD displays
             timeDisplay.text = "0";
             speedDisplay.text = "0";
 
             // show aiming guides
             lr.enabled = true;
-            startLaunchPoint.SetActive(true);
+            launchDirectionPoint.SetActive(true);
 
-            bool IsTouchOverStartLaunchPoint(Touch touch)
+            bool IsTouchOverLaunchDirectionPoint(Touch touch)
             {
                 RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(touch.position), Vector2.zero);
 
-                if (hit.collider != null && hit.collider.gameObject == startLaunchPoint)
+                if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
                 {
                     return true;
                 }
@@ -95,49 +103,30 @@ public class Player : MonoBehaviour
                 return false;
             }
 
-            // check if a touch just began over startLaunchPoint
-            if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && IsTouchOverStartLaunchPoint(Input.GetTouch(0)))
-                canMoveStartLaunchPoint = true;
+            // check if a touch just began over launchDirectionPoint
+            if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && IsTouchOverLaunchDirectionPoint(Input.GetTouch(0)))
+                canMoveLaunchDirectionPoint = true;
 
             // when touch ends, reset ability to move start launch point
             if (Input.touchCount == 0)
-                canMoveStartLaunchPoint = false;
+                canMoveLaunchDirectionPoint = false;
 
-            //// Check if a touch just began over startLaunchPoint
-            //if (Input.touchCount > 0)
-            //{
-            //    foreach (Touch touch in Input.touches)
-            //    {
-            //        if (touch.phase == TouchPhase.Began && IsTouchOverStartLaunchPoint(touch))
-            //        {
-            //            canMoveStartLaunchPoint = true;
-            //            break; // Exit loop after finding one touch over startLaunchPoint
-            //        }
-            //    }
-            //}
-            //else
-            //{
-            //    canMoveStartLaunchPoint = false;
-            //}
-
-            Debug.Log(canMoveStartLaunchPoint.ToString());
-
-            // set startLaunchPoint location to touch position
-            if (!GameManager.Instance.touchPointIsOverButton && Input.touchCount == 1 && canMoveStartLaunchPoint)
+            // set launchDirectionPoint location to touch position
+            if (!GameManager.Instance.touchPointIsOverButton && Input.touchCount == 1 && canMoveLaunchDirectionPoint)
             {
                 Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 mousePosition.z = 0;
 
-                startLaunchPoint.transform.position = mousePosition;
+                launchDirectionPoint.transform.position = mousePosition;
             }
 
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
 
-            // launch player in direction of startLaunchPoint
+            // launch player in direction of launchDirectionPoint
             if (Input.GetButtonDown("Jump") || playerPressedStart)
             {
-                startDirection = (startLaunchPoint.transform.position - rb.transform.position).normalized;
+                startDirection = (launchDirectionPoint.transform.position - rb.transform.position).normalized;
                 rb.velocity = startDirection * startForce;
 
                 // set timeAtLastRetry for time display calculation
@@ -147,26 +136,30 @@ public class Player : MonoBehaviour
                 playerPressedStart = false;
             }
         }
+        else // in play mode
+        {
+            // show retry button instead of launch button
+            retryButton.SetActive(true);
+            launchButton.SetActive(false);
+        }
     }
-
-    //bool IsTouchOverStartLaunchPoint(Touch touch)
-    //{
-    //    RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(touch.position), Vector2.zero);
-    //    if (hit.collider != null && hit.collider.gameObject == startLaunchPoint)
-    //    {
-    //        return true;
-    //    }
-    //    return false;
-    //}
 
     void UpdateLineRenderer()
     {
         lr.SetPosition(0, this.gameObject.transform.position);
-        lr.SetPosition(1, startLaunchPoint.transform.position);
+        lr.SetPosition(1, launchDirectionPoint.transform.position);
     }
 
     void RetryLevel()
     {
+        isInAimingMode = true;
+        isInWinState = false;
+        isInLoseState = false;
+        playerPressedStart = false;
+
+        // ensure velocity is zero
+        rb.velocity = Vector2.zero;
+
         // reset to start location, ensuring z = 0
         this.gameObject.transform.position = new Vector3(startLocation.transform.position.x, startLocation.transform.position.y, 0);
         // hide displays
@@ -178,30 +171,28 @@ public class Player : MonoBehaviour
 
         // reset trail renderer
         tr.Clear();
-
-        isInAimingMode = true;
-        isInWinState = false;
-        isInLoseState = false;
     }
 
-    void HandleSwitchToLevelEditor()
+    public void SwitchToLevelEditor()
     {
-        if (Input.GetButtonDown("Fire3"))
-        {
-            RetryLevel();
+        RetryLevel();
 
-            levelEditor.SetActive(true);
-            this.gameObject.SetActive(false);
+        levelEditor.SetActive(true);
+        this.gameObject.SetActive(false);
 
-            // show player start location icon
-            startLocationIcon.SetActive(true);
+        // show player start location icon
+        startLocationIcon.SetActive(true);
 
-            // ensure unpause
-            Time.timeScale = 1f;
+        // ensure unpause
+        Time.timeScale = 1f;
 
-            // ensure not in win state
-            isInWinState = false;
-        }
+        // ensure not in win state
+        isInWinState = false;
+    }
+
+    public void RecenterCamera()
+    {
+        Camera.main.transform.position = new Vector3(gameObject.transform.position.x, gameObject.transform.position.y, -1);
     }
 
     void OnTriggerStay2D(Collider2D collision)

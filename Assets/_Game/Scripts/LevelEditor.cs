@@ -1,10 +1,6 @@
-using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 public class LevelEditor : MonoBehaviour
 {
@@ -15,6 +11,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject player;
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] EventSystem es;
+    [SerializeField] GameObject canvas;
 
     // world object references
     [Header("World Objects")]
@@ -35,6 +32,16 @@ public class LevelEditor : MonoBehaviour
 
     float cameraZoomAtStart;
 
+    readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
+    {
+        "X",
+        "Y",
+        "Both",
+        "Rotate",
+        "Close",
+        "Duplicate"
+    };
+
     void Awake()
     {
         // ensure level editor object and all of it's visuals are disabled before starting game
@@ -45,13 +52,15 @@ public class LevelEditor : MonoBehaviour
     void Start()
     {
         cameraZoomAtStart = Camera.main.orthographicSize;
+
+        // ensure level editor UI is enabled
+        canvas.gameObject.SetActive(true);
     }
 
     void Update()
     {
         HandleViewMovement();
         HandlePlacePrefab();
-        HandleSwitchToPlayMode();
         GetTouchPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
@@ -65,19 +74,16 @@ public class LevelEditor : MonoBehaviour
         rb.velocity = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) * viewMoveSpeed;
     }
 
-    void HandleSwitchToPlayMode()
+    public void SwitchToPlayMode()
     {
-        if (Input.GetButtonDown("Fire3"))
-        {
-            // hide player start location icon
-            startLocationIcon.SetActive(false);
+        // hide player start location icon
+        startLocationIcon.SetActive(false);
 
-            // ensure objectTransformControls are hidden
-            objectTransformControls.SetActive(false);
+        // ensure objectTransformControls are hidden
+        objectTransformControls.SetActive(false);
 
-            player.SetActive(true);
-            this.gameObject.SetActive(false);
-        }
+        player.SetActive(true);
+        this.gameObject.SetActive(false);
     }
 
     void GetTouchPosition()
@@ -119,6 +125,7 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+
     // select the object the player clicks on
     void HandleSelectObject()
     {
@@ -129,7 +136,7 @@ public class LevelEditor : MonoBehaviour
 
             if (hit.collider != null)
             {
-                if (!hit.collider.gameObject.transform.parent.name.Equals("Scale") && !hit.collider.gameObject.transform.parent.name.Equals("ObjectTransformControls")) // don't allow any object transform controls to be set as selected object
+                if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any object transform controls to be set as selected object
                 {
                     selectedObject = hit.collider.gameObject;
                     objectTransformControls.transform.position = hit.transform.position;
@@ -205,6 +212,7 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    // if the player taps/clicks close icon, deselect object and hide object transform controls
     void HandleCloseObjectTransformControls()
     {
         if (Input.GetButtonDown("Fire1"))
@@ -253,6 +261,7 @@ public class LevelEditor : MonoBehaviour
         pointerIsOverObjectSelectionBar = false;
     }
 
+    #region Object Place Functions
     // place events for each level object button
     public void PlaceBooster()
     {
@@ -304,8 +313,10 @@ public class LevelEditor : MonoBehaviour
         prefabToPlace = GameManager.Instance.slipperyWallPrefab;
         TryToPlace();
     }
+    #endregion
 
     // expose level manager functions for level editor UI button events
+    // TODO: just make buttons reference level manager directly
     public void SaveLevel()
     {
         LevelManager.Instance.SaveLevel();
@@ -323,6 +334,6 @@ public class LevelEditor : MonoBehaviour
 
     public void RecenterCamera()
     {
-        Camera.main.transform.position = new Vector3(0f,0f, -1f);
+        Camera.main.transform.position = new Vector3(startLocationIcon.transform.position.x, startLocationIcon.transform.position.y, -1f);
     }
 }

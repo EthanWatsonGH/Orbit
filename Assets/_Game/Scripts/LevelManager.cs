@@ -40,6 +40,7 @@ public class LevelManager : MonoBehaviour
     #endregion
 
     #region Level Struct
+    // TODO: may need to make more of these for different loader versions, and check which one to use for each
     [System.Serializable]
     struct Level
     {
@@ -111,7 +112,7 @@ public class LevelManager : MonoBehaviour
         Level level = new Level();
         level.levelObjects = new List<Level.LevelObject>();
 
-        // TODO: add input fields for these values
+        // TODO: make these values get properly set
         // set values to save
         level.levelName = "hardcoded level name 2";
         level.levelAuthor = "hardcoded level author 2";

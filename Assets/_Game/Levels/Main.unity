@@ -262,6 +262,10 @@ PrefabInstance:
       propertyPath: startLocationIcon
       value: 
       objectReference: {fileID: 1231841329}
+    - target: {fileID: 6151453574519394481, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7399950350171434113, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
       propertyPath: m_AnchorMax.x
       value: 0
@@ -621,6 +625,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6966686429508407471, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7560339558180301626, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}

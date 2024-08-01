@@ -69,12 +69,12 @@ public class GameManager : MonoBehaviour
     public void SetTouchPointIsOverButtonTrue()
     {
         touchPointIsOverButton = true;
-        Debug.Log("yes");
+        //Debug.Log("yes");
     }
     public void SetTouchPointIsOverButtonFalse()
     {
         touchPointIsOverButton = false;
-        Debug.Log("no");
+        //Debug.Log("no");
 
     }
 }
