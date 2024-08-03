@@ -48,6 +48,8 @@ public class Player : MonoBehaviour
         {
             TryStartMovement();
 
+            EnsureLaunchDirectionPointAlwaysInFront();
+            HandleLaunchDirectionPointRotation();
             UpdateLineRenderer();
 
             if (!isInAimingMode)
@@ -61,7 +63,7 @@ public class Player : MonoBehaviour
                 // update speed display
                 speedDisplay.text = rb.velocity.magnitude.ToString("F2");
 
-                // hide start guides when not trying to start movement
+                // hide launch direction UI when not in aiming mode
                 lr.enabled = false;
                 launchDirectionPoint.SetActive(false);
             }
@@ -115,7 +117,6 @@ public class Player : MonoBehaviour
             if (!GameManager.Instance.touchPointIsOverButton && Input.touchCount == 1 && canMoveLaunchDirectionPoint)
             {
                 Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-                mousePosition.z = 0;
 
                 launchDirectionPoint.transform.position = mousePosition;
             }
@@ -143,6 +144,23 @@ public class Player : MonoBehaviour
             launchButton.SetActive(false);
         }
     }
+
+    void EnsureLaunchDirectionPointAlwaysInFront()
+    {
+        Vector3 launchDirectionPointPosition = new Vector3(launchDirectionPoint.transform.position.x, launchDirectionPoint.transform.position.y, -1f);
+        launchDirectionPoint.transform.position = launchDirectionPointPosition;
+    }
+
+    void HandleLaunchDirectionPointRotation()
+    {
+        // make launchDirectionPoint icon point away from the player
+        // TODO: make it only update when the player is currently dragging the launchDirectionPoint
+        Vector3 direction = launchDirectionPoint.transform.position - transform.position;
+
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+
+        launchDirectionPoint.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
+    }    
 
     void UpdateLineRenderer()
     {

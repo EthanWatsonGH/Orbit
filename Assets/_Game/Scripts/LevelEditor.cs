@@ -12,6 +12,8 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] EventSystem es;
     [SerializeField] GameObject canvas;
+    [SerializeField] GameObject localTransformButton;
+    [SerializeField] GameObject worldTransformButton;
 
     // world object references
     [Header("World Objects")]
@@ -241,7 +243,7 @@ public class LevelEditor : MonoBehaviour
 
     void EnsureObjectTransformControlsAlwaysInFront()
     {
-        Vector3 objectTransformControlsPosition = new Vector3(objectTransformControls.transform.position.x, objectTransformControls.transform.position.y, 1f);
+        Vector3 objectTransformControlsPosition = new Vector3(objectTransformControls.transform.position.x, objectTransformControls.transform.position.y, -1f);
         objectTransformControls.transform.position = objectTransformControlsPosition;
     }
 
@@ -335,5 +337,19 @@ public class LevelEditor : MonoBehaviour
     public void RecenterCamera()
     {
         Camera.main.transform.position = new Vector3(startLocationIcon.transform.position.x, startLocationIcon.transform.position.y, -1f);
+    }
+
+    public void SwitchToLocalTransformMode()
+    {
+        // change to opposite button
+        worldTransformButton.SetActive(false);
+        localTransformButton.SetActive(true);
+    }
+
+    public void SwitchToWorldTransformMode()
+    {
+        // change to opposite button
+        localTransformButton.SetActive(false);
+        worldTransformButton.SetActive(true);
     }
 }
