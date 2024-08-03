@@ -24,6 +24,7 @@ public class Player : MonoBehaviour
     // variables
     [SerializeField] float pullForce;
     [SerializeField] float startForce;
+    float cameraZoomAtStart;
     Vector2 startDirection;
     float timeAtLastRetry;
     bool isInAimingMode = true;
@@ -32,9 +33,12 @@ public class Player : MonoBehaviour
     bool isInWinState = false;
     bool isInLoseState = false;
     bool canMoveLaunchDirectionPoint = false;
+    Vector3 offsetAtStartMoveLaunchDirectionPoint = Vector3.zero;
 
     void Start()
     {
+        cameraZoomAtStart = Camera.main.orthographicSize;
+
         lr.positionCount = 2;
         RetryLevel();
 
@@ -66,6 +70,11 @@ public class Player : MonoBehaviour
         }
     }
 
+    void LateUpdate()
+    {
+        
+    }
+
     private void OnEnable()
     {
         isInWinState = false;
@@ -93,6 +102,7 @@ public class Player : MonoBehaviour
             HandleMoveLaunchDirectionPoint();
             HandleLaunchDirectionPointRotation();
             UpdateLineRenderer();
+            HandleScaleLaunchDirectionPointWithZoom();
 
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
@@ -126,19 +136,31 @@ public class Player : MonoBehaviour
 
     void HandleMoveLaunchDirectionPoint()
     {
-        bool IsTouchOverLaunchDirectionPoint(Touch touch)
+        bool IsTouchOverLaunchDirectionPoint(Touch touch) // touchscreen
         {
             RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(touch.position), Vector2.zero);
-            return hit.collider != null && hit.collider.gameObject == launchDirectionPoint;
+            if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
+            {
+                offsetAtStartMoveLaunchDirectionPoint = launchDirectionPoint.transform.position - Camera.main.ScreenToWorldPoint(touch.position);
+                return true;
+            }
+            else
+                return false;
         }
 
-        bool IsMouseOverLaunchDirectionPoint()
+        bool IsMouseOverLaunchDirectionPoint() // desktop
         {
             RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
-            return hit.collider != null && hit.collider.gameObject == launchDirectionPoint;
+            if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
+            {
+                offsetAtStartMoveLaunchDirectionPoint = launchDirectionPoint.transform.position - Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                return true;
+            }
+            else
+                return false;
         }
 
-        // check if a touch just began over launchDirectionPoint
+        // check if a touch/click just began over launchDirectionPoint
         if ((Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && IsTouchOverLaunchDirectionPoint(Input.GetTouch(0))) // touchscreen
             || (Input.GetMouseButtonDown(0) && IsMouseOverLaunchDirectionPoint())) // desktop
             canMoveLaunchDirectionPoint = true;
@@ -151,23 +173,42 @@ public class Player : MonoBehaviour
         if (canMoveLaunchDirectionPoint)
         {
             if (Input.touchCount == 1) // touchscreen
-                launchDirectionPoint.transform.position = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
+                launchDirectionPoint.transform.position = 
+                    new Vector3(Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position).x + offsetAtStartMoveLaunchDirectionPoint.x,
+                    Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position).y + offsetAtStartMoveLaunchDirectionPoint.y, 
+                    launchDirectionPoint.transform.position.z);
 
-            if (Input.GetMouseButtonDown(0)) // desktop
-                launchDirectionPoint.transform.position = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            if (Input.GetMouseButton(0)) // desktop
+                launchDirectionPoint.transform.position = 
+                    new Vector3(Camera.main.ScreenToWorldPoint(Input.mousePosition).x + offsetAtStartMoveLaunchDirectionPoint.x,
+                    Camera.main.ScreenToWorldPoint(Input.mousePosition).y + offsetAtStartMoveLaunchDirectionPoint.y,
+                    launchDirectionPoint.transform.position.z);
         }
     }
 
     void HandleLaunchDirectionPointRotation()
     {
         // make launchDirectionPoint icon point away from the player
-        // TODO: make it only update when the player is currently dragging the launchDirectionPoint
-        Vector3 direction = launchDirectionPoint.transform.position - transform.position;
+        if (canMoveLaunchDirectionPoint)
+        {
+            Vector3 direction = launchDirectionPoint.transform.position - transform.position;
 
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
 
-        launchDirectionPoint.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
-    }    
+            launchDirectionPoint.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
+        }
+    }
+
+    void HandleScaleLaunchDirectionPointWithZoom()
+    {
+        float currentCameraSize = Camera.main.orthographicSize;
+        float cameraScaleRatio = cameraZoomAtStart / currentCameraSize;
+        // invert so its bigger when zoomed out instead of smaller
+        cameraScaleRatio = 1 / cameraScaleRatio;
+
+        Vector3 newLaunchDirectionPointScale = new Vector3(GameManager.Instance.UIScale * cameraScaleRatio, GameManager.Instance.UIScale * cameraScaleRatio, 1f);
+        launchDirectionPoint.transform.localScale = newLaunchDirectionPointScale;
+    }
 
     void UpdateLineRenderer()
     {
@@ -236,18 +277,21 @@ public class Player : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D collision)
     {
-        // kill area
-        if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
+        if (!isInAimingMode)
         {
-            Time.timeScale = 0f;
-            loseDisplay.gameObject.SetActive(true);
-            isInLoseState = true;
-        }
-        // finish area
-        if (collision.gameObject.CompareTag("Finish") && !isInLoseState)
-        {
-            winDisplay.gameObject.SetActive(true);
-            isInWinState = true;
+            // kill area
+            if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
+            {
+                Time.timeScale = 0f;
+                loseDisplay.gameObject.SetActive(true);
+                isInLoseState = true;
+            }
+            // finish area
+            if (collision.gameObject.CompareTag("Finish") && !isInLoseState)
+            {
+                winDisplay.gameObject.SetActive(true);
+                isInWinState = true;
+            }
         }
     }
 

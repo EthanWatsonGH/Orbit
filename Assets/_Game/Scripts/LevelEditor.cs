@@ -230,7 +230,7 @@ public class LevelEditor : MonoBehaviour
         // invert so its bigger when zoomed out instead of smaller
         cameraScaleRatio = 1 / cameraScaleRatio;
 
-        Vector3 newObjectTransformControlsScale = new Vector3(1 * cameraScaleRatio, 1 * cameraScaleRatio, 1);
+        Vector3 newObjectTransformControlsScale = new Vector3(GameManager.Instance.UIScale * cameraScaleRatio, GameManager.Instance.UIScale * cameraScaleRatio, 1);
         objectTransformControls.transform.localScale = newObjectTransformControlsScale;
     }
 

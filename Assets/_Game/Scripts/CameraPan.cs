@@ -44,8 +44,8 @@ public class CameraPan : MonoBehaviour
 
         #region Desktop
         Vector3 newPosition = transform.position;
-        // keyboard panning
 
+        // keyboard panning
         float zoomRatio = (Camera.main.orthographicSize / cameraZoomAtStart) + 1;
 
         if (Input.GetKey(KeyCode.W))

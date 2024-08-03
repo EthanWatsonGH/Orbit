@@ -40,6 +40,7 @@ public class GameManager : MonoBehaviour
     #endregion
 
     // level editor placeable objects references
+    // TODO: make these capitalized to signify public
     [Header("Level Editor Placable Objects")]
     [SerializeField] public GameObject bouncyWallPrefab;
     [SerializeField] public GameObject boosterPrefab;
@@ -51,8 +52,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] public GameObject pullerPrefab;
     [SerializeField] public GameObject pusherPrefab;
     [SerializeField] public GameObject slipperyWallPrefab;
+    [SerializeField] public float UIScale = 1.5f;
 
-    public bool touchPointIsOverButton = false ;
+    public bool touchPointIsOverButton = false;
 
     void Start()
     {
@@ -75,6 +77,5 @@ public class GameManager : MonoBehaviour
     {
         touchPointIsOverButton = false;
         //Debug.Log("no");
-
     }
 }
