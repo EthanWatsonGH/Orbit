@@ -7,7 +7,6 @@ public class LevelEditor : MonoBehaviour
     // self object references
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
-    [SerializeField] float viewMoveSpeed;
     [SerializeField] GameObject player;
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] EventSystem es;
@@ -61,7 +60,6 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
-        HandleViewMovement();
         HandlePlacePrefab();
         GetTouchPosition();
         HandleSelectObject();
@@ -69,11 +67,6 @@ public class LevelEditor : MonoBehaviour
         HandleCloseObjectTransformControls();
         HandleScaleObjectTransformControlsWithZoom();
         EnsureObjectTransformControlsAlwaysInFront();
-    }
-
-    void HandleViewMovement()
-    {
-        rb.velocity = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) * viewMoveSpeed;
     }
 
     public void SwitchToPlayMode()
@@ -336,7 +329,7 @@ public class LevelEditor : MonoBehaviour
 
     public void RecenterCamera()
     {
-        Camera.main.transform.position = new Vector3(startLocationIcon.transform.position.x, startLocationIcon.transform.position.y, -1f);
+        Camera.main.transform.position = new Vector3(startLocationIcon.transform.position.x, startLocationIcon.transform.position.y, Camera.main.transform.position.z);
     }
 
     public void SwitchToLocalTransformMode()

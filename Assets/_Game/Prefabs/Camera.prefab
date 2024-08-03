@@ -119,3 +119,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6262198ed727334ca42a26acc850d12, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  keyboardPanSpeed: 10

@@ -48,10 +48,6 @@ public class Player : MonoBehaviour
         {
             TryStartMovement();
 
-            EnsureLaunchDirectionPointAlwaysInFront();
-            HandleLaunchDirectionPointRotation();
-            UpdateLineRenderer();
-
             if (!isInAimingMode)
             {
                 if (!isInWinState)
@@ -93,44 +89,21 @@ public class Player : MonoBehaviour
             lr.enabled = true;
             launchDirectionPoint.SetActive(true);
 
-            bool IsTouchOverLaunchDirectionPoint(Touch touch)
-            {
-                RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(touch.position), Vector2.zero);
-
-                if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
-                {
-                    return true;
-                }
-
-                return false;
-            }
-
-            // check if a touch just began over launchDirectionPoint
-            if (Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && IsTouchOverLaunchDirectionPoint(Input.GetTouch(0)))
-                canMoveLaunchDirectionPoint = true;
-
-            // when touch ends, reset ability to move start launch point
-            if (Input.touchCount == 0)
-                canMoveLaunchDirectionPoint = false;
-
-            // set launchDirectionPoint location to touch position
-            if (!GameManager.Instance.touchPointIsOverButton && Input.touchCount == 1 && canMoveLaunchDirectionPoint)
-            {
-                Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-
-                launchDirectionPoint.transform.position = mousePosition;
-            }
+            EnsureLaunchDirectionPointAlwaysInFront();
+            HandleMoveLaunchDirectionPoint();
+            HandleLaunchDirectionPointRotation();
+            UpdateLineRenderer();
 
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
 
-            // launch player in direction of launchDirectionPoint
+            // launch player in direction of launchDirectionPoint when they press launch
             if (Input.GetButtonDown("Jump") || playerPressedStart)
             {
                 startDirection = (launchDirectionPoint.transform.position - rb.transform.position).normalized;
                 rb.velocity = startDirection * startForce;
 
-                // set timeAtLastRetry for time display calculation
+                // for timer calculation
                 timeAtLastRetry = Time.time;
 
                 isInAimingMode = false;
@@ -149,6 +122,40 @@ public class Player : MonoBehaviour
     {
         Vector3 launchDirectionPointPosition = new Vector3(launchDirectionPoint.transform.position.x, launchDirectionPoint.transform.position.y, -1f);
         launchDirectionPoint.transform.position = launchDirectionPointPosition;
+    }
+
+    void HandleMoveLaunchDirectionPoint()
+    {
+        bool IsTouchOverLaunchDirectionPoint(Touch touch)
+        {
+            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(touch.position), Vector2.zero);
+            return hit.collider != null && hit.collider.gameObject == launchDirectionPoint;
+        }
+
+        bool IsMouseOverLaunchDirectionPoint()
+        {
+            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
+            return hit.collider != null && hit.collider.gameObject == launchDirectionPoint;
+        }
+
+        // check if a touch just began over launchDirectionPoint
+        if ((Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && IsTouchOverLaunchDirectionPoint(Input.GetTouch(0))) // touchscreen
+            || (Input.GetMouseButtonDown(0) && IsMouseOverLaunchDirectionPoint())) // desktop
+            canMoveLaunchDirectionPoint = true;
+
+        // when touch ends, reset ability to move start launch point
+        if (Input.touchCount == 0 && !Input.GetMouseButton(0))
+            canMoveLaunchDirectionPoint = false;
+
+        // set launchDirectionPoint location to touch/mouse position
+        if (canMoveLaunchDirectionPoint)
+        {
+            if (Input.touchCount == 1) // touchscreen
+                launchDirectionPoint.transform.position = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
+
+            if (Input.GetMouseButtonDown(0)) // desktop
+                launchDirectionPoint.transform.position = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        }
     }
 
     void HandleLaunchDirectionPointRotation()
@@ -210,7 +217,7 @@ public class Player : MonoBehaviour
 
     public void RecenterCamera()
     {
-        Camera.main.transform.position = new Vector3(gameObject.transform.position.x, gameObject.transform.position.y, -1);
+        Camera.main.transform.position = new Vector3(gameObject.transform.position.x, gameObject.transform.position.y, Camera.main.transform.position.z);
     }
 
     void OnTriggerStay2D(Collider2D collision)
