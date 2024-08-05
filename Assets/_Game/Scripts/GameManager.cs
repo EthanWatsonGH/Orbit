@@ -52,7 +52,15 @@ public class GameManager : MonoBehaviour
     [SerializeField] public GameObject pullerPrefab;
     [SerializeField] public GameObject pusherPrefab;
     [SerializeField] public GameObject slipperyWallPrefab;
-    [SerializeField] public float UIScale = 1.5f;
+    
+    // player preferences fields
+    // TODO: make menus to change these. make them save to / load from file(s) to keep between restarts.
+    public float UIScale = 1.5f;
+    public float DefaultCameraZoom = 10f;
+    public float MaxCameraZoom = 100f;
+    public float MinCameraZoom = 2f;
+    public float ScrollZoomIncrement = 10f;
+    public float KeyboardPanSpeed = 20f;
 
     public bool touchPointIsOverButton = false;
 

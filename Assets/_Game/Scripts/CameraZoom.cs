@@ -4,40 +4,43 @@ using UnityEngine;
 
 public class CameraZoom : MonoBehaviour
 {
-    [SerializeField] Camera cam;
-    [SerializeField] float scrollZoomIncrement = 10f;
-
-    Vector2[] zoomStartTouchPositions = new Vector2[2];
-
-    float minZoom = 2f;
-    float maxZoom = 100f;
-
-    float cameraZoomAtStart;
+    float newCameraZoom;
 
     void Start()
     {
         // set the default zoom of the camera
-        cam.orthographicSize = 10f;
+        Camera.main.orthographicSize = GameManager.Instance.DefaultCameraZoom;
 
-        cameraZoomAtStart = Camera.main.orthographicSize;
+        // initialize value
+        newCameraZoom = GameManager.Instance.DefaultCameraZoom;
     }
 
     void Update()
     {
-        HandleZoom();
-    }
-
-    void HandleZoom()
-    {
         // touchscreen
         if (Input.touchCount == 2)
         {
+            Touch touch0 = Input.GetTouch(0);
+            Touch touch1 = Input.GetTouch(1);
 
+            if (touch1.phase == TouchPhase.Began)
+            {
+                
+            }
+
+            // get distance between touches at start of zoom
+            // compare distance between touches at start to the distance on this frame
         }
 
         // desktop
-        float zoomRatio = (Camera.main.orthographicSize / cameraZoomAtStart); // makes zoom increment per scroll exponential with zoom level
+        float zoomRatio = Camera.main.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
         if (Input.GetAxisRaw("Mouse ScrollWheel") != 0)
-            cam.orthographicSize = Mathf.Clamp(cam.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * scrollZoomIncrement * zoomRatio * -1f, minZoom, maxZoom);
+            newCameraZoom = Mathf.Clamp(Camera.main.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * zoomRatio * -1f, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+    }
+
+    void LateUpdate()
+    {
+        // TODO: if it's jittering when i add touchscreen zoom, put this in Update
+        Camera.main.orthographicSize = newCameraZoom;
     }
 }

@@ -2,25 +2,21 @@ using UnityEngine;
 
 public class CameraPan : MonoBehaviour
 {
-    [SerializeField] float keyboardPanSpeed = 10f;
     Vector3 touchStartPosition;
     bool isMousePanning = false;
     Vector3 mouseWorldPositionAtStartMousePan;
     Vector3 parentObjectPositionAtStartPan;
-    float cameraZoomAtStart;
+    Vector3 newPosition;
 
     void Start()
     {
         // failsafe for first touch
         touchStartPosition = Vector3.zero;
-        touchStartPosition.z = transform.position.z; // keep z position
-
-        cameraZoomAtStart = Camera.main.orthographicSize;
     }
 
     void Update()
     {
-        Vector3 newPosition = transform.position;
+        newPosition = transform.position;
 
         #region Touchscreen
         // 2 finger drag panning
@@ -34,7 +30,6 @@ public class CameraPan : MonoBehaviour
             if (touch1.phase == TouchPhase.Began)
             {
                 touchStartPosition = Camera.main.ScreenToWorldPoint(touchMidpoint);
-                touchStartPosition.z = transform.position.z; // keep z position
                 parentObjectPositionAtStartPan = gameObject.transform.parent.position;
             }
             else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
@@ -45,9 +40,10 @@ public class CameraPan : MonoBehaviour
 
                 newPosition -= touchPositionDelta + parentObjectOffsetFromStartPan;
 
+                // TODO: i should only have this in LateUpdate, but if i dont have this here then the camera jitters as i touch pan and im not sure why
                 // don't move z
                 newPosition.z = transform.position.z;
-
+                // apply movement to camera
                 transform.position = newPosition;
             }
         }
@@ -56,25 +52,10 @@ public class CameraPan : MonoBehaviour
         #region Desktop
         // keyboard panning
         // make pan speed at different zoom levels exponentially more
-        float zoomRatio = (Camera.main.orthographicSize / cameraZoomAtStart) + 1;
+        float zoomRatio = (Camera.main.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1;
 
-        if (Input.GetKey(KeyCode.W))
-        {
-            newPosition.y += keyboardPanSpeed * Time.deltaTime * zoomRatio;
-        }
-        if (Input.GetKey(KeyCode.S))
-        {
-            newPosition.y -= keyboardPanSpeed * Time.deltaTime * zoomRatio;
-        }
-        if (Input.GetKey(KeyCode.A))
-        {
-            newPosition.x -= keyboardPanSpeed * Time.deltaTime * zoomRatio;
-        }
-        if (Input.GetKey(KeyCode.D))
-        {
-            newPosition.x += keyboardPanSpeed * Time.deltaTime * zoomRatio;
-        }
-        transform.position = newPosition;
+        newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
+        newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
 
         // mouse panning
         if (Input.GetMouseButtonDown(1))
@@ -95,12 +76,15 @@ public class CameraPan : MonoBehaviour
             Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
 
             newPosition -= mousePositionDelta + parentObjectOffsetFromStartPan;
-
-            // don't move z
-            newPosition.z = transform.position.z;
-
-            transform.position = newPosition;
         }
         #endregion
+    }
+
+    void LateUpdate()
+    {
+        // don't move z
+        newPosition.z = transform.position.z;
+        // apply movement to camera
+        transform.position = newPosition;
     }
 }
