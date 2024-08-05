@@ -6,6 +6,7 @@ public class CameraPan : MonoBehaviour
     Vector3 touchStartPosition;
     bool isMousePanning = false;
     Vector3 mouseWorldPositionAtStartMousePan;
+    Vector3 parentObjectPositionAtStartPan;
     float cameraZoomAtStart;
 
     void Start()
@@ -19,6 +20,8 @@ public class CameraPan : MonoBehaviour
 
     void Update()
     {
+        Vector3 newPosition = transform.position;
+
         #region Touchscreen
         // 2 finger drag panning
         if (Input.touchCount == 2)
@@ -32,20 +35,27 @@ public class CameraPan : MonoBehaviour
             {
                 touchStartPosition = Camera.main.ScreenToWorldPoint(touchMidpoint);
                 touchStartPosition.z = transform.position.z; // keep z position
+                parentObjectPositionAtStartPan = gameObject.transform.parent.position;
             }
             else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
             {
                 Vector3 touchPositionDelta = Camera.main.ScreenToWorldPoint(touchMidpoint) - touchStartPosition;
+                // make camera move relative its parent object as player pans
+                Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
 
-                transform.position -= touchPositionDelta;
+                newPosition -= touchPositionDelta + parentObjectOffsetFromStartPan;
+
+                // don't move z
+                newPosition.z = transform.position.z;
+
+                transform.position = newPosition;
             }
         }
         #endregion
 
         #region Desktop
-        Vector3 newPosition = transform.position;
-
         // keyboard panning
+        // make pan speed at different zoom levels exponentially more
         float zoomRatio = (Camera.main.orthographicSize / cameraZoomAtStart) + 1;
 
         if (Input.GetKey(KeyCode.W))
@@ -71,15 +81,20 @@ public class CameraPan : MonoBehaviour
         {
             isMousePanning = true;
             mouseWorldPositionAtStartMousePan = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            parentObjectPositionAtStartPan = gameObject.transform.parent.position;
         }
         if (Input.GetMouseButtonUp(1))
+        {
             isMousePanning = false;
+        }
 
         if (isMousePanning)
         {
             Vector3 mousePositionDelta = Camera.main.ScreenToWorldPoint(Input.mousePosition) - mouseWorldPositionAtStartMousePan;
+            // make camera move relative its parent object as player pans
+            Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
 
-            newPosition -= mousePositionDelta;
+            newPosition -= mousePositionDelta + parentObjectOffsetFromStartPan;
 
             // don't move z
             newPosition.z = transform.position.z;

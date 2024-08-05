@@ -1078,7 +1078,7 @@ MonoBehaviour:
   startLocation: {fileID: 0}
   startLocationIcon: {fileID: 0}
   pullForce: 50
-  startForce: 10
+  launchForce: 10
 --- !u!96 &-6138430638685780608
 TrailRenderer:
   serializedVersion: 3
@@ -1728,7 +1728,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 5290990243053682229}
         m_TargetAssemblyTypeName: Player, Assembly-CSharp
-        m_MethodName: PressedStart
+        m_MethodName: PressedLaunch
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2225,7 +2225,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 5, z: 0}
-  m_LocalScale: {x: 1.5, y: 1.5, z: 1.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1804465594435737020}

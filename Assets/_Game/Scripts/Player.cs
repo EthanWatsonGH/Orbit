@@ -1,4 +1,5 @@
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class Player : MonoBehaviour
@@ -23,12 +24,11 @@ public class Player : MonoBehaviour
     [SerializeField] GameObject startLocationIcon;
     // variables
     [SerializeField] float pullForce;
-    [SerializeField] float startForce;
+    [SerializeField] float launchForce;
     float cameraZoomAtStart;
-    Vector2 startDirection;
     float timeAtLastRetry;
     bool isInAimingMode = true;
-    bool playerPressedStart = false; // TODO: change to events
+    bool playerPressedLaunch = false; // TODO: change to events
     bool isInvincible = false;
     bool isInWinState = false;
     bool isInLoseState = false;
@@ -50,7 +50,7 @@ public class Player : MonoBehaviour
     {
         if (true) // TODO: add a check to disallow doing these things while in pause menu
         {
-            TryStartMovement();
+            TryLaunch();
 
             if (!isInAimingMode)
             {
@@ -81,7 +81,7 @@ public class Player : MonoBehaviour
         RetryLevel();
     }
 
-    void TryStartMovement()
+    void TryLaunch()
     {
         // TODO: improve this logic to only trigger once per retry
         if (isInAimingMode)
@@ -108,16 +108,16 @@ public class Player : MonoBehaviour
             rb.velocity = Vector2.zero;
 
             // launch player in direction of launchDirectionPoint when they press launch
-            if (Input.GetButtonDown("Jump") || playerPressedStart)
+            if (Input.GetButtonDown("Jump") || playerPressedLaunch)
             {
-                startDirection = (launchDirectionPoint.transform.position - rb.transform.position).normalized;
-                rb.velocity = startDirection * startForce;
+                Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
+                rb.velocity = launchDirection.normalized * launchForce;
 
                 // for timer calculation
                 timeAtLastRetry = Time.time;
 
                 isInAimingMode = false;
-                playerPressedStart = false;
+                playerPressedLaunch = false;
             }
         }
         else // in play mode
@@ -221,7 +221,7 @@ public class Player : MonoBehaviour
         isInAimingMode = true;
         isInWinState = false;
         isInLoseState = false;
-        playerPressedStart = false;
+        playerPressedLaunch = false;
 
         // ensure velocity is zero
         rb.velocity = Vector2.zero;
@@ -264,13 +264,13 @@ public class Player : MonoBehaviour
     void OnTriggerStay2D(Collider2D collision)
     {
         // pull area
-        if (Input.GetAxisRaw("Fire1") > 0f && !isInAimingMode)
+        // TODO: subtract 1 touch for each one over a UI element, and then check if its still == 1 touch count
+        if ((Input.GetMouseButton(0) || Input.touchCount == 1) && !isInAimingMode)
         {
             if (collision.gameObject.CompareTag("Pull"))
             {
                 Vector2 pullDirection = collision.transform.position - rb.transform.position;
-                pullDirection.Normalize();
-                rb.AddForce(pullDirection * pullForce, ForceMode2D.Force);
+                rb.AddForce(pullDirection.normalized * pullForce, ForceMode2D.Force);
             }
         }
     }
@@ -295,9 +295,10 @@ public class Player : MonoBehaviour
         }
     }
 
-    public void PressedStart()
+    // TODO: change these to proper events
+    public void PressedLaunch()
     {
-        playerPressedStart = true;
+        playerPressedLaunch = true;
     }
     public void PressedRetry()
     {
