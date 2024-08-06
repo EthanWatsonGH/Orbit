@@ -5,6 +5,8 @@ using UnityEngine;
 public class CameraZoom : MonoBehaviour
 {
     float newCameraZoom;
+    float distanceBetweenTouchesAtTouchBegan;
+    float cameraZoomAtTouchBegan;
 
     void Start()
     {
@@ -25,22 +27,25 @@ public class CameraZoom : MonoBehaviour
 
             if (touch1.phase == TouchPhase.Began)
             {
-                
+                distanceBetweenTouchesAtTouchBegan = Vector3.Distance(touch1.position, touch0.position);
+                cameraZoomAtTouchBegan = Camera.main.orthographicSize;
             }
-
-            // get distance between touches at start of zoom
-            // compare distance between touches at start to the distance on this frame
+            else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
+            {
+                float currentDistanceBetweenTouches = Vector3.Distance(touch1.position, touch0.position);
+                float touchZoomRatio = distanceBetweenTouchesAtTouchBegan / currentDistanceBetweenTouches;
+                newCameraZoom = cameraZoomAtTouchBegan * touchZoomRatio;
+            }
         }
 
         // desktop
-        float zoomRatio = Camera.main.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
+        float desktopZoomRatio = Camera.main.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
         if (Input.GetAxisRaw("Mouse ScrollWheel") != 0)
-            newCameraZoom = Mathf.Clamp(Camera.main.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * zoomRatio * -1f, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+            newCameraZoom = Camera.main.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * desktopZoomRatio * -1f;
     }
 
     void LateUpdate()
     {
-        // TODO: if it's jittering when i add touchscreen zoom, put this in Update
-        Camera.main.orthographicSize = newCameraZoom;
+        Camera.main.orthographicSize = Mathf.Clamp(newCameraZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
     }
 }

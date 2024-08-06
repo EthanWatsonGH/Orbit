@@ -40,7 +40,7 @@ public class CameraPan : MonoBehaviour
 
                 newPosition -= touchPositionDelta + parentObjectOffsetFromStartPan;
 
-                // TODO: i should only have this in LateUpdate, but if i dont have this here then the camera jitters as i touch pan and im not sure why
+                // TODO: i should only have this in LateUpdate, but if i dont have this here then the camera jitters as i touch pan and im not sure why. could it be because this is an else if?
                 // don't move z
                 newPosition.z = transform.position.z;
                 // apply movement to camera
