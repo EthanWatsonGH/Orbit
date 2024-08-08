@@ -40,20 +40,6 @@ public class GameManager : MonoBehaviour
     }
     #endregion
 
-    // level editor placeable objects references
-    // TODO: make these capitalized to signify public
-    [Header("Level Editor Placable Objects")]
-    public GameObject bouncyWallPrefab;
-    public GameObject boosterPrefab;
-    public GameObject constantPullerPrefab;
-    public GameObject constantPusherPrefab;
-    public GameObject finishPrefab;
-    public GameObject killCirclePrefab;
-    public GameObject killWallPrefab;
-    public GameObject pullerPrefab;
-    public GameObject pusherPrefab;
-    public GameObject slipperyWallPrefab;
-
     [Header("Player Preferences Fields")]
     // TODO: make menus to change these. make them save to / load from file(s) to keep between restarts.
     public float UIScale = 1.5f;
@@ -62,29 +48,31 @@ public class GameManager : MonoBehaviour
     public float MinCameraZoom = 2f;
     public float ScrollZoomIncrement = 10f;
     public float KeyboardPanSpeed = 20f;
+    public int FramerateLimit = 60;
 
     // TODO: move this stuff to be handled in UI manager
-    public bool touchPointIsOverButton = false;
+    public bool TouchPointIsOverButton = false;
 
     void Start()
     {
-        
+        Application.targetFrameRate = FramerateLimit;
     }
 
     void Update()
     {
-        
+        // TODO: this is just for testing. move this to only be updated on an event when the player changes the setting
+        Application.targetFrameRate = FramerateLimit;
     }
 
     // buttons will use these to say if the touch point is over any button
     public void SetTouchPointIsOverButtonTrue()
     {
-        touchPointIsOverButton = true;
+        TouchPointIsOverButton = true;
         //Debug.Log("yes");
     }
     public void SetTouchPointIsOverButtonFalse()
     {
-        touchPointIsOverButton = false;
+        TouchPointIsOverButton = false;
         //Debug.Log("no");
     }
 }

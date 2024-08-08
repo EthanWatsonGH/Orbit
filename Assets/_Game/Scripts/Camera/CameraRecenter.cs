@@ -4,31 +4,14 @@ using UnityEngine;
 
 public class CameraRecenter : MonoBehaviour
 {
-    void Start()
-    {
-        
-    }
-    void Update()
-    {
-        
-    }
-
     void OnEnable()
     {
-        if (EventManager.Instance != null)
-        {
-            EventManager.Instance.RecenterCameraEvent.AddListener(RecenterCamera);
-        }
-        else
-            Debug.Log("event manager is null");
+        EventManager.Instance.RecenterCameraEvent.AddListener(RecenterCamera);
     }
 
     void OnDisable()
     {
-        if (EventManager.Instance != null)
-        {
-            EventManager.Instance.RecenterCameraEvent.RemoveListener(RecenterCamera);
-        }
+        EventManager.Instance.RecenterCameraEvent.RemoveListener(RecenterCamera);
     }
 
     void RecenterCamera()

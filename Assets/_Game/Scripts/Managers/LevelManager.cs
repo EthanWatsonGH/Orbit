@@ -64,11 +64,24 @@ public class LevelManager : MonoBehaviour
     }
     #endregion
 
+    [Header("Level Editor Placable Objects Prefabs")]
+    public GameObject BoosterPrefab;
+    public GameObject BouncyWallPrefab;
+    public GameObject ConstantPullerPrefab;
+    public GameObject ConstantPusherPrefab;
+    public GameObject FinishPrefab;
+    public GameObject KillCirclePrefab;
+    public GameObject KillWallPrefab;
+    public GameObject PullerPrefab;
+    public GameObject PusherPrefab;
+    public GameObject SlipperyWallPrefab;
+
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
     public const byte LOADER_VERSION = 1;
 
     string levelDirectory;
 
+    [Header("World Object References")]
     [SerializeField] GameObject levelObjectsContainer;
     [SerializeField] GameObject playerStartPoint;
     [SerializeField] TMP_InputField levelSaveNameInput;
@@ -80,11 +93,6 @@ public class LevelManager : MonoBehaviour
         // get directory for player's levels
         levelDirectory = Application.persistentDataPath + "/playerLevels";
         EnsureLevelDirectoryExists();
-    }
-
-    void Update()
-    {
-        
     }
 
     void EnsureLevelDirectoryExists()
@@ -204,34 +212,34 @@ public class LevelManager : MonoBehaviour
                     switch(levelObject.type)
                     {
                         case "Booster":
-                            prefabToInstantiate = GameManager.Instance.boosterPrefab;
+                            prefabToInstantiate = LevelManager.Instance.BoosterPrefab;
                             break;
                         case "BouncyWall":
-                            prefabToInstantiate = GameManager.Instance.bouncyWallPrefab;
+                            prefabToInstantiate = LevelManager.Instance.BouncyWallPrefab;
                             break;
                         case "ConstantPuller":
-                            prefabToInstantiate = GameManager.Instance.constantPullerPrefab;
+                            prefabToInstantiate = LevelManager.Instance.ConstantPullerPrefab;
                             break;
                         case "ConstantPusher":
-                            prefabToInstantiate = GameManager.Instance.constantPusherPrefab;
+                            prefabToInstantiate = LevelManager.Instance.ConstantPusherPrefab;
                             break;
                         case "Finish":
-                            prefabToInstantiate = GameManager.Instance.finishPrefab;
+                            prefabToInstantiate = LevelManager.Instance.FinishPrefab;
                             break;
                         case "KillCircle":
-                            prefabToInstantiate = GameManager.Instance.killCirclePrefab;
+                            prefabToInstantiate = LevelManager.Instance.KillCirclePrefab;
                             break;
                         case "KillWall":
-                            prefabToInstantiate = GameManager.Instance.killWallPrefab;
+                            prefabToInstantiate = LevelManager.Instance.KillWallPrefab;
                             break;
                         case "Puller":
-                            prefabToInstantiate = GameManager.Instance.pullerPrefab;
+                            prefabToInstantiate = LevelManager.Instance.PullerPrefab;
                             break;
                         case "Pusher":
-                            prefabToInstantiate = GameManager.Instance.pusherPrefab;
+                            prefabToInstantiate = LevelManager.Instance.PusherPrefab;
                             break;
                         case "SlipperyWall":
-                            prefabToInstantiate = GameManager.Instance.slipperyWallPrefab;
+                            prefabToInstantiate = LevelManager.Instance.SlipperyWallPrefab;
                             break;
                         default:
                             // TODO: display in game

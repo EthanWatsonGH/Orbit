@@ -13,6 +13,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject canvas;
     [SerializeField] GameObject localTransformButton;
     [SerializeField] GameObject worldTransformButton;
+    [SerializeField] GameObject closeObjectTransformControlsButton;
 
     // world object references
     [Header("World Objects")]
@@ -64,21 +65,8 @@ public class LevelEditor : MonoBehaviour
         GetTouchPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
-        HandleCloseObjectTransformControls();
         HandleScaleObjectTransformControlsWithZoom();
         EnsureObjectTransformControlsAlwaysInFront();
-    }
-
-    public void SwitchToPlayMode()
-    {
-        // hide player start location icon
-        startLocationIcon.SetActive(false);
-
-        // ensure objectTransformControls are hidden
-        objectTransformControls.SetActive(false);
-
-        player.SetActive(true);
-        this.gameObject.SetActive(false);
     }
 
     void GetTouchPosition()
@@ -120,16 +108,15 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-
-    // select the object the player clicks on
     void HandleSelectObject()
     {
+        // set the object the player clicks as selected if it's allowed to be selected
         if (Input.GetButtonDown("Fire1"))
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
-            if (hit.collider != null)
+            if (hit.collider != null) // object hit
             {
                 if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any object transform controls to be set as selected object
                 {
@@ -137,9 +124,11 @@ public class LevelEditor : MonoBehaviour
                     objectTransformControls.transform.position = hit.transform.position;
                 }
             }
-            else
+            else // no object / background hit
             {
+                // deselect current object, if any
                 selectedObject = null;
+                closeObjectTransformControlsButton.SetActive(false);
             }
 
             // only show controls if something is selected
@@ -207,22 +196,6 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    // if the player taps/clicks close icon, deselect object and hide object transform controls
-    void HandleCloseObjectTransformControls()
-    {
-        if (Input.GetButtonDown("Fire1"))
-        {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
-
-            if (hit.transform != null && hit.transform.gameObject.name.Equals("Close"))
-            {
-                objectTransformControls.SetActive(false);
-                selectedObject = null;
-            }
-        }
-    }
-
     void HandleScaleObjectTransformControlsWithZoom()
     {
         float currentCameraSize = Camera.main.orthographicSize;
@@ -240,13 +213,78 @@ public class LevelEditor : MonoBehaviour
         objectTransformControls.transform.position = objectTransformControlsPosition;
     }
 
-    void TryToPlace()
+    void StartTryingToPlaceObject()
     {
         isTryingToPlace = true;
         objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, touchPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
 
-    // update value of pointerIsOverObjectSelectionBar on pointer enter and exit
+    public void SwitchToPlayMode()
+    {
+        // hide player start location icon
+        startLocationIcon.SetActive(false);
+
+        // ensure objectTransformControls are hidden
+        objectTransformControls.SetActive(false);
+
+        player.SetActive(true);
+        this.gameObject.SetActive(false);
+    }
+
+    #region Object Place Functions
+    public void PlaceBooster()
+    {
+        prefabToPlace = LevelManager.Instance.BoosterPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceBouncyWall()
+    {
+        prefabToPlace = LevelManager.Instance.BouncyWallPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceConstantPuller()
+    {
+        prefabToPlace = LevelManager.Instance.ConstantPullerPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceConstantPusher()
+    {
+        prefabToPlace = LevelManager.Instance.ConstantPusherPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceFinish()
+    {
+        prefabToPlace = LevelManager.Instance.FinishPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceKillCircle()
+    {
+        prefabToPlace = LevelManager.Instance.KillCirclePrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceKillWall()
+    {
+        prefabToPlace = LevelManager.Instance.KillWallPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlacePuller()
+    {
+        prefabToPlace = LevelManager.Instance.PullerPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlacePusher()
+    {
+        prefabToPlace = LevelManager.Instance.PusherPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceSlipperyWall()
+    {
+        prefabToPlace = LevelManager.Instance.SlipperyWallPrefab;
+        StartTryingToPlaceObject();
+    }
+    #endregion
+
+    // UI events use these to update value of pointerIsOverObjectSelectionBar on pointer enter and exit
     public void SetPointerIsOverObjectSelectionBarTrue()
     {
         pointerIsOverObjectSelectionBar = true;
@@ -256,75 +294,24 @@ public class LevelEditor : MonoBehaviour
         pointerIsOverObjectSelectionBar = false;
     }
 
-    #region Object Place Functions
-    // place events for each level object button
-    public void PlaceBooster()
-    {
-        prefabToPlace = GameManager.Instance.boosterPrefab;
-        TryToPlace();
-    }
-    public void PlaceBouncyWall()
-    {
-        prefabToPlace = GameManager.Instance.bouncyWallPrefab;
-        TryToPlace();
-    }
-    public void PlaceConstantPuller()
-    {
-        prefabToPlace = GameManager.Instance.constantPullerPrefab;
-        TryToPlace();
-    }
-    public void PlaceConstantPusher()
-    {
-        prefabToPlace = GameManager.Instance.constantPusherPrefab;
-        TryToPlace();
-    }
-    public void PlaceFinish()
-    {
-        prefabToPlace = GameManager.Instance.finishPrefab;
-        TryToPlace();
-    }
-    public void PlaceKillCircle()
-    {
-        prefabToPlace = GameManager.Instance.killCirclePrefab;
-        TryToPlace();
-    }
-    public void PlaceKillWall()
-    {
-        prefabToPlace = GameManager.Instance.killWallPrefab;
-        TryToPlace();
-    }
-    public void PlacePuller()
-    {
-        prefabToPlace = GameManager.Instance.pullerPrefab;
-        TryToPlace();
-    }
-    public void PlacePusher()
-    {
-        prefabToPlace = GameManager.Instance.pusherPrefab;
-        TryToPlace();
-    }
-    public void PlaceSlipperyWall()
-    {
-        prefabToPlace = GameManager.Instance.slipperyWallPrefab;
-        TryToPlace();
-    }
-    #endregion
-
-    // expose level manager functions for level editor UI button events
-    // TODO: just make buttons reference level manager directly
+    // expose level manager functions for level editor UI buttons
     public void SaveLevel()
     {
         LevelManager.Instance.SaveLevel();
     }
-
     public void LoadLevel()
     {
         LevelManager.Instance.LoadLevel();
     }
-
     public void DeleteAllLevelObjects()
     {
         LevelManager.Instance.DestroyAllExistingLevelObjects();
+    }
+
+    public void CloseObjectTransformControls()
+    {
+        objectTransformControls.SetActive(false);
+        selectedObject = null;
     }
 
     public void SwitchToLocalTransformMode()

@@ -73,11 +73,6 @@ public class Player : MonoBehaviour
         }
     }
 
-    void LateUpdate()
-    {
-
-    }
-
     private void OnEnable()
     {
         isInWinState = false;
@@ -177,7 +172,7 @@ public class Player : MonoBehaviour
         if (Input.touchCount == 0 && !Input.GetMouseButton(0))
             canMoveLaunchDirectionPoint = false;
 
-        // set launchDirectionPoint location to touch/mouse position
+        // set launchDirectionPoint location to pointer position
         if (canMoveLaunchDirectionPoint)
         {
             if (Input.touchCount == 1) // touchscreen
