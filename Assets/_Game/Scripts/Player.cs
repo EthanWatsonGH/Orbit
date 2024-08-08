@@ -8,6 +8,7 @@ public class Player : MonoBehaviour
     [SerializeField] Rigidbody2D rb;
     [SerializeField] TrailRenderer tr;
     [SerializeField] LineRenderer lr;
+    [SerializeField] TrailRenderer finishTrailRenderer;
     // self object references
     [SerializeField] GameObject launchDirectionPoint;
     [SerializeField] GameObject canvas;
@@ -44,6 +45,8 @@ public class Player : MonoBehaviour
 
         // ensure player UI is enabled
         canvas.gameObject.SetActive(true);
+
+        HideFinishTrailRenderer();
     }
 
     void Update()
@@ -241,8 +244,11 @@ public class Player : MonoBehaviour
         // ensure unpause
         Time.timeScale = 1f;
 
-        // reset trail renderer
+        // reset trail renderers
         tr.Clear();
+        finishTrailRenderer.Clear();
+
+        HideFinishTrailRenderer();
     }
 
     public void SwitchToLevelEditor()
@@ -262,6 +268,20 @@ public class Player : MonoBehaviour
         isInWinState = false;
     }
 
+    void HideFinishTrailRenderer()
+    {
+        Color c = finishTrailRenderer.material.color;
+        c.a = 0f;
+        finishTrailRenderer.material.color = c;
+    }
+
+    void ShowFinishTrailRenderer()
+    {
+        Color c = finishTrailRenderer.material.color;
+        c.a = 1f;
+        finishTrailRenderer.material.color = c;
+    }
+
     void OnTriggerStay2D(Collider2D collision)
     {
         // pull area
@@ -278,7 +298,7 @@ public class Player : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D collision)
     {
-        if (!isInAimingMode)
+        if (!isInAimingMode) // in play mode
         {
             // kill area
             if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
@@ -292,6 +312,7 @@ public class Player : MonoBehaviour
             {
                 winDisplay.gameObject.SetActive(true);
                 isInWinState = true;
+                ShowFinishTrailRenderer();
             }
         }
     }
