@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class CameraPan : MonoBehaviour
 {
+    Camera cam;
+
     Vector3 touchStartPosition;
     bool isMousePanning = false;
     Vector3 mouseWorldPositionAtStartMousePan;
@@ -10,6 +12,8 @@ public class CameraPan : MonoBehaviour
 
     void Start()
     {
+        cam = gameObject.transform.GetComponent<Camera>();
+
         // failsafe for first touch
         touchStartPosition = Vector3.zero;
     }
@@ -29,18 +33,18 @@ public class CameraPan : MonoBehaviour
 
             if (touch1.phase == TouchPhase.Began)
             {
-                touchStartPosition = Camera.main.ScreenToWorldPoint(touchMidpoint);
+                touchStartPosition = cam.ScreenToWorldPoint(touchMidpoint);
                 parentObjectPositionAtStartPan = gameObject.transform.parent.position;
             }
             else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
             {
-                Vector3 touchPositionDelta = Camera.main.ScreenToWorldPoint(touchMidpoint) - touchStartPosition;
+                Vector3 touchPositionDelta = cam.ScreenToWorldPoint(touchMidpoint) - touchStartPosition;
                 // make camera move relative its parent object as player pans
                 Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
 
                 newPosition -= touchPositionDelta + parentObjectOffsetFromStartPan;
 
-                // TODO: i should only have this in LateUpdate, but if i dont have this here then the camera jitters as i touch pan and im not sure why. could it be because this is an else if?
+                // TODO: i should only have this at the end of Update, but if i dont have this here then the camera jitters as i touch pan and im not sure why. could it be because this is an else if?
                 // don't move z
                 newPosition.z = transform.position.z;
                 // apply movement to camera
@@ -50,18 +54,11 @@ public class CameraPan : MonoBehaviour
         #endregion
 
         #region Desktop
-        // keyboard panning
-        // make pan speed at different zoom levels exponentially more
-        float zoomRatio = (Camera.main.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1;
-
-        newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
-        newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
-
         // mouse panning
         if (Input.GetMouseButtonDown(1))
         {
             isMousePanning = true;
-            mouseWorldPositionAtStartMousePan = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            mouseWorldPositionAtStartMousePan = cam.ScreenToWorldPoint(Input.mousePosition);
             parentObjectPositionAtStartPan = gameObject.transform.parent.position;
         }
         if (Input.GetMouseButtonUp(1))
@@ -71,20 +68,30 @@ public class CameraPan : MonoBehaviour
 
         if (isMousePanning)
         {
-            Vector3 mousePositionDelta = Camera.main.ScreenToWorldPoint(Input.mousePosition) - mouseWorldPositionAtStartMousePan;
+            Vector3 mousePositionDelta = cam.ScreenToWorldPoint(Input.mousePosition) - mouseWorldPositionAtStartMousePan;
             // make camera move relative its parent object as player pans
             Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
 
             newPosition -= mousePositionDelta + parentObjectOffsetFromStartPan;
         }
-        #endregion
-    }
 
-    void LateUpdate()
-    {
+        // keyboard panning
+        // make pan speed at different zoom levels exponentially more
+        float zoomRatio = (cam.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1;
+
+        newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
+        newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
+        #endregion
+
+        // apply movement
         // don't move z
         newPosition.z = transform.position.z;
         // apply movement to camera
         transform.position = newPosition;
+    }
+
+    void LateUpdate()
+    {
+        
     }
 }

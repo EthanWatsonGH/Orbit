@@ -241,8 +241,7 @@ public class LevelManager : MonoBehaviour
 
                     if (prefabToInstantiate != null)
                     {
-                        // TODO: ensure it's placed at Z 0
-                        Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition);
+                        Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
                         Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
 
                         GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, levelObjectsContainer.transform);

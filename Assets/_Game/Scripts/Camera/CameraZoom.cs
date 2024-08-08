@@ -4,14 +4,18 @@ using UnityEngine;
 
 public class CameraZoom : MonoBehaviour
 {
+    Camera cam;
+
     float newCameraZoom;
     float distanceBetweenTouchesAtTouchBegan;
     float cameraZoomAtTouchBegan;
 
     void Start()
     {
+        cam = gameObject.transform.GetComponent<Camera>();
+
         // set the default zoom of the camera
-        Camera.main.orthographicSize = GameManager.Instance.DefaultCameraZoom;
+        cam.orthographicSize = GameManager.Instance.DefaultCameraZoom;
 
         // initialize value
         newCameraZoom = GameManager.Instance.DefaultCameraZoom;
@@ -28,7 +32,7 @@ public class CameraZoom : MonoBehaviour
             if (touch1.phase == TouchPhase.Began)
             {
                 distanceBetweenTouchesAtTouchBegan = Vector3.Distance(touch1.position, touch0.position);
-                cameraZoomAtTouchBegan = Camera.main.orthographicSize;
+                cameraZoomAtTouchBegan = cam.orthographicSize;
             }
             else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
             {
@@ -39,13 +43,13 @@ public class CameraZoom : MonoBehaviour
         }
 
         // desktop
-        float desktopZoomRatio = Camera.main.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
+        float desktopZoomRatio = cam.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
         if (Input.GetAxisRaw("Mouse ScrollWheel") != 0)
-            newCameraZoom = Camera.main.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * desktopZoomRatio * -1f;
+            newCameraZoom = cam.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * desktopZoomRatio * -1f;
     }
 
     void LateUpdate()
     {
-        Camera.main.orthographicSize = Mathf.Clamp(newCameraZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+        cam.orthographicSize = Mathf.Clamp(newCameraZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
     }
 }

@@ -327,11 +327,6 @@ public class LevelEditor : MonoBehaviour
         LevelManager.Instance.DestroyAllExistingLevelObjects();
     }
 
-    public void RecenterCamera()
-    {
-        Camera.main.transform.position = new Vector3(startLocationIcon.transform.position.x, startLocationIcon.transform.position.y, Camera.main.transform.position.z);
-    }
-
     public void SwitchToLocalTransformMode()
     {
         // change to opposite button

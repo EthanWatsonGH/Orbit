@@ -43,18 +43,18 @@ public class GameManager : MonoBehaviour
     // level editor placeable objects references
     // TODO: make these capitalized to signify public
     [Header("Level Editor Placable Objects")]
-    [SerializeField] public GameObject bouncyWallPrefab;
-    [SerializeField] public GameObject boosterPrefab;
-    [SerializeField] public GameObject constantPullerPrefab;
-    [SerializeField] public GameObject constantPusherPrefab;
-    [SerializeField] public GameObject finishPrefab;
-    [SerializeField] public GameObject killCirclePrefab;
-    [SerializeField] public GameObject killWallPrefab;
-    [SerializeField] public GameObject pullerPrefab;
-    [SerializeField] public GameObject pusherPrefab;
-    [SerializeField] public GameObject slipperyWallPrefab;
-    
-    // player preferences fields
+    public GameObject bouncyWallPrefab;
+    public GameObject boosterPrefab;
+    public GameObject constantPullerPrefab;
+    public GameObject constantPusherPrefab;
+    public GameObject finishPrefab;
+    public GameObject killCirclePrefab;
+    public GameObject killWallPrefab;
+    public GameObject pullerPrefab;
+    public GameObject pusherPrefab;
+    public GameObject slipperyWallPrefab;
+
+    [Header("Player Preferences Fields")]
     // TODO: make menus to change these. make them save to / load from file(s) to keep between restarts.
     public float UIScale = 1.5f;
     public float DefaultCameraZoom = 10f;
@@ -63,6 +63,7 @@ public class GameManager : MonoBehaviour
     public float ScrollZoomIncrement = 10f;
     public float KeyboardPanSpeed = 20f;
 
+    // TODO: move this stuff to be handled in UI manager
     public bool touchPointIsOverButton = false;
 
     void Start()
@@ -75,7 +76,6 @@ public class GameManager : MonoBehaviour
         
     }
 
-    // TODO: may not need this
     // buttons will use these to say if the touch point is over any button
     public void SetTouchPointIsOverButtonTrue()
     {

@@ -72,7 +72,7 @@ public class Player : MonoBehaviour
 
     void LateUpdate()
     {
-        
+
     }
 
     private void OnEnable()
@@ -107,6 +107,7 @@ public class Player : MonoBehaviour
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
 
+            // TODO: if i click the restart button, then whenever i press space to launch after that it instantly restarts and launches
             // launch player in direction of launchDirectionPoint when they press launch
             if (Input.GetButtonDown("Jump") || playerPressedLaunch)
             {
@@ -122,12 +123,16 @@ public class Player : MonoBehaviour
         }
         else // in play mode
         {
+            if (Input.GetButtonDown("Jump"))
+                RetryLevel();
+
             // show retry button instead of launch button
             retryButton.SetActive(true);
             launchButton.SetActive(false);
         }
     }
 
+    // TODO: split launch direction point logic into its own script
     void EnsureLaunchDirectionPointAlwaysInFront()
     {
         Vector3 launchDirectionPointPosition = new Vector3(launchDirectionPoint.transform.position.x, launchDirectionPoint.transform.position.y, -1f);
@@ -227,7 +232,8 @@ public class Player : MonoBehaviour
         rb.velocity = Vector2.zero;
 
         // reset to start location, ensuring z = 0
-        this.gameObject.transform.position = new Vector3(startLocation.transform.position.x, startLocation.transform.position.y, 0);
+        gameObject.transform.position = new Vector3(startLocation.transform.position.x, startLocation.transform.position.y, 0f);
+
         // hide displays
         winDisplay.gameObject.SetActive(false);
         loseDisplay.gameObject.SetActive(false);
@@ -254,11 +260,6 @@ public class Player : MonoBehaviour
 
         // ensure not in win state
         isInWinState = false;
-    }
-
-    public void RecenterCamera()
-    {
-        Camera.main.transform.position = new Vector3(gameObject.transform.position.x, gameObject.transform.position.y, Camera.main.transform.position.z);
     }
 
     void OnTriggerStay2D(Collider2D collision)
