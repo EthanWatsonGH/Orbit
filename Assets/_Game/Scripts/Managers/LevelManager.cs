@@ -86,7 +86,6 @@ public class LevelManager : MonoBehaviour
     [SerializeField] GameObject playerStartPoint;
     [SerializeField] TMP_InputField levelSaveNameInput;
     [SerializeField] TMP_InputField levelLoadNameInput;
-    
 
     void Start()
     {

@@ -32,15 +32,15 @@ public class LevelEditor : MonoBehaviour
     Vector3 moveControlOffsetFromParent;
     Vector3 moveOffset;
 
-    float cameraZoomAtStart;
-
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
-        "X",
-        "Y",
-        "Both",
+        "Move X",
+        "Move Y",
+        "Move Both",
+        "Scale X",
+        "Scale Y",
+        "Scale Both",
         "Rotate",
-        "Close",
         "Duplicate"
     };
 
@@ -53,8 +53,6 @@ public class LevelEditor : MonoBehaviour
 
     void Start()
     {
-        cameraZoomAtStart = Camera.main.orthographicSize;
-
         // ensure level editor UI is enabled
         canvas.gameObject.SetActive(true);
     }
@@ -65,7 +63,6 @@ public class LevelEditor : MonoBehaviour
         GetTouchPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
-        HandleScaleObjectTransformControlsWithZoom();
         EnsureObjectTransformControlsAlwaysInFront();
     }
 
@@ -118,10 +115,11 @@ public class LevelEditor : MonoBehaviour
 
             if (hit.collider != null) // object hit
             {
-                if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any object transform controls to be set as selected object
+                if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any UI objects to be set as selected object
                 {
                     selectedObject = hit.collider.gameObject;
                     objectTransformControls.transform.position = hit.transform.position;
+                    closeObjectTransformControlsButton.SetActive(true);
                 }
             }
             else // no object / background hit
@@ -194,17 +192,6 @@ public class LevelEditor : MonoBehaviour
                 }
             }
         }
-    }
-
-    void HandleScaleObjectTransformControlsWithZoom()
-    {
-        float currentCameraSize = Camera.main.orthographicSize;
-        float cameraScaleRatio = cameraZoomAtStart / currentCameraSize;
-        // invert so its bigger when zoomed out instead of smaller
-        cameraScaleRatio = 1 / cameraScaleRatio;
-
-        Vector3 newObjectTransformControlsScale = new Vector3(GameManager.Instance.UIScale * cameraScaleRatio, GameManager.Instance.UIScale * cameraScaleRatio, 1);
-        objectTransformControls.transform.localScale = newObjectTransformControlsScale;
     }
 
     void EnsureObjectTransformControlsAlwaysInFront()

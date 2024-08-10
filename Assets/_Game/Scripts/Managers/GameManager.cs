@@ -43,6 +43,7 @@ public class GameManager : MonoBehaviour
     [Header("Player Preferences Fields")]
     // TODO: make menus to change these. make them save to / load from file(s) to keep between restarts.
     public float UIScale = 1.5f;
+    public float ObjectTransformControlsOffsetMultiplier = 1f;
     public float DefaultCameraZoom = 10f;
     public float MaxCameraZoom = 100f;
     public float MinCameraZoom = 2f;

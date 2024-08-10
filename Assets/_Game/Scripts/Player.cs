@@ -26,7 +26,6 @@ public class Player : MonoBehaviour
     // variables
     [SerializeField] float pullForce;
     [SerializeField] float launchForce;
-    float cameraZoomAtStart;
     float timeAtLastRetry;
     bool isInAimingMode = true;
     bool playerPressedLaunch = false; // TODO: change to events
@@ -38,8 +37,6 @@ public class Player : MonoBehaviour
 
     void Start()
     {
-        cameraZoomAtStart = Camera.main.orthographicSize;
-
         lr.positionCount = 2;
         RetryLevel();
 
@@ -100,7 +97,6 @@ public class Player : MonoBehaviour
             HandleMoveLaunchDirectionPoint();
             HandleLaunchDirectionPointRotation();
             UpdateLineRenderer();
-            HandleScaleLaunchDirectionPointWithZoom();
 
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
@@ -200,17 +196,6 @@ public class Player : MonoBehaviour
 
             launchDirectionPoint.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
         }
-    }
-
-    void HandleScaleLaunchDirectionPointWithZoom()
-    {
-        float currentCameraSize = Camera.main.orthographicSize;
-        float cameraScaleRatio = cameraZoomAtStart / currentCameraSize;
-        // invert so its bigger when zoomed out instead of smaller
-        cameraScaleRatio = 1 / cameraScaleRatio;
-
-        Vector3 newLaunchDirectionPointScale = new Vector3(GameManager.Instance.UIScale * cameraScaleRatio, GameManager.Instance.UIScale * cameraScaleRatio, 1f);
-        launchDirectionPoint.transform.localScale = newLaunchDirectionPointScale;
     }
 
     void UpdateLineRenderer()
