@@ -2901,6 +2901,7 @@ GameObject:
   - component: {fileID: 7348976789439281276}
   - component: {fileID: 6596382160931283187}
   - component: {fileID: 5912244211506732396}
+  - component: {fileID: 8771974035429653277}
   m_Layer: 5
   m_Name: RecenterCamera
   m_TagString: Untagged
@@ -3008,7 +3009,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 7348976789439281276}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 8771974035429653277}
+        m_TargetAssemblyTypeName: ButtonEventCaller, Assembly-CSharp
+        m_MethodName: RecenterCamera
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &5912244211506732396
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3054,6 +3067,18 @@ MonoBehaviour:
             m_StringArgument: 
             m_BoolArgument: 0
           m_CallState: 2
+--- !u!114 &8771974035429653277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2934434330421695630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd490b4291a847d47a766aae5b470dd5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &3308667759710492590
 GameObject:
   m_ObjectHideFlags: 0
