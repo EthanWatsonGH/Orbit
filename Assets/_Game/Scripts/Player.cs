@@ -101,7 +101,7 @@ public class Player : MonoBehaviour
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
 
-            // TODO: if i click the restart button, then whenever i press space to launch after that it instantly restarts and launches
+            // TODO: if i click the restart button, then whenever i press space to launch after that it instantly restarts and launches. but when i win or lose it fixes itself.
             // launch player in direction of launchDirectionPoint when they press launch
             if (Input.GetButtonDown("Jump") || playerPressedLaunch)
             {
@@ -126,7 +126,6 @@ public class Player : MonoBehaviour
         }
     }
 
-    // TODO: split launch direction point logic into its own script
     void EnsureLaunchDirectionPointAlwaysInFront()
     {
         Vector3 launchDirectionPointPosition = new Vector3(launchDirectionPoint.transform.position.x, launchDirectionPoint.transform.position.y, -1f);
@@ -200,7 +199,7 @@ public class Player : MonoBehaviour
 
     void UpdateLineRenderer()
     {
-        lr.SetPosition(0, this.gameObject.transform.position);
+        lr.SetPosition(0, transform.position);
         lr.SetPosition(1, launchDirectionPoint.transform.position);
     }
 

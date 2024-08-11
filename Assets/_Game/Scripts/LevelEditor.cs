@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -27,6 +28,8 @@ public class LevelEditor : MonoBehaviour
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
     bool isTryingToMoveSelectedObject = false;
+    bool isTryingToRotateSelectedObject = false;
+    float selectedObjectRotationAtStartRotate;
 
     // object movement
     Vector3 moveControlOffsetFromParent;
@@ -63,6 +66,7 @@ public class LevelEditor : MonoBehaviour
         GetTouchPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
+        HandleRotateSelectedObject();
         EnsureObjectTransformControlsAlwaysInFront();
     }
 
@@ -191,6 +195,59 @@ public class LevelEditor : MonoBehaviour
                     objectTransformControls.SetActive(true);
                 }
             }
+        }
+    }
+
+    void HandleRotateSelectedObject()
+    {
+        void HideAllObjectTransformControlsChildren()
+        {
+            foreach (Transform child in objectTransformControls.transform)
+            {
+                child.gameObject.SetActive(false);
+            }
+        }
+
+        void ShowAllObjectTransformControlsChildren()
+        {
+            foreach (Transform child in objectTransformControls.transform)
+            {
+                child.gameObject.SetActive(true);
+            }
+        }
+
+        if (Input.GetButtonDown("Fire1"))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
+
+            if (/*hit.transform != null &&*/ hit.transform.IsChildOf(objectTransformControls.transform))
+            {
+                switch (hit.transform.name)
+                {
+                    case "Rotate":
+                        HideAllObjectTransformControlsChildren();
+                        isTryingToRotateSelectedObject = true;
+                        objectTransformControls.GetComponent<LineRenderer>().enabled = true;
+                        selectedObjectRotationAtStartRotate = selectedObject.transform.localRotation.z;
+                        break;
+                }
+            }
+        }
+        if (Input.GetButtonUp("Fire1") && isTryingToRotateSelectedObject)
+        {
+            ShowAllObjectTransformControlsChildren();
+            isTryingToRotateSelectedObject = false;
+            objectTransformControls.GetComponent<LineRenderer>().enabled = false;
+        }
+        if (isTryingToRotateSelectedObject)
+        {
+            objectTransformControls.GetComponent<LineRenderer>().SetPosition(0, objectTransformControls.transform.position);
+            objectTransformControls.GetComponent<LineRenderer>().SetPosition(1, Camera.main.ScreenToWorldPoint(Input.mousePosition));
+
+            Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, angle));
         }
     }
 
