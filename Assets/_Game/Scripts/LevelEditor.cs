@@ -365,6 +365,7 @@ public class LevelEditor : MonoBehaviour
         pointerIsOverObjectSelectionBar = false;
     }
 
+    // TODO: move these to ButtonEventCaller
     // expose level manager functions for level editor UI buttons
     public void SaveLevel()
     {
