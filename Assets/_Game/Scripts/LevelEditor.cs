@@ -25,7 +25,7 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
-    Vector3 touchPosition;
+    Vector3 pointerPosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
 
@@ -38,8 +38,6 @@ public class LevelEditor : MonoBehaviour
     bool isTryingToRotateSelectedObject = false;
     float selectedObjectRotationAtStartRotate;
     float angleToPointerAtStartRotate;
-
-    
 
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
@@ -69,29 +67,32 @@ public class LevelEditor : MonoBehaviour
     void Update()
     {
         HandlePlacePrefab();
-        GetTouchPosition();
+        GetPointerPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
         HandleRotateSelectedObject();
         EnsureObjectTransformControlsAlwaysInFront();
     }
 
-    void GetTouchPosition()
+    void GetPointerPosition()
     {
+        pointerPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+
         if (Input.touchCount >= 1)
         {
-            touchPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
-            // ensure no depth
-            touchPosition.z = 0;
+            pointerPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
         }
+
+        // ensure no depth
+        pointerPosition.z = 0;
     }
 
     void HandlePlacePrefab()
     {
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
-            // make the object the player is currently trying to place follow the mouse
-            objectCurrentlyTryingToPlace.transform.position = touchPosition;
+            // make the object the player is currently trying to place follow the pointer
+            objectCurrentlyTryingToPlace.transform.position = pointerPosition;
 
             // dont show object that is currently trying to be placed when over object selection bar
             if (pointerIsOverObjectSelectionBar)
@@ -108,6 +109,10 @@ public class LevelEditor : MonoBehaviour
                 if (pointerIsOverObjectSelectionBar)
                 {
                     Destroy(objectCurrentlyTryingToPlace);
+                }
+                else
+                {
+                    selectedObject = objectCurrentlyTryingToPlace;
                 }
 
                 objectCurrentlyTryingToPlace = null;
@@ -128,7 +133,6 @@ public class LevelEditor : MonoBehaviour
                 if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any UI objects to be set as selected object
                 {
                     selectedObject = hit.collider.gameObject;
-                    objectTransformControls.transform.position = hit.transform.position;
                     closeObjectTransformControlsButton.SetActive(true);
                 }
             }
@@ -138,9 +142,14 @@ public class LevelEditor : MonoBehaviour
                 selectedObject = null;
                 closeObjectTransformControlsButton.SetActive(false);
             }
+        }
 
-            // only show controls if something is selected
-            objectTransformControls.SetActive(selectedObject != null);
+        // only show controls if something is selected
+        objectTransformControls.SetActive(selectedObject != null);
+
+        if (selectedObject != null)
+        {
+            objectTransformControls.transform.position = selectedObject.transform.position;
         }
     }
 
@@ -159,7 +168,7 @@ public class LevelEditor : MonoBehaviour
                 // set offset from parent to keep relative offset at all scales
                 moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
                 // set position of mouse at click for calculating offset for movement
-                moveOffset = moveControl.transform.position - touchPosition;
+                moveOffset = moveControl.transform.position - pointerPosition;
             }
         }
 
@@ -183,7 +192,7 @@ public class LevelEditor : MonoBehaviour
             if (isTryingToMoveSelectedObject)
             {
                 // make moveControl follow mouse, with the offset from the exact location on click
-                moveControl.transform.position = touchPosition + moveOffset;
+                moveControl.transform.position = pointerPosition + moveOffset;
                 // make objectTransformControls follow moveControl while keeping offset
                 objectTransformControls.transform.position = moveControl.transform.position - moveControlOffsetFromParent;
                 // make selectedObject follow objectTransformControls
@@ -274,7 +283,7 @@ public class LevelEditor : MonoBehaviour
 
             // update line renderer position
             objectTransformControls.GetComponent<LineRenderer>().SetPosition(0, objectTransformControls.transform.position);
-            objectTransformControls.GetComponent<LineRenderer>().SetPosition(1, Camera.main.ScreenToWorldPoint(Input.mousePosition));
+            objectTransformControls.GetComponent<LineRenderer>().SetPosition(1, pointerPosition);
         }
     }
 
@@ -282,12 +291,6 @@ public class LevelEditor : MonoBehaviour
     {
         Vector3 objectTransformControlsPosition = new Vector3(objectTransformControls.transform.position.x, objectTransformControls.transform.position.y, -1f);
         objectTransformControls.transform.position = objectTransformControlsPosition;
-    }
-
-    void StartTryingToPlaceObject()
-    {
-        isTryingToPlace = true;
-        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, touchPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
 
     public void SwitchToPlayMode()
@@ -303,6 +306,11 @@ public class LevelEditor : MonoBehaviour
     }
 
     #region Object Place Functions
+    void StartTryingToPlaceObject()
+    {
+        isTryingToPlace = true;
+        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerPosition, Quaternion.identity, levelObjectsCollection.transform);
+    }
     public void PlaceBooster()
     {
         prefabToPlace = LevelManager.Instance.BoosterPrefab;

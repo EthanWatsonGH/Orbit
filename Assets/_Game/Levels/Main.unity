@@ -312,6 +312,10 @@ PrefabInstance:
       propertyPath: m_AnchorMin.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8212459075170661228, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8234236127215419273, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
@@ -461,6 +465,10 @@ PrefabInstance:
     - target: {fileID: 1092709086154943868, guid: ff437deca4d40c54f8558385786f9464, type: 3}
       propertyPath: m_Name
       value: ObjectTransformControls
+      objectReference: {fileID: 0}
+    - target: {fileID: 1092709086154943868, guid: ff437deca4d40c54f8558385786f9464, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2406358938379761101, guid: ff437deca4d40c54f8558385786f9464, type: 3}
       propertyPath: m_LocalPosition.x
@@ -634,6 +642,10 @@ PrefabInstance:
     - target: {fileID: 3080308539409343846, guid: 52b56b07a05ad7b4f84894842f98b1fa, type: 3}
       propertyPath: m_Name
       value: PlayerStartPoint
+      objectReference: {fileID: 0}
+    - target: {fileID: 3080308539409343846, guid: 52b56b07a05ad7b4f84894842f98b1fa, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
