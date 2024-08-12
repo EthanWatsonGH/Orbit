@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UIElements;
 
 public class LevelEditor : MonoBehaviour
 {
@@ -27,13 +28,18 @@ public class LevelEditor : MonoBehaviour
     Vector3 touchPosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
-    bool isTryingToMoveSelectedObject = false;
-    bool isTryingToRotateSelectedObject = false;
-    float selectedObjectRotationAtStartRotate;
 
     // object movement
     Vector3 moveControlOffsetFromParent;
     Vector3 moveOffset;
+    bool isTryingToMoveSelectedObject = false;
+
+    // object rotation
+    bool isTryingToRotateSelectedObject = false;
+    float selectedObjectRotationAtStartRotate;
+    float angleToPointerAtStartRotate;
+
+    
 
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
@@ -216,38 +222,59 @@ public class LevelEditor : MonoBehaviour
             }
         }
 
-        if (Input.GetButtonDown("Fire1"))
+        if (Input.GetButtonDown("Fire1")) // start
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
-            if (/*hit.transform != null &&*/ hit.transform.IsChildOf(objectTransformControls.transform))
+            if (hit.transform != null && hit.transform.IsChildOf(objectTransformControls.transform))
             {
                 switch (hit.transform.name)
                 {
                     case "Rotate":
+                        // dont show any part of the object transform controls other than its line renderer
                         HideAllObjectTransformControlsChildren();
-                        isTryingToRotateSelectedObject = true;
                         objectTransformControls.GetComponent<LineRenderer>().enabled = true;
-                        selectedObjectRotationAtStartRotate = selectedObject.transform.localRotation.z;
+
+                        // initiate rotation
+                        isTryingToRotateSelectedObject = true;
+                        
+                        // remember values at start rotate to later make the rotation relative to the selected object's starting rotation
+                        selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
+                        // get the angle to the pointer when the player starts rotating the object
+                        Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
+                        angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
                         break;
                 }
             }
         }
-        if (Input.GetButtonUp("Fire1") && isTryingToRotateSelectedObject)
+        if (Input.GetButtonUp("Fire1") && isTryingToRotateSelectedObject) // end
         {
+            // show everything on object transform controls except its line renderer
             ShowAllObjectTransformControlsChildren();
-            isTryingToRotateSelectedObject = false;
             objectTransformControls.GetComponent<LineRenderer>().enabled = false;
+
+            // stop rotating
+            isTryingToRotateSelectedObject = false;
         }
         if (isTryingToRotateSelectedObject)
         {
+            // get rotation to current pointer position
+            Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
+            float currentAngleToPointer = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+
+            // get the difference between current angle to pointer and the angle to pointer when the player started rotating
+            float deltaAngle = currentAngleToPointer - angleToPointerAtStartRotate;
+
+            // add the difference between start and end rotate to the selected object's rotation when the player started rotating
+            float newRotation = selectedObjectRotationAtStartRotate + deltaAngle;
+
+            // apply new rotation to selected object
+            selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, newRotation));
+
+            // update line renderer position
             objectTransformControls.GetComponent<LineRenderer>().SetPosition(0, objectTransformControls.transform.position);
             objectTransformControls.GetComponent<LineRenderer>().SetPosition(1, Camera.main.ScreenToWorldPoint(Input.mousePosition));
-
-            Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
-            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-            selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, angle));
         }
     }
 
