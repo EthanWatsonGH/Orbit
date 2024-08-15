@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -142,6 +143,15 @@ public class LevelEditor : MonoBehaviour
                 {
                     selectedObject = hit.collider.gameObject;
                     closeObjectTransformControlsButton.SetActive(true);
+
+                    if (selectedObject.name == "PlayerStartPoint")
+                    {
+                        objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(false);
+                    }
+                    else
+                    {
+                        objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(true);
+                    }
                 }
             }
             else // no object / background hit

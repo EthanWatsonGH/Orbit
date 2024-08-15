@@ -875,6 +875,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 234237094}
     m_Modifications:
+    - target: {fileID: 1582589389475793930, guid: a750cb96939758d40a0b972111cb27ff, type: 3}
+      propertyPath: DefaultCameraZoom
+      value: 10
+      objectReference: {fileID: 0}
     - target: {fileID: 6142234520521865159, guid: a750cb96939758d40a0b972111cb27ff, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
