@@ -167,8 +167,13 @@ public class LevelEditor : MonoBehaviour
             {
                 string hitName = hit.transform.name;
 
-                if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y")
+                if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y" || hitName == "Duplicate")
                 {
+                    if (hitName == "Duplicate")
+                    {
+                        selectedObject = Instantiate(selectedObject, levelObjectsCollection.transform);
+                    }
+
                     isTryingToMoveSelectedObject = true;
                     lastHitMoveControl = hit.transform;
                     selectedObjectPositionAtStartMove = selectedObject.transform.position;
