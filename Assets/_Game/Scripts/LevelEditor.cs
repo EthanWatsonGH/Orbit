@@ -16,6 +16,9 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject localTransformButton;
     [SerializeField] GameObject worldTransformButton;
     [SerializeField] GameObject closeObjectTransformControlsButton;
+    [SerializeField] LineRenderer verticalLine;
+    [SerializeField] LineRenderer horizontalLine;
+    [SerializeField] LineRenderer rotationLine;
 
     // world object references
     [Header("World Objects")]
@@ -29,7 +32,6 @@ public class LevelEditor : MonoBehaviour
     GameObject selectedObject = null;
 
     // object movement
-    Vector3 moveControlOffsetFromParent;
     Vector3 moveOffset;
     bool isTryingToMoveSelectedObject = false;
     Transform lastHitMoveControl = null;
@@ -70,8 +72,8 @@ public class LevelEditor : MonoBehaviour
         HandlePlacePrefab();
         UpdatePointerPosition();
         HandleSelectObject();
-        HandleMoveSelectedObject();
         HandleRotateSelectedObject();
+        HandleMoveSelectedObject();
         EnsureObjectTransformControlsAlwaysInFront();
     }
 
@@ -174,26 +176,27 @@ public class LevelEditor : MonoBehaviour
                         selectedObject = Instantiate(selectedObject, levelObjectsCollection.transform);
                     }
 
+                    objectTransformControls.SetActive(false);
+
                     isTryingToMoveSelectedObject = true;
                     lastHitMoveControl = hit.transform;
                     selectedObjectPositionAtStartMove = selectedObject.transform.position;
 
-                    // set offset from parent to keep relative offset at all scales
-                    moveControlOffsetFromParent = lastHitMoveControl.position - objectTransformControls.transform.position;
-                    // set position of mouse at click for calculating offset for movement
-                    moveOffset = lastHitMoveControl.position - pointerPosition;
+                    // get offset between selected object and pointer position to keep it while moving
+                    moveOffset = selectedObject.transform.position - pointerPosition;
                 }
             }
         }
 
         // stop trying to move selected object when player releases
         // TODO: handle if they pause or exit edit mode while moving object, if that's still an issue later
-        if (Input.GetButtonUp("Fire1"))
+        if (Input.GetButtonUp("Fire1") && isTryingToMoveSelectedObject)
         {
+            objectTransformControls.SetActive(true);
             isTryingToMoveSelectedObject = false;
             lastHitMoveControl = null;
 
-            // if object is dropped over selection bar, destroy it
+            // if object is dropped while pointer is over object selection bar, destroy it
             if (selectedObject != null && pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
             {
                 Destroy(selectedObject);
@@ -204,91 +207,74 @@ public class LevelEditor : MonoBehaviour
 
         if (Input.GetAxisRaw("Fire1") > 0 && selectedObject != null)
         {
+            objectTransformControls.SetActive(false);
+
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
-                // make moveControl follow mouse, with the offset from the exact location on click
-                lastHitMoveControl.position = pointerPosition + moveOffset;
-                // make objectTransformControls follow moveControl while keeping offset
-                objectTransformControls.transform.position = lastHitMoveControl.position - moveControlOffsetFromParent;
-                // make selectedObject follow objectTransformControls
-                selectedObject.transform.position = objectTransformControls.transform.position;
+                // make selectedObject move with pointer
+                selectedObject.transform.position = pointerPosition + moveOffset;
 
                 // if hovering over object selection bar, hide object placement preview and transform controls
                 if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint")) // TODO: make it so you can remove player start point, but must have one before you can play the level?
                 {
                     selectedObject.SetActive(false);
-                    objectTransformControls.SetActive(false);
                 }
-                else
+                else // not hovering pointer over object selection bar
                 {
                     selectedObject.SetActive(true);
-                    objectTransformControls.SetActive(true);
                 }
 
                 if (lastHitMoveControl.name == "Move X")
+                {
                     selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, selectedObjectPositionAtStartMove.y, 0f);
+                }
 
                 if (lastHitMoveControl.name == "Move Y")
+                {
                     selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, selectedObject.transform.position.y, 0f);
+                }
             }
         }
     }
 
     void HandleRotateSelectedObject()
     {
-        void HideAllObjectTransformControlsChildren()
-        {
-            foreach (Transform child in objectTransformControls.transform)
-            {
-                child.gameObject.SetActive(false);
-            }
-        }
-
-        void ShowAllObjectTransformControlsChildren()
-        {
-            foreach (Transform child in objectTransformControls.transform)
-            {
-                child.gameObject.SetActive(true);
-            }
-        }
-
-        if (Input.GetButtonDown("Fire1")) // start
+        if (Input.GetButtonDown("Fire1")) // start rotate
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
-            if (hit.transform != null && hit.transform.IsChildOf(objectTransformControls.transform))
+            if (hit.transform != null && hit.transform.name == "Rotate")
             {
-                switch (hit.transform.name)
-                {
-                    case "Rotate":
-                        // dont show any part of the object transform controls other than its line renderer
-                        HideAllObjectTransformControlsChildren();
-                        objectTransformControls.GetComponent<LineRenderer>().enabled = true;
+                objectTransformControls.SetActive(false);
+                rotationLine.gameObject.SetActive(true);
+                rotationLine.SetPosition(0, selectedObject.transform.position);
 
-                        // initiate rotation
-                        isTryingToRotateSelectedObject = true;
+                // initiate rotation
+                isTryingToRotateSelectedObject = true;
                         
-                        // remember values at start rotate to later make the rotation relative to the selected object's starting rotation
-                        selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
-                        // get the angle to the pointer when the player starts rotating the object
-                        Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
-                        angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-                        break;
-                }
+                // remember values at start rotate to later make the rotation relative to the selected object's starting rotation
+                selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
+                // get the angle to the pointer when the player starts rotating the object
+                Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
+                angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
             }
         }
-        if (Input.GetButtonUp("Fire1") && isTryingToRotateSelectedObject) // end
+
+        if (Input.GetButtonUp("Fire1") && isTryingToRotateSelectedObject) // end rotate
         {
-            // show everything on object transform controls except its line renderer
-            ShowAllObjectTransformControlsChildren();
-            objectTransformControls.GetComponent<LineRenderer>().enabled = false;
+            objectTransformControls.SetActive(true);
+            rotationLine.gameObject.SetActive(false);
 
             // stop rotating
             isTryingToRotateSelectedObject = false;
         }
-        if (isTryingToRotateSelectedObject)
+
+        if (isTryingToRotateSelectedObject) // do rotate
         {
+            // TODO: may not need this once it get it all good on the movement side
+            objectTransformControls.SetActive(false);
+
             // get rotation to current pointer position
             Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
             float currentAngleToPointer = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
@@ -303,8 +289,7 @@ public class LevelEditor : MonoBehaviour
             selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, newRotation));
 
             // update line renderer position
-            objectTransformControls.GetComponent<LineRenderer>().SetPosition(0, objectTransformControls.transform.position);
-            objectTransformControls.GetComponent<LineRenderer>().SetPosition(1, pointerPosition);
+            rotationLine.SetPosition(1, pointerPosition);
         }
     }
 
