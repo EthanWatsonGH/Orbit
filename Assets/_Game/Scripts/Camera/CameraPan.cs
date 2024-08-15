@@ -80,11 +80,10 @@ public class CameraPan : MonoBehaviour
         // make pan speed at different zoom levels exponentially more
         float zoomRatio = (cam.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1;
 
-        newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
-        newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.deltaTime * zoomRatio;
+        newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
+        newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
         #endregion
 
-        // apply movement
         // don't move z
         newPosition.z = transform.position.z;
         // apply movement to camera

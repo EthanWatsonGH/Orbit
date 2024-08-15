@@ -33,7 +33,8 @@ public class EventManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // TODO: this is always being destroyed for some reason. if i delete the object and place a new one in the scene it fixes it, until i restart the editor and it starts doing it again
+            //Destroy(gameObject);
         }
     }
     #endregion

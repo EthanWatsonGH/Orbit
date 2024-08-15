@@ -4,25 +4,36 @@ using UnityEngine;
 
 public class OffsetObjectWithZoom : MonoBehaviour
 {
-    float offsetAtStartX;
-    float offsetAtStartY;
-    float cameraZoomAtStart;
+    float offsetAtAwakeX;
+    float offsetAtAwakeY;
+    float cameraZoomAtAwake;
 
-    void Start()
+    void Awake()
     {
-        offsetAtStartX = transform.localPosition.x;
-        offsetAtStartY = transform.localPosition.y;
-        cameraZoomAtStart = Camera.main.orthographicSize;
+        offsetAtAwakeX = transform.localPosition.x;
+        offsetAtAwakeY = transform.localPosition.y;
+        cameraZoomAtAwake = Camera.main.orthographicSize;
+    }
+
+    void OnEnable()
+    {
+        Offset();
     }
 
     void Update()
     {
-        float cameraScaleRatio = cameraZoomAtStart / Camera.main.orthographicSize;
+        Offset();
+
+    }
+
+    void Offset()
+    {
+        float cameraScaleRatio = cameraZoomAtAwake / Camera.main.orthographicSize;
         cameraScaleRatio = 1 / cameraScaleRatio;
 
-        Vector3 newPosition = 
-            new Vector3(offsetAtStartX * cameraScaleRatio * GameManager.Instance.ObjectTransformControlsOffsetMultiplier, 
-            offsetAtStartY * cameraScaleRatio * GameManager.Instance.ObjectTransformControlsOffsetMultiplier, 
+        Vector3 newPosition =
+            new Vector3(offsetAtAwakeX * cameraScaleRatio * GameManager.Instance.ObjectTransformControlsOffsetMultiplier,
+            offsetAtAwakeY * cameraScaleRatio * GameManager.Instance.ObjectTransformControlsOffsetMultiplier,
             transform.localPosition.z);
         transform.localPosition = newPosition;
     }

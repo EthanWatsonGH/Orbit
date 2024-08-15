@@ -67,17 +67,18 @@ public class LevelEditor : MonoBehaviour
     void Update()
     {
         HandlePlacePrefab();
-        GetPointerPosition();
+        UpdatePointerPosition();
         HandleSelectObject();
         HandleMoveSelectedObject();
         HandleRotateSelectedObject();
         EnsureObjectTransformControlsAlwaysInFront();
     }
 
-    void GetPointerPosition()
+    void UpdatePointerPosition()
     {
         pointerPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
+        // TODO: i dont like this because when there's more than 1 finger the pointerPosition will jump between the fingers. just make each funtion handle touch and mouse position independently on their own
         if (Input.touchCount >= 1)
         {
             pointerPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);

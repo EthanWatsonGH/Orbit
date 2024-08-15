@@ -26,7 +26,7 @@ public class Player : MonoBehaviour
     // variables
     [SerializeField] float pullForce;
     [SerializeField] float launchForce;
-    float timeAtLastRetry;
+    float timeAtLastLaunch;
     bool isInAimingMode = true;
     bool playerPressedLaunch = false; // TODO: change to events
     bool isInvincible = false;
@@ -34,6 +34,7 @@ public class Player : MonoBehaviour
     bool isInLoseState = false;
     bool canMoveLaunchDirectionPoint = false;
     Vector3 offsetAtStartMoveLaunchDirectionPoint = Vector3.zero;
+    float timeAtLastRetry;
 
     void Start()
     {
@@ -57,7 +58,7 @@ public class Player : MonoBehaviour
                 if (!isInWinState)
                 {
                     // update time display
-                    timeDisplay.text = (Time.time - timeAtLastRetry).ToString("F3");
+                    timeDisplay.text = (Time.time - timeAtLastLaunch).ToString("F3");
                 }
 
                 // update speed display
@@ -101,15 +102,14 @@ public class Player : MonoBehaviour
             // ensure velocity is zero
             rb.velocity = Vector2.zero;
 
-            // TODO: if i click the restart button, then whenever i press space to launch after that it instantly restarts and launches. but when i win or lose it fixes itself.
             // launch player in direction of launchDirectionPoint when they press launch
-            if (Input.GetButtonDown("Jump") || playerPressedLaunch)
+            if ((Input.GetButtonDown("Jump") || playerPressedLaunch) && Time.time > timeAtLastRetry + 0.1f) // since launch and retry are on the same key, check a delay to not let them happen on the same frame
             {
                 Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
                 rb.velocity = launchDirection.normalized * launchForce;
 
                 // for timer calculation
-                timeAtLastRetry = Time.time;
+                timeAtLastLaunch = Time.time;
 
                 isInAimingMode = false;
                 playerPressedLaunch = false;
@@ -118,7 +118,9 @@ public class Player : MonoBehaviour
         else // in play mode
         {
             if (Input.GetButtonDown("Jump"))
+            {
                 RetryLevel();
+            }
 
             // show retry button instead of launch button
             retryButton.SetActive(true);
@@ -205,6 +207,8 @@ public class Player : MonoBehaviour
 
     void RetryLevel()
     {
+        timeAtLastRetry = Time.time;
+
         isInAimingMode = true;
         isInWinState = false;
         isInLoseState = false;
@@ -289,6 +293,7 @@ public class Player : MonoBehaviour
             // finish area
             if (collision.gameObject.CompareTag("Finish") && !isInLoseState)
             {
+                Time.timeScale = 0f;
                 winDisplay.gameObject.SetActive(true);
                 isInWinState = true;
                 ShowFinishTrailRenderer();
