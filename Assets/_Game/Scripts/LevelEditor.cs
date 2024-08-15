@@ -65,6 +65,10 @@ public class LevelEditor : MonoBehaviour
     {
         // ensure level editor UI is enabled
         canvas.gameObject.SetActive(true);
+
+        
+
+        
     }
 
     void Update()
@@ -193,6 +197,9 @@ public class LevelEditor : MonoBehaviour
         if (Input.GetButtonUp("Fire1") && isTryingToMoveSelectedObject)
         {
             objectTransformControls.SetActive(true);
+            verticalLine.gameObject.SetActive(false);
+            horizontalLine.gameObject.SetActive(false);
+
             isTryingToMoveSelectedObject = false;
             lastHitMoveControl = null;
 
@@ -227,11 +234,19 @@ public class LevelEditor : MonoBehaviour
                 if (lastHitMoveControl.name == "Move X")
                 {
                     selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, selectedObjectPositionAtStartMove.y, 0f);
+                    horizontalLine.gameObject.SetActive(true);
+                    horizontalLine.transform.position = selectedObject.transform.position;
+                    horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 999999, horizontalLine.transform.position.y, 0f));
+                    horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 999999, horizontalLine.transform.position.y, 0f));
                 }
 
                 if (lastHitMoveControl.name == "Move Y")
                 {
                     selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, selectedObject.transform.position.y, 0f);
+                    verticalLine.gameObject.SetActive(true);
+                    verticalLine.transform.position = selectedObject.transform.position;
+                    verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 999999, 0f));
+                    verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 999999, 0f));
                 }
             }
         }
