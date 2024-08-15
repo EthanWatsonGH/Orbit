@@ -21,7 +21,6 @@ public class LevelEditor : MonoBehaviour
     [Header("World Objects")]
     [SerializeField] GameObject levelObjectsCollection;
     [SerializeField] GameObject objectTransformControls;
-    [SerializeField] GameObject moveControl;
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
@@ -33,6 +32,8 @@ public class LevelEditor : MonoBehaviour
     Vector3 moveControlOffsetFromParent;
     Vector3 moveOffset;
     bool isTryingToMoveSelectedObject = false;
+    Transform lastHitMoveControl = null;
+    Vector3 selectedObjectPositionAtStartMove;
 
     // object rotation
     bool isTryingToRotateSelectedObject = false;
@@ -53,7 +54,7 @@ public class LevelEditor : MonoBehaviour
 
     void Awake()
     {
-        // ensure level editor object and all of it's visuals are disabled before starting game
+        // ensure level editor object and all of its visuals are disabled before starting game
         gameObject.SetActive(false);
         objectTransformControls.SetActive(false);
     }
@@ -162,14 +163,21 @@ public class LevelEditor : MonoBehaviour
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
-            if (hit.transform != null && hit.transform.gameObject.name.Equals("Move"))
+            if (hit.transform != null)
             {
-                isTryingToMoveSelectedObject = true;
+                string hitName = hit.transform.name;
 
-                // set offset from parent to keep relative offset at all scales
-                moveControlOffsetFromParent = moveControl.transform.position - objectTransformControls.transform.position;
-                // set position of mouse at click for calculating offset for movement
-                moveOffset = moveControl.transform.position - pointerPosition;
+                if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y")
+                {
+                    isTryingToMoveSelectedObject = true;
+                    lastHitMoveControl = hit.transform;
+                    selectedObjectPositionAtStartMove = selectedObject.transform.position;
+
+                    // set offset from parent to keep relative offset at all scales
+                    moveControlOffsetFromParent = lastHitMoveControl.position - objectTransformControls.transform.position;
+                    // set position of mouse at click for calculating offset for movement
+                    moveOffset = lastHitMoveControl.position - pointerPosition;
+                }
             }
         }
 
@@ -178,6 +186,7 @@ public class LevelEditor : MonoBehaviour
         if (Input.GetButtonUp("Fire1"))
         {
             isTryingToMoveSelectedObject = false;
+            lastHitMoveControl = null;
 
             // if object is dropped over selection bar, destroy it
             if (selectedObject != null && pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
@@ -190,12 +199,12 @@ public class LevelEditor : MonoBehaviour
 
         if (Input.GetAxisRaw("Fire1") > 0 && selectedObject != null)
         {
-            if (isTryingToMoveSelectedObject)
+            if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
                 // make moveControl follow mouse, with the offset from the exact location on click
-                moveControl.transform.position = pointerPosition + moveOffset;
+                lastHitMoveControl.position = pointerPosition + moveOffset;
                 // make objectTransformControls follow moveControl while keeping offset
-                objectTransformControls.transform.position = moveControl.transform.position - moveControlOffsetFromParent;
+                objectTransformControls.transform.position = lastHitMoveControl.position - moveControlOffsetFromParent;
                 // make selectedObject follow objectTransformControls
                 selectedObject.transform.position = objectTransformControls.transform.position;
 
@@ -210,6 +219,12 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.SetActive(true);
                     objectTransformControls.SetActive(true);
                 }
+
+                if (lastHitMoveControl.name == "Move X")
+                    selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, selectedObjectPositionAtStartMove.y, 0f);
+
+                if (lastHitMoveControl.name == "Move Y")
+                    selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, selectedObject.transform.position.y, 0f);
             }
         }
     }

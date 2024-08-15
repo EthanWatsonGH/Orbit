@@ -237,18 +237,12 @@ public class Player : MonoBehaviour
     public void SwitchToLevelEditor()
     {
         RetryLevel();
-
-        levelEditor.SetActive(true);
-        this.gameObject.SetActive(false);
-
+        
         // show player start location icon
         startLocationIcon.SetActive(true);
 
-        // ensure unpause
-        Time.timeScale = 1f;
-
-        // ensure not in win state
-        isInWinState = false;
+        levelEditor.SetActive(true);
+        this.gameObject.SetActive(false);
     }
 
     void HideFinishTrailRenderer()
