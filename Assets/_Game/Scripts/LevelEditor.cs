@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -35,13 +36,19 @@ public class LevelEditor : MonoBehaviour
     // object movement
     Vector3 moveOffset;
     bool isTryingToMoveSelectedObject = false;
-    Transform lastHitMoveControl = null;
+    Transform lastHitMoveControl;
     Vector3 selectedObjectPositionAtStartMove;
 
     // object rotation
     bool isTryingToRotateSelectedObject = false;
     float selectedObjectRotationAtStartRotate;
     float angleToPointerAtStartRotate;
+
+    // object scaling
+    bool isTryingToScaleSelectedObject;
+    Vector3 pointerPositionAtStartScale;
+    Vector3 selectedObjectScaleAtStartScale;
+    Transform lastHitScaleControl;
 
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
@@ -77,6 +84,7 @@ public class LevelEditor : MonoBehaviour
         HandlePlacePrefab();
         UpdatePointerPosition();
         HandleSelectObject();
+        HandleScaleSelectedObject();
         HandleRotateSelectedObject();
         HandleMoveSelectedObject();
         EnsureObjectTransformControlsAlwaysInFront();
@@ -144,14 +152,16 @@ public class LevelEditor : MonoBehaviour
                     selectedObject = hit.collider.gameObject;
                     closeObjectTransformControlsButton.SetActive(true);
 
-                    if (selectedObject.name == "PlayerStartPoint")
-                    {
-                        objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(false);
-                    }
-                    else
-                    {
-                        objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(true);
-                    }
+                    AlignScaleControlsWithSelectedObject();
+
+                    // hide certain controls for certain objects
+                    bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
+                    bool isPuller = selectedObject.name.Contains("Puller");
+
+                    objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(!isPlayerStartPoint);
+                    objectTransformControls.transform.Find("Scale Both").gameObject.SetActive(!isPlayerStartPoint);
+                    objectTransformControls.transform.Find("Scale X").gameObject.SetActive(!isPlayerStartPoint && !isPuller);
+                    objectTransformControls.transform.Find("Scale Y").gameObject.SetActive(!isPlayerStartPoint && !isPuller);
                 }
             }
             else // no object / background hit
@@ -171,6 +181,13 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void AlignScaleControlsWithSelectedObject()
+    {
+        objectTransformControls.transform.Find("Scale Both").transform.localRotation = selectedObject.transform.localRotation;
+        objectTransformControls.transform.Find("Scale X").transform.localRotation = selectedObject.transform.localRotation;
+        objectTransformControls.transform.Find("Scale Y").transform.localRotation = selectedObject.transform.localRotation * Quaternion.Euler(0f, 0f, 90f);
+    }
+
     void HandleMoveSelectedObject()
     {
         // start trying to move selected object when the player presses on move control
@@ -182,6 +199,7 @@ public class LevelEditor : MonoBehaviour
             if (hit.transform != null)
             {
                 string hitName = hit.transform.name;
+                //Debug.Log(hitName);
 
                 if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y" || hitName == "Duplicate")
                 {
@@ -246,8 +264,8 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, selectedObjectPositionAtStartMove.y, 0f);
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.transform.position = selectedObject.transform.position;
-                    horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 999999, horizontalLine.transform.position.y, 0f));
-                    horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 999999, horizontalLine.transform.position.y, 0f));
+                    horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 999999f, horizontalLine.transform.position.y, 0f));
+                    horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 999999f, horizontalLine.transform.position.y, 0f));
                 }
 
                 if (lastHitMoveControl.name == "Move Y")
@@ -255,8 +273,8 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, selectedObject.transform.position.y, 0f);
                     verticalLine.gameObject.SetActive(true);
                     verticalLine.transform.position = selectedObject.transform.position;
-                    verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 999999, 0f));
-                    verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 999999, 0f));
+                    verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 999999f, 0f));
+                    verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 999999f, 0f));
                 }
             }
         }
@@ -271,6 +289,8 @@ public class LevelEditor : MonoBehaviour
 
             if (hit.transform != null && hit.transform.name == "Rotate")
             {
+                Debug.Log(hit.transform.name);
+
                 objectTransformControls.SetActive(false);
                 rotationLine.gameObject.SetActive(true);
                 rotationLine.SetPosition(0, selectedObject.transform.position);
@@ -293,6 +313,8 @@ public class LevelEditor : MonoBehaviour
 
             // stop rotating
             isTryingToRotateSelectedObject = false;
+
+            AlignScaleControlsWithSelectedObject();
         }
 
         if (isTryingToRotateSelectedObject) // do rotate
@@ -315,6 +337,60 @@ public class LevelEditor : MonoBehaviour
 
             // update line renderer position
             rotationLine.SetPosition(1, pointerPosition);
+        }
+    }
+
+    void HandleScaleSelectedObject()
+    {
+        if (Input.GetButtonDown("Fire1"))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
+
+            if (hit.transform != null)
+            {
+                string hitName = hit.transform.name;
+
+                if (hitName == "Scale Both" || hitName == "Scale X" || hitName == "Scale Y")
+                {
+                    isTryingToScaleSelectedObject = true;
+                    pointerPositionAtStartScale = pointerPosition;
+                    selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
+                    lastHitScaleControl = hit.transform;
+                }
+            }
+        }
+        if (Input.GetButtonUp("Fire1") && isTryingToScaleSelectedObject)
+        {
+            isTryingToScaleSelectedObject = false;
+        }
+        if (isTryingToScaleSelectedObject)
+        {
+            Vector3 newScale = selectedObject.transform.localScale;
+
+            switch (lastHitScaleControl.name)
+            {
+                case "Scale Both":
+                    float differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // make it so that when the pointer moves up/left it scales the object up
+                    float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
+                    break;
+                case "Scale X":
+                    differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // make it so that when the pointer moves up/left it scales the object up
+                    differenceY = pointerPositionAtStartScale.y - pointerPosition.y;
+
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y, 1f);
+                    break;
+                case "Scale Y":
+                    differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // make it so that when the pointer moves up/left it scales the object up
+                    differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x, selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
+                    break;
+            }
+
+            selectedObject.transform.localScale = newScale;
         }
     }
 

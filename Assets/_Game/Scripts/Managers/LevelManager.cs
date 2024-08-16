@@ -105,8 +105,10 @@ public class LevelManager : MonoBehaviour
 
     public void DestroyAllExistingLevelObjects()
     {
-        // reset player start point position
+        // reset player start point position to center of world
         playerStartPoint.transform.position = Vector3.zero;
+
+        EventManager.Instance.RecenterCamera();
 
         foreach (Transform levelObject in levelObjectsContainer.transform)
         {
