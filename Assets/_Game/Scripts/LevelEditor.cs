@@ -129,10 +129,11 @@ public class LevelEditor : MonoBehaviour
                 {
                     Destroy(objectCurrentlyTryingToPlace);
                 }
-                else
+                else // place object
                 {
                     selectedObject = objectCurrentlyTryingToPlace;
                     SetWhichObjectTransformControlsToShow();
+                    AlignScaleControlsWithSelectedObject();
                 }
 
                 objectCurrentlyTryingToPlace = null;
@@ -212,7 +213,6 @@ public class LevelEditor : MonoBehaviour
             if (hit.transform != null)
             {
                 string hitName = hit.transform.name;
-                Debug.Log(hitName);
 
                 if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y" || hitName == "Duplicate")
                 {
@@ -379,7 +379,7 @@ public class LevelEditor : MonoBehaviour
                     float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * 1.5f, selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * 1.5f, 1f);
                     break;
                 case "Scale X":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
@@ -389,7 +389,7 @@ public class LevelEditor : MonoBehaviour
                     horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 999999f);
                     horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 999999f);
 
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y, 1f);
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * 1.5f, selectedObjectScaleAtStartScale.y, 1f);
                     break;
                 case "Scale Y":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
@@ -406,7 +406,7 @@ public class LevelEditor : MonoBehaviour
                         differenceY *= -1;
                     }
 
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x, selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x, selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * 1.5f, 1f);
                     break;
             }
 

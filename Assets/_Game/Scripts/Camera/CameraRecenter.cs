@@ -16,6 +16,13 @@ public class CameraRecenter : MonoBehaviour
 
     void RecenterCamera()
     {
-        transform.position = new Vector3(transform.parent.position.x, transform.parent.position.y, transform.position.z);
+        if (transform.parent.name == "LevelEditor")
+        {
+            Transform recenterLocation = GameObject.Find("PlayerStartPoint").transform;
+
+            transform.position = new Vector3(recenterLocation.position.x, recenterLocation.position.y, transform.position.z);
+        }
+        else
+            transform.position = new Vector3(transform.parent.position.x, transform.parent.position.y, transform.position.z);
     }
 }

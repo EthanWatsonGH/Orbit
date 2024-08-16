@@ -259,6 +259,8 @@ public class LevelManager : MonoBehaviour
                     }
                 }
 
+                EventManager.Instance.RecenterCamera();
+
                 // TODO: display a message in game
                 Debug.Log("Loaded level.");
                 break;
