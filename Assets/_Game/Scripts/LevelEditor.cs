@@ -199,7 +199,6 @@ public class LevelEditor : MonoBehaviour
             if (hit.transform != null)
             {
                 string hitName = hit.transform.name;
-                //Debug.Log(hitName);
 
                 if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y" || hitName == "Duplicate")
                 {
@@ -289,8 +288,6 @@ public class LevelEditor : MonoBehaviour
 
             if (hit.transform != null && hit.transform.name == "Rotate")
             {
-                Debug.Log(hit.transform.name);
-
                 objectTransformControls.SetActive(false);
                 rotationLine.gameObject.SetActive(true);
                 rotationLine.SetPosition(0, selectedObject.transform.position);
@@ -371,20 +368,34 @@ public class LevelEditor : MonoBehaviour
             switch (lastHitScaleControl.name)
             {
                 case "Scale Both":
-                    float differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // make it so that when the pointer moves up/left it scales the object up
+                    float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
                     break;
                 case "Scale X":
-                    differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // make it so that when the pointer moves up/left it scales the object up
+                    differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPositionAtStartScale.y - pointerPosition.y;
+
+                    // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
+                    if (selectedObjectScaleAtStartScale.x < 0)
+                    {
+                        differenceX *= -1;
+                        differenceY *= -1;
+                    }
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y, 1f);
                     break;
                 case "Scale Y":
-                    differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // make it so that when the pointer moves up/left it scales the object up
+                    differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+
+                    // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
+                    if (selectedObjectScaleAtStartScale.y < 0)
+                    {
+                        differenceX *= -1;
+                        differenceY *= -1;
+                    }
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x, selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
                     break;
