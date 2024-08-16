@@ -130,6 +130,7 @@ public class LevelEditor : MonoBehaviour
                 else
                 {
                     selectedObject = objectCurrentlyTryingToPlace;
+                    SetWhichObjectTransformControlsToShow();
                 }
 
                 objectCurrentlyTryingToPlace = null;
@@ -154,14 +155,7 @@ public class LevelEditor : MonoBehaviour
 
                     AlignScaleControlsWithSelectedObject();
 
-                    // hide certain controls for certain objects
-                    bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
-                    bool isPuller = selectedObject.name.Contains("Puller");
-
-                    objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(!isPlayerStartPoint);
-                    objectTransformControls.transform.Find("Scale Both").gameObject.SetActive(!isPlayerStartPoint);
-                    objectTransformControls.transform.Find("Scale X").gameObject.SetActive(!isPlayerStartPoint && !isPuller);
-                    objectTransformControls.transform.Find("Scale Y").gameObject.SetActive(!isPlayerStartPoint && !isPuller);
+                    SetWhichObjectTransformControlsToShow();
                 }
             }
             else // no object / background hit
@@ -183,9 +177,33 @@ public class LevelEditor : MonoBehaviour
 
     void AlignScaleControlsWithSelectedObject()
     {
-        objectTransformControls.transform.Find("Scale Both").transform.localRotation = selectedObject.transform.localRotation;
-        objectTransformControls.transform.Find("Scale X").transform.localRotation = selectedObject.transform.localRotation;
-        objectTransformControls.transform.Find("Scale Y").transform.localRotation = selectedObject.transform.localRotation * Quaternion.Euler(0f, 0f, 90f);
+        if (selectedObject != null)
+        {
+            objectTransformControls.transform.Find("Scale Both").transform.localRotation = selectedObject.transform.localRotation;
+            objectTransformControls.transform.Find("Scale X").transform.localRotation = selectedObject.transform.localRotation;
+            objectTransformControls.transform.Find("Scale Y").transform.localRotation = selectedObject.transform.localRotation * Quaternion.Euler(0f, 0f, 90f);
+
+            //horizontalLine.gameObject.SetActive(true);
+            //horizontalLine.SetPosition(0, selectedObject.transform.forward * 999999);
+            //horizontalLine.SetPosition(1, selectedObject.transform.forward * -999999);
+        }
+    }
+
+    void SetWhichObjectTransformControlsToShow()
+    {
+        if (selectedObject != null)
+        {
+            // hide certain controls for certain objects
+            bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
+            bool isPuller = selectedObject.name.Contains("Puller");
+            bool isKillCircle = selectedObject.name.Contains("KillCircle");
+
+            objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(!isPlayerStartPoint);
+            objectTransformControls.transform.Find("Scale Both").gameObject.SetActive(!isPlayerStartPoint);
+            objectTransformControls.transform.Find("Scale X").gameObject.SetActive(!isPlayerStartPoint && !isPuller && !isKillCircle);
+            objectTransformControls.transform.Find("Scale Y").gameObject.SetActive(!isPlayerStartPoint && !isPuller && !isKillCircle);
+            objectTransformControls.transform.Find("Rotate").gameObject.SetActive(!isPlayerStartPoint && !isPuller && !isKillCircle);
+        }
     }
 
     void HandleMoveSelectedObject()
@@ -370,6 +388,13 @@ public class LevelEditor : MonoBehaviour
                 case "Scale Both":
                     float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+
+                    // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
+                    if (selectedObjectScaleAtStartScale.x < 0)
+                    {
+                        differenceX *= -1;
+                        differenceY *= -1;
+                    }
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
                     break;
