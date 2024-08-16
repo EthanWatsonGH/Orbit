@@ -64,19 +64,21 @@ public class LevelEditor : MonoBehaviour
 
     void Awake()
     {
-        // ensure level editor object and all of its visuals are disabled before starting game
-        gameObject.SetActive(false);
-        objectTransformControls.SetActive(false);
+        // enable this for a frame to let the scaling initialize
+        // TODO: change this to false once i change them to real buttons
+        objectTransformControls.SetActive(true);
     }
 
     void Start()
     {
+        // ensure level editor object and all of its visuals are disabled before starting game
+        // TODO: move this back to awake once i add real buttons. this is also to initialize button scaling
+        gameObject.SetActive(false);
+
         // ensure level editor UI is enabled
         canvas.gameObject.SetActive(true);
 
-        
-
-        
+        objectTransformControls.SetActive(false);
     }
 
     void Update()
@@ -87,7 +89,7 @@ public class LevelEditor : MonoBehaviour
         HandleScaleSelectedObject();
         HandleRotateSelectedObject();
         HandleMoveSelectedObject();
-        EnsureObjectTransformControlsAlwaysInFront();
+        HandleShowObjectTransformControls();
     }
 
     void UpdatePointerPosition()
@@ -166,12 +168,9 @@ public class LevelEditor : MonoBehaviour
             }
         }
 
-        // only show controls if something is selected
-        objectTransformControls.SetActive(selectedObject != null);
-
         if (selectedObject != null)
         {
-            objectTransformControls.transform.position = selectedObject.transform.position;
+            objectTransformControls.transform.position = new Vector3(selectedObject.transform.position.x, selectedObject.transform.position.y, objectTransformControls.transform.position.z);
         }
     }
 
@@ -217,6 +216,7 @@ public class LevelEditor : MonoBehaviour
             if (hit.transform != null)
             {
                 string hitName = hit.transform.name;
+                Debug.Log(hitName);
 
                 if (hitName == "Move Both" || hitName == "Move X" || hitName == "Move Y" || hitName == "Duplicate")
                 {
@@ -224,8 +224,6 @@ public class LevelEditor : MonoBehaviour
                     {
                         selectedObject = Instantiate(selectedObject, levelObjectsCollection.transform);
                     }
-
-                    objectTransformControls.SetActive(false);
 
                     isTryingToMoveSelectedObject = true;
                     lastHitMoveControl = hit.transform;
@@ -241,7 +239,6 @@ public class LevelEditor : MonoBehaviour
         // TODO: handle if they pause or exit edit mode while moving object, if that's still an issue later
         if (Input.GetButtonUp("Fire1") && isTryingToMoveSelectedObject)
         {
-            objectTransformControls.SetActive(true);
             verticalLine.gameObject.SetActive(false);
             horizontalLine.gameObject.SetActive(false);
 
@@ -253,14 +250,11 @@ public class LevelEditor : MonoBehaviour
             {
                 Destroy(selectedObject);
                 selectedObject = null;
-                objectTransformControls.SetActive(false);
             }
         }
 
         if (Input.GetAxisRaw("Fire1") > 0 && selectedObject != null)
         {
-            objectTransformControls.SetActive(false);
-
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
                 // make selectedObject move with pointer
@@ -306,7 +300,6 @@ public class LevelEditor : MonoBehaviour
 
             if (hit.transform != null && hit.transform.name == "Rotate")
             {
-                objectTransformControls.SetActive(false);
                 rotationLine.gameObject.SetActive(true);
                 rotationLine.SetPosition(0, selectedObject.transform.position);
 
@@ -323,7 +316,6 @@ public class LevelEditor : MonoBehaviour
 
         if (Input.GetButtonUp("Fire1") && isTryingToRotateSelectedObject) // end rotate
         {
-            objectTransformControls.SetActive(true);
             rotationLine.gameObject.SetActive(false);
 
             // stop rotating
@@ -334,9 +326,6 @@ public class LevelEditor : MonoBehaviour
 
         if (isTryingToRotateSelectedObject) // do rotate
         {
-            // TODO: may not need this once it get it all good on the movement side
-            objectTransformControls.SetActive(false);
-
             // get rotation to current pointer position
             Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
             float currentAngleToPointer = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
@@ -430,19 +419,15 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    void EnsureObjectTransformControlsAlwaysInFront()
+    void HandleShowObjectTransformControls()
     {
-        Vector3 objectTransformControlsPosition = new Vector3(objectTransformControls.transform.position.x, objectTransformControls.transform.position.y, -1f);
-        objectTransformControls.transform.position = objectTransformControlsPosition;
+        objectTransformControls.SetActive(selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject));
     }
 
     public void SwitchToPlayMode()
     {
         // hide player start location icon
         startLocationIcon.SetActive(false);
-
-        // ensure objectTransformControls are hidden
-        objectTransformControls.SetActive(false);
 
         player.SetActive(true);
         this.gameObject.SetActive(false);
@@ -533,7 +518,6 @@ public class LevelEditor : MonoBehaviour
 
     public void CloseObjectTransformControls()
     {
-        objectTransformControls.SetActive(false);
         selectedObject = null;
     }
 
