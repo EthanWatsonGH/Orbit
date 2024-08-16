@@ -362,6 +362,9 @@ public class LevelEditor : MonoBehaviour
         }
         if (Input.GetButtonUp("Fire1") && isTryingToScaleSelectedObject)
         {
+            // make sure no axis stay negative to avoid weird scaling proportions
+            selectedObject.transform.localScale = new Vector3(Mathf.Abs(selectedObject.transform.localScale.x), Mathf.Abs(selectedObject.transform.localScale.y), Mathf.Abs(selectedObject.transform.localScale.z));
+
             isTryingToScaleSelectedObject = false;
             horizontalLine.gameObject.SetActive(false);
             verticalLine.gameObject.SetActive(false);
@@ -376,13 +379,6 @@ public class LevelEditor : MonoBehaviour
                     float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
-                    // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
-                    if (selectedObjectScaleAtStartScale.x < 0)
-                    {
-                        differenceX *= -1;
-                        differenceY *= -1;
-                    }
-
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y + (differenceX + differenceY), 1f);
                     break;
                 case "Scale X":
@@ -392,13 +388,6 @@ public class LevelEditor : MonoBehaviour
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 999999f);
                     horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 999999f);
-
-                    // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
-                    if (selectedObjectScaleAtStartScale.x < 0)
-                    {
-                        differenceX *= -1;
-                        differenceY *= -1;
-                    }
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY), selectedObjectScaleAtStartScale.y, 1f);
                     break;
