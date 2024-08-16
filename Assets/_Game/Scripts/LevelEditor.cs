@@ -181,10 +181,6 @@ public class LevelEditor : MonoBehaviour
             objectTransformControls.transform.Find("Scale Both").transform.localRotation = selectedObject.transform.localRotation;
             objectTransformControls.transform.Find("Scale X").transform.localRotation = selectedObject.transform.localRotation;
             objectTransformControls.transform.Find("Scale Y").transform.localRotation = selectedObject.transform.localRotation * Quaternion.Euler(0f, 0f, 90f);
-
-            //horizontalLine.gameObject.SetActive(true);
-            //horizontalLine.SetPosition(0, selectedObject.transform.forward * 999999);
-            //horizontalLine.SetPosition(1, selectedObject.transform.forward * -999999);
         }
     }
 
@@ -367,6 +363,8 @@ public class LevelEditor : MonoBehaviour
         if (Input.GetButtonUp("Fire1") && isTryingToScaleSelectedObject)
         {
             isTryingToScaleSelectedObject = false;
+            horizontalLine.gameObject.SetActive(false);
+            verticalLine.gameObject.SetActive(false);
         }
         if (isTryingToScaleSelectedObject)
         {
@@ -391,6 +389,10 @@ public class LevelEditor : MonoBehaviour
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPositionAtStartScale.y - pointerPosition.y;
 
+                    horizontalLine.gameObject.SetActive(true);
+                    horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 999999f);
+                    horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 999999f);
+
                     // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
                     if (selectedObjectScaleAtStartScale.x < 0)
                     {
@@ -403,6 +405,10 @@ public class LevelEditor : MonoBehaviour
                 case "Scale Y":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+
+                    verticalLine.gameObject.SetActive(true);
+                    verticalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.up * 999999f);
+                    verticalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.up * 999999f);
 
                     // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
                     if (selectedObjectScaleAtStartScale.y < 0)
