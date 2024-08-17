@@ -379,7 +379,12 @@ public class LevelEditor : MonoBehaviour
                     float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * 1.5f, selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * 1.5f, 1f);
+                    float xToYRatio = selectedObjectScaleAtStartScale.x / selectedObjectScaleAtStartScale.y;
+                    float yToXRatio = selectedObjectScaleAtStartScale.y / selectedObjectScaleAtStartScale.x;
+                    // this is so weird but it works. keep relative proportions of both axis while scaling.
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * (xToYRatio > yToXRatio ? xToYRatio : 1f), 
+                        selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * (yToXRatio > xToYRatio ? yToXRatio : 1f), 
+                        1f);
                     break;
                 case "Scale X":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
