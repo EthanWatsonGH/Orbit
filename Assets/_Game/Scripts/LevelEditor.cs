@@ -49,6 +49,9 @@ public class LevelEditor : MonoBehaviour
     Vector3 pointerPositionAtStartScale;
     Vector3 selectedObjectScaleAtStartScale;
     Transform lastHitScaleControl;
+    float minimumScale = 0.2f;
+    float maximumScale = 999999f;
+    float scaleMultiplier = 1.5f;
 
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
@@ -159,6 +162,12 @@ public class LevelEditor : MonoBehaviour
                     AlignScaleControlsWithSelectedObject();
 
                     SetWhichObjectTransformControlsToShow();
+
+                    // set minimum scale depending on which type of object is selected
+                    if (selectedObject.transform.name.Contains("Puller"))
+                        minimumScale = 3f;
+                    else
+                        minimumScale = 0.2f;
                 }
             }
             else // no object / background hit
@@ -362,10 +371,9 @@ public class LevelEditor : MonoBehaviour
         }
         if (Input.GetButtonUp("Fire1") && isTryingToScaleSelectedObject)
         {
-            // make sure no axis stay negative to avoid weird scaling proportions
-            selectedObject.transform.localScale = new Vector3(Mathf.Abs(selectedObject.transform.localScale.x), Mathf.Abs(selectedObject.transform.localScale.y), Mathf.Abs(selectedObject.transform.localScale.z));
-
             isTryingToScaleSelectedObject = false;
+
+            // hide guide
             horizontalLine.gameObject.SetActive(false);
             verticalLine.gameObject.SetActive(false);
         }
@@ -382,36 +390,35 @@ public class LevelEditor : MonoBehaviour
                     float xToYRatio = selectedObjectScaleAtStartScale.x / selectedObjectScaleAtStartScale.y;
                     float yToXRatio = selectedObjectScaleAtStartScale.y / selectedObjectScaleAtStartScale.x;
                     // this is so weird but it works. keep relative proportions of both axis while scaling.
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * (xToYRatio > yToXRatio ? xToYRatio : 1f), 
-                        selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * (yToXRatio > xToYRatio ? yToXRatio : 1f), 
+                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * (xToYRatio > yToXRatio ? xToYRatio : 1f), minimumScale, maximumScale), 
+                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * (yToXRatio > xToYRatio ? yToXRatio : 1f), minimumScale, maximumScale), 
                         1f);
                     break;
                 case "Scale X":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPositionAtStartScale.y - pointerPosition.y;
 
+                    // show guide
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 999999f);
                     horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 999999f);
 
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * 1.5f, selectedObjectScaleAtStartScale.y, 1f);
+                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * scaleMultiplier, minimumScale, maximumScale),
+                        selectedObjectScaleAtStartScale.y, 
+                        1f);
                     break;
                 case "Scale Y":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
+                    // show guide
                     verticalLine.gameObject.SetActive(true);
                     verticalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.up * 999999f);
                     verticalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.up * 999999f);
 
-                    // if scale is negative when starting the scaling, invert differences to make the direction to drag the same as when it's in positive scale
-                    if (selectedObjectScaleAtStartScale.y < 0)
-                    {
-                        differenceX *= -1;
-                        differenceY *= -1;
-                    }
-
-                    newScale = new Vector3(selectedObjectScaleAtStartScale.x, selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * 1.5f, 1f);
+                    newScale = new Vector3(selectedObjectScaleAtStartScale.x,
+                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * scaleMultiplier, minimumScale, maximumScale),
+                        1f);
                     break;
             }
 
