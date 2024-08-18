@@ -137,6 +137,7 @@ public class LevelEditor : MonoBehaviour
                     selectedObject = objectCurrentlyTryingToPlace;
                     SetWhichObjectTransformControlsToShow();
                     AlignScaleControlsWithSelectedObject();
+                    SetMinimumScale();
                 }
 
                 objectCurrentlyTryingToPlace = null;
@@ -160,14 +161,8 @@ public class LevelEditor : MonoBehaviour
                     closeObjectTransformControlsButton.SetActive(true);
 
                     AlignScaleControlsWithSelectedObject();
-
                     SetWhichObjectTransformControlsToShow();
-
-                    // set minimum scale depending on which type of object is selected
-                    if (selectedObject.transform.name.Contains("Puller"))
-                        minimumScale = 3f;
-                    else
-                        minimumScale = 0.2f;
+                    SetMinimumScale();
                 }
             }
             else // no object / background hit
@@ -209,6 +204,15 @@ public class LevelEditor : MonoBehaviour
             objectTransformControls.transform.Find("Scale Y").gameObject.SetActive(!isPlayerStartPoint && !isPuller && !isKillCircle);
             objectTransformControls.transform.Find("Rotate").gameObject.SetActive(!isPlayerStartPoint && !isPuller && !isKillCircle);
         }
+    }
+
+    void SetMinimumScale()
+    {
+        // set minimum scale depending on which type of object is selected
+        if (selectedObject.transform.name.Contains("Puller"))
+            minimumScale = 3f;
+        else
+            minimumScale = 0.2f;
     }
 
     void HandleMoveSelectedObject()
@@ -387,23 +391,27 @@ public class LevelEditor : MonoBehaviour
                     float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
+                    float scaleToAdd = differenceX + differenceY;
+
                     float xToYRatio = selectedObjectScaleAtStartScale.x / selectedObjectScaleAtStartScale.y;
                     float yToXRatio = selectedObjectScaleAtStartScale.y / selectedObjectScaleAtStartScale.x;
                     // this is so weird but it works. keep relative proportions of both axis while scaling.
-                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * (xToYRatio > yToXRatio ? xToYRatio : 1f), minimumScale, maximumScale), 
-                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * (yToXRatio > xToYRatio ? yToXRatio : 1f), minimumScale, maximumScale), 
+                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + scaleToAdd * (xToYRatio > yToXRatio ? xToYRatio : 1f), minimumScale, maximumScale), 
+                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + scaleToAdd * (yToXRatio > xToYRatio ? yToXRatio : 1f), minimumScale, maximumScale), 
                         1f);
                     break;
                 case "Scale X":
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPositionAtStartScale.y - pointerPosition.y;
 
+                    scaleToAdd = differenceX + differenceY;
+
                     // show guide
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 999999f);
                     horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 999999f);
 
-                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + (differenceX + differenceY) * scaleMultiplier, minimumScale, maximumScale),
+                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + scaleToAdd * scaleMultiplier, minimumScale, maximumScale),
                         selectedObjectScaleAtStartScale.y, 
                         1f);
                     break;
@@ -411,13 +419,15 @@ public class LevelEditor : MonoBehaviour
                     differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
                     differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
+                    scaleToAdd = differenceX + differenceY;
+
                     // show guide
                     verticalLine.gameObject.SetActive(true);
                     verticalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.up * 999999f);
                     verticalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.up * 999999f);
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x,
-                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + (differenceX + differenceY) * scaleMultiplier, minimumScale, maximumScale),
+                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + scaleToAdd * scaleMultiplier, minimumScale, maximumScale),
                         1f);
                     break;
             }
