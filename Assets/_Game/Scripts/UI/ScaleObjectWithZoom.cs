@@ -19,12 +19,11 @@ public class ScaleObjectWithZoom : MonoBehaviour
     void Update()
     {
         Scale();
-
     }
 
     void Scale()
     {
-        // makes object always be the same size it was relative to the screen at start, at all camera zoom levels
+        // makes object always be the same size it was relative to the screen at awake, at all camera zoom levels
         float cameraScaleRatio = cameraZoomAtAwake / Camera.main.orthographicSize;
         // invert so object is bigger when zoomed out instead of smaller
         cameraScaleRatio = 1 / cameraScaleRatio;
@@ -33,6 +32,7 @@ public class ScaleObjectWithZoom : MonoBehaviour
             new Vector3(GameManager.Instance.UIScale * cameraScaleRatio,
             GameManager.Instance.UIScale * cameraScaleRatio,
             transform.localScale.z);
+
         transform.localScale = newScale;
     }
 }

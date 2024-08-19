@@ -1,18 +1,18 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class ScaleLineRendererWidthWithZoom : MonoBehaviour
 {
     LineRenderer lr;
     float cameraZoomAtAwake;
-    float lrWidthAtAwake;
+    float lrStartWidthAtAwake;
+    float lrEndWidthAtAwake;
 
     void Awake()
     {
         lr = gameObject.GetComponent<LineRenderer>();
         cameraZoomAtAwake = Camera.main.orthographicSize;
-        lrWidthAtAwake = lr.startWidth;
+        lrStartWidthAtAwake = lr.startWidth;
+        lrEndWidthAtAwake = lr.startWidth;
     }
 
     void OnEnable()
@@ -27,10 +27,12 @@ public class ScaleLineRendererWidthWithZoom : MonoBehaviour
 
     void ScaleWidth()
     {
+        // ratio between zoom at awake and current zoom
         float cameraZoomRatio = cameraZoomAtAwake / Camera.main.orthographicSize;
+        // invert so its bigger when farther
         cameraZoomRatio = 1 / cameraZoomRatio;
 
-        lr.startWidth = lrWidthAtAwake * cameraZoomRatio;
-        lr.endWidth = lrWidthAtAwake * cameraZoomRatio;
+        lr.startWidth = lrStartWidthAtAwake * cameraZoomRatio;
+        lr.endWidth = lrEndWidthAtAwake * cameraZoomRatio;
     }
 }

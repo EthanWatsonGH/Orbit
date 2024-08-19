@@ -121,10 +121,15 @@ public class LevelManager : MonoBehaviour
         Level level = new Level();
         level.levelObjects = new List<Level.LevelObject>();
 
+        // get level name input, or just create one if nothing was input
+        string levelName = "Custom Level " + DateTime.Now.ToString("yyyyMMdd HHmmss");
+        if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
+            levelName = levelSaveNameInput.text.Trim();
+
         // TODO: make these values get properly set
         // set values to save
-        level.levelName = "hardcoded level name 2";
-        level.levelAuthor = "hardcoded level author 2";
+        level.levelName = levelName;
+        level.levelAuthor = "TO ADD";
         level.loaderVersion = LOADER_VERSION;
         level.playerStartPointXPosition = playerStartPoint.transform.position.x;
         level.playerStartPointYPosition = playerStartPoint.transform.position.y;
@@ -159,11 +164,6 @@ public class LevelManager : MonoBehaviour
         string json = JsonUtility.ToJson(level, true);
 
         EnsureLevelDirectoryExists();
-
-        // get level name input, or just create one if nothing was input
-        string levelName = "Custom Level " + DateTime.Now.ToString("yyyyMMdd HHmmss");
-        if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
-            levelName = levelSaveNameInput.text.Trim();
 
         string saveLocation = Path.Combine(levelDirectory, levelName + ".json");
 
@@ -213,34 +213,34 @@ public class LevelManager : MonoBehaviour
                     switch(levelObject.type)
                     {
                         case "Booster":
-                            prefabToInstantiate = LevelManager.Instance.BoosterPrefab;
+                            prefabToInstantiate = BoosterPrefab;
                             break;
                         case "BouncyWall":
-                            prefabToInstantiate = LevelManager.Instance.BouncyWallPrefab;
+                            prefabToInstantiate = BouncyWallPrefab;
                             break;
                         case "ConstantPuller":
-                            prefabToInstantiate = LevelManager.Instance.ConstantPullerPrefab;
+                            prefabToInstantiate = ConstantPullerPrefab;
                             break;
                         case "ConstantPusher":
-                            prefabToInstantiate = LevelManager.Instance.ConstantPusherPrefab;
+                            prefabToInstantiate = ConstantPusherPrefab;
                             break;
                         case "Finish":
-                            prefabToInstantiate = LevelManager.Instance.FinishPrefab;
+                            prefabToInstantiate = FinishPrefab;
                             break;
                         case "KillCircle":
-                            prefabToInstantiate = LevelManager.Instance.KillCirclePrefab;
+                            prefabToInstantiate = KillCirclePrefab;
                             break;
                         case "KillWall":
-                            prefabToInstantiate = LevelManager.Instance.KillWallPrefab;
+                            prefabToInstantiate = KillWallPrefab;
                             break;
                         case "Puller":
-                            prefabToInstantiate = LevelManager.Instance.PullerPrefab;
+                            prefabToInstantiate = PullerPrefab;
                             break;
                         case "Pusher":
-                            prefabToInstantiate = LevelManager.Instance.PusherPrefab;
+                            prefabToInstantiate = PusherPrefab;
                             break;
                         case "SlipperyWall":
-                            prefabToInstantiate = LevelManager.Instance.SlipperyWallPrefab;
+                            prefabToInstantiate = SlipperyWallPrefab;
                             break;
                         default:
                             // TODO: display in game
