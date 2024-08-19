@@ -34,7 +34,7 @@ public class LevelManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            //Destroy(gameObject);
         }
     }
     #endregion
