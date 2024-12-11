@@ -14,7 +14,7 @@ public class CameraPan : MonoBehaviour
     {
         cam = gameObject.transform.GetComponent<Camera>();
 
-        // failsafe for first touch
+        // failsafe for initial touch
         touchStartPosition = Vector3.zero;
     }
 
@@ -56,13 +56,13 @@ public class CameraPan : MonoBehaviour
         #region Desktop
         // mouse panning
         // TODO: mouse panning and zooming are fighting each other. when i scoll in a step, it has to move the camera to where the mouse is on the new zoom level, causing a jittering effect. im not sure if this is some execution ordering issue where for some reason they aren't being done on the same frame, or if there's somthing about my code that makes the panning have to wait to be executed after the zooming.
-        if (Input.GetMouseButtonDown(1))
+        if (Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
         {
             isMousePanning = true;
             mouseWorldPositionAtStartMousePan = cam.ScreenToWorldPoint(Input.mousePosition);
             parentObjectPositionAtStartPan = gameObject.transform.parent.position;
         }
-        if (Input.GetMouseButtonUp(1))
+        if (Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2))
         {
             isMousePanning = false;
         }

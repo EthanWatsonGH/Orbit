@@ -395,9 +395,23 @@ public class LevelEditor : MonoBehaviour
 
                     float xToYRatio = selectedObjectScaleAtStartScale.x / selectedObjectScaleAtStartScale.y;
                     float yToXRatio = selectedObjectScaleAtStartScale.y / selectedObjectScaleAtStartScale.x;
+                    
+                    float xMultiplier = xToYRatio > yToXRatio ? xToYRatio : 1f;
+                    float yMuitiplier = yToXRatio > xToYRatio ? yToXRatio : 1f;
+
+                    //float bothRatio = xToYRatio / yToXRatio;
+
                     // this is so weird but it works. keep relative proportions of both axis while scaling.
-                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + scaleToAdd * (xToYRatio > yToXRatio ? xToYRatio : 1f), minimumScale, maximumScale), 
-                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + scaleToAdd * (yToXRatio > xToYRatio ? yToXRatio : 1f), minimumScale, maximumScale), 
+
+                    // nevermind this is all stupid. all i need is some basic math.
+
+                    // get object width/magnitude at start scale, eg. 17m
+                    // get distance from pointer movement to add as width, eg. 2m
+                    // divide width to add by object width at start, eg. 2 / 17 = 0.11764...
+                    // multiply object width at start by (1 + value of previous calculation), eg. (1 + 0.11764...) * 17 = 19
+
+                    newScale = new Vector3(Mathf.Clamp(selectedObjectScaleAtStartScale.x + scaleToAdd * (xMultiplier /*/ bothRatio*/), minimumScale, maximumScale), 
+                        Mathf.Clamp(selectedObjectScaleAtStartScale.y + scaleToAdd * (yMuitiplier /*/ bothRatio*/), minimumScale, maximumScale), 
                         1f);
                     break;
                 case "Scale X":
