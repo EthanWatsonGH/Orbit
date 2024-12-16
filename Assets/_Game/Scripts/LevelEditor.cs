@@ -132,13 +132,11 @@ public class LevelEditor : MonoBehaviour
                 if (pointerIsOverObjectSelectionBar) // if player tries to place object over object selection bar, delete the object to cancel placement
                 {
                     Destroy(objectCurrentlyTryingToPlace);
-                    closeObjectTransformControlsButton.SetActive(false);
                 }
                 else // place object
                 {
                     selectedObject = objectCurrentlyTryingToPlace;
                     SetWhichObjectTransformControlsToShow();
-                    closeObjectTransformControlsButton.SetActive(true);
                     AlignScaleControlsWithSelectedObject();
                     SetMinimumScale();
                 }
@@ -161,7 +159,6 @@ public class LevelEditor : MonoBehaviour
                 if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any UI objects to be set as selected object
                 {
                     selectedObject = hit.collider.gameObject;
-                    closeObjectTransformControlsButton.SetActive(true);
 
                     AlignScaleControlsWithSelectedObject();
                     SetWhichObjectTransformControlsToShow();
@@ -172,7 +169,6 @@ public class LevelEditor : MonoBehaviour
             {
                 // deselect current object, if any
                 selectedObject = null;
-                closeObjectTransformControlsButton.SetActive(false);
             }
         }
 
@@ -196,7 +192,7 @@ public class LevelEditor : MonoBehaviour
     {
         if (selectedObject != null)
         {
-            // hide/show certain controls for depending on the type of object selected
+            // show/hide certain controls depending on the type of object selected
             bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
             bool isPuller = selectedObject.name.Contains("Puller");
             bool isKillCircle = selectedObject.name.Contains("KillCircle");
@@ -479,7 +475,9 @@ public class LevelEditor : MonoBehaviour
 
     void HandleShowObjectTransformControls()
     {
-        objectTransformControls.SetActive(selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject));
+        bool show = selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject);
+        objectTransformControls.SetActive(show);
+        closeObjectTransformControlsButton.SetActive(show);
     }
 
     public void SwitchToPlayMode()
