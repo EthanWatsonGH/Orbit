@@ -54,6 +54,7 @@ public class LevelEditor : MonoBehaviour
     float selectedObjectWidthAtStartScaleX;
     float selectedObjectWidthAtStartScaleY;
 
+    // TODO: if i turn the in world buttons into UI buttons i won't need this
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
         "Move X",
@@ -128,15 +129,16 @@ public class LevelEditor : MonoBehaviour
             {
                 isTryingToPlace = false;
 
-                // if player tries to place object over object selection bar, delete the object to cancel placement
-                if (pointerIsOverObjectSelectionBar)
+                if (pointerIsOverObjectSelectionBar) // if player tries to place object over object selection bar, delete the object to cancel placement
                 {
                     Destroy(objectCurrentlyTryingToPlace);
+                    closeObjectTransformControlsButton.SetActive(false);
                 }
                 else // place object
                 {
                     selectedObject = objectCurrentlyTryingToPlace;
                     SetWhichObjectTransformControlsToShow();
+                    closeObjectTransformControlsButton.SetActive(true);
                     AlignScaleControlsWithSelectedObject();
                     SetMinimumScale();
                 }
@@ -260,6 +262,7 @@ public class LevelEditor : MonoBehaviour
             {
                 Destroy(selectedObject);
                 selectedObject = null;
+                closeObjectTransformControlsButton.gameObject.SetActive(false);
             }
         }
 
@@ -285,8 +288,8 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, selectedObjectPositionAtStartMove.y, 0f);
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.transform.position = selectedObject.transform.position;
-                    horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 999999f, horizontalLine.transform.position.y, 0f));
-                    horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 999999f, horizontalLine.transform.position.y, 0f));
+                    horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 9999f, horizontalLine.transform.position.y, 0f));
+                    horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 9999f, horizontalLine.transform.position.y, 0f));
                 }
 
                 if (lastHitMoveControl.name == "Move Y")
@@ -294,8 +297,8 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, selectedObject.transform.position.y, 0f);
                     verticalLine.gameObject.SetActive(true);
                     verticalLine.transform.position = selectedObject.transform.position;
-                    verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 999999f, 0f));
-                    verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 999999f, 0f));
+                    verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 9999f, 0f));
+                    verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 9999f, 0f));
                 }
             }
         }
