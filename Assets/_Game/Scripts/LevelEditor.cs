@@ -51,8 +51,8 @@ public class LevelEditor : MonoBehaviour
     Transform lastHitScaleControl;
     float minimumScale = 0.2f;
     float maximumScale = 999999f;
-    float selectedObjectWidthAtStartScaleX;
-    float selectedObjectWidthAtStartScaleY;
+    float selectedObjectXScaleAtStartScale;
+    float selectedObjectYScaleAtStartScale;
 
     // TODO: if i turn the in world buttons into UI buttons i won't need this
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
@@ -370,8 +370,8 @@ public class LevelEditor : MonoBehaviour
                     pointerPositionAtStartScale = pointerPosition;
                     selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
                     lastHitScaleControl = hit.transform;
-                    selectedObjectWidthAtStartScaleX = selectedObject.transform.gameObject.GetComponent<SpriteRenderer>().bounds.size.x;
-                    selectedObjectWidthAtStartScaleY = selectedObject.transform.gameObject.GetComponent<SpriteRenderer>().bounds.size.y;
+                    selectedObjectXScaleAtStartScale = selectedObject.transform.localScale.x;
+                    selectedObjectYScaleAtStartScale = selectedObject.transform.localScale.y;
                 }
             }
         }
@@ -394,8 +394,8 @@ public class LevelEditor : MonoBehaviour
 
             float scaleToAdd = differenceX + differenceY;
 
-            float xMultiplier = scaleToAdd / selectedObjectWidthAtStartScaleX;
-            float yMultiplier = scaleToAdd / selectedObjectWidthAtStartScaleY;
+            float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
+            float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
 
             // get scaling depending on which scale control was pressed
             switch (lastHitScaleControl.name)
@@ -413,26 +413,26 @@ public class LevelEditor : MonoBehaviour
                     //  the x axis increased by (2.5 / 13 = 0.1923...) so the y axis should be increasing by the same percentage.
                     //  i dont even have to do any adding of the movement value to the smaller axis, just multiplying by the same percent
 
-                    if (selectedObjectWidthAtStartScaleX > selectedObjectWidthAtStartScaleY) // x width bigger than y width
+                    if (selectedObjectXScaleAtStartScale > selectedObjectYScaleAtStartScale) // x width bigger than y width
                     {
-                        float xAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.x / selectedObjectWidthAtStartScaleX;
+                        float xAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.x / selectedObjectXScaleAtStartScale;
 
-                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier) * selectedObjectWidthAtStartScaleX, minimumScale, maximumScale),
-                        Mathf.Clamp(selectedObjectWidthAtStartScaleY * xAxisScaleDifferenceSinceStartScale, minimumScale, maximumScale),
+                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier) * selectedObjectXScaleAtStartScale, minimumScale, maximumScale),
+                        Mathf.Clamp(selectedObjectYScaleAtStartScale * xAxisScaleDifferenceSinceStartScale, minimumScale, maximumScale),
                         1f);
                     }
-                    else if (selectedObjectWidthAtStartScaleY > selectedObjectWidthAtStartScaleX) // y width bigger than x width
+                    else if (selectedObjectYScaleAtStartScale > selectedObjectXScaleAtStartScale) // y width bigger than x width
                     {
-                        float yAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.y / selectedObjectWidthAtStartScaleY;
+                        float yAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.y / selectedObjectYScaleAtStartScale;
 
-                        newScale = new Vector3(Mathf.Clamp(selectedObjectWidthAtStartScaleX * yAxisScaleDifferenceSinceStartScale, minimumScale, maximumScale),
-                        Mathf.Clamp((1 + yMultiplier) * selectedObjectWidthAtStartScaleY, minimumScale, maximumScale),
+                        newScale = new Vector3(Mathf.Clamp(selectedObjectXScaleAtStartScale * yAxisScaleDifferenceSinceStartScale, minimumScale, maximumScale),
+                        Mathf.Clamp((1 + yMultiplier) * selectedObjectYScaleAtStartScale, minimumScale, maximumScale),
                         1f);
                     }
                     else // x and y width equal. so square or circular objects
                     {
-                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier) * selectedObjectWidthAtStartScaleX, minimumScale, maximumScale), // * 2 since it's for both sides
-                        Mathf.Clamp((1 + yMultiplier) * selectedObjectWidthAtStartScaleY, minimumScale, maximumScale),
+                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier) * selectedObjectXScaleAtStartScale, minimumScale, maximumScale), // * 2 since it's for both sides
+                        Mathf.Clamp((1 + yMultiplier) * selectedObjectYScaleAtStartScale, minimumScale, maximumScale),
                         1f);
 
                         // TODO: this is a cool bug that i could turn into a feature
