@@ -103,7 +103,7 @@ public class Player : MonoBehaviour
             rb.velocity = Vector2.zero;
 
             // launch player in direction of launchDirectionPoint when they press launch
-            if ((Input.GetButtonDown("Jump") || playerPressedLaunch) && Time.time > timeAtLastRetry + 0.1f) // since launch and retry are on the same key, check a delay to not let them happen on the same frame
+            if ((Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4) || playerPressedLaunch) && Time.time > timeAtLastRetry + 0.1f) // since launch and retry are on the same key, check a delay to not let them happen on the same frame
             {
                 Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
                 rb.velocity = launchDirection.normalized * launchForce;
@@ -117,7 +117,7 @@ public class Player : MonoBehaviour
         }
         else // in play mode
         {
-            if (Input.GetButtonDown("Jump"))
+            if (Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4))
             {
                 RetryLevel();
             }
