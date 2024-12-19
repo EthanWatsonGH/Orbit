@@ -413,26 +413,29 @@ public class LevelEditor : MonoBehaviour
                     //  the x axis increased by (2.5 / 13 = 0.1923...) so the y axis should be increasing by the same percentage.
                     //  i dont even have to do any adding of the movement value to the smaller axis, just multiplying by the same percent
 
+                    float parentXScale = selectedObject.transform.parent.localScale.x;
+                    float parentYScale = selectedObject.transform.parent.localScale.y;
+
                     if (selectedObjectXScaleAtStartScale > selectedObjectYScaleAtStartScale) // x width bigger than y width
                     {
                         float xAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.x / selectedObjectXScaleAtStartScale;
 
-                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier) * selectedObjectXScaleAtStartScale, minimumScale, maximumScale),
-                        Mathf.Clamp(selectedObjectYScaleAtStartScale * xAxisScaleDifferenceSinceStartScale, minimumScale, maximumScale),
+                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
+                        Mathf.Clamp(selectedObjectYScaleAtStartScale * xAxisScaleDifferenceSinceStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
                         1f);
                     }
                     else if (selectedObjectYScaleAtStartScale > selectedObjectXScaleAtStartScale) // y width bigger than x width
                     {
                         float yAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.y / selectedObjectYScaleAtStartScale;
 
-                        newScale = new Vector3(Mathf.Clamp(selectedObjectXScaleAtStartScale * yAxisScaleDifferenceSinceStartScale, minimumScale, maximumScale),
-                        Mathf.Clamp((1 + yMultiplier) * selectedObjectYScaleAtStartScale, minimumScale, maximumScale),
+                        newScale = new Vector3(Mathf.Clamp(selectedObjectXScaleAtStartScale * yAxisScaleDifferenceSinceStartScale, minimumScale * parentXScale, maximumScale * parentXScale),
+                        Mathf.Clamp((1 + yMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
                         1f);
                     }
                     else // x and y width equal. so square or circular objects
                     {
-                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier) * selectedObjectXScaleAtStartScale, minimumScale, maximumScale), // * 2 since it's for both sides
-                        Mathf.Clamp((1 + yMultiplier) * selectedObjectYScaleAtStartScale, minimumScale, maximumScale),
+                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
+                        Mathf.Clamp((1 + yMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
                         1f);
 
                         // TODO: this is a cool bug that i could turn into a feature
