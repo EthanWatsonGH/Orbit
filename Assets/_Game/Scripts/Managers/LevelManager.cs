@@ -220,13 +220,17 @@ public class LevelManager : MonoBehaviour
         levelLoadJson = File.ReadAllText(loadLocation);
     }
 
-    public void LoadLevel()
+    GameObject GenerateLevelObjectFromJson()
     {
+        GameObject level = new GameObject();
+
         switch (LOADER_VERSION)
         {
             case 1:
                 // TODO: handle invalid levelLoadJson and display a message in game
                 Level loadedLevel = JsonUtility.FromJson<Level>(levelLoadJson);
+
+                level.gameObject.name = loadedLevel.levelName;
 
                 DestroyAllExistingLevelObjects();
 
@@ -237,7 +241,7 @@ public class LevelManager : MonoBehaviour
                 foreach (Level.LevelObject levelObject in loadedLevel.levelObjects)
                 {
                     GameObject prefabToInstantiate = null;
-                    switch(levelObject.type)
+                    switch (levelObject.type)
                     {
                         case "Booster":
                             prefabToInstantiate = BoosterPrefab;
@@ -280,7 +284,7 @@ public class LevelManager : MonoBehaviour
                         Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
                         Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
 
-                        GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, levelObjectsContainer.transform);
+                        GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, level.transform);
 
                         lastPlacedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale);
                     }
@@ -292,6 +296,13 @@ public class LevelManager : MonoBehaviour
                 Debug.Log("Loaded level.");
                 break;
         }
+
+        return level;
+    }
+
+    public void LoadLevel()
+    {
+        GenerateLevelObjectFromJson().transform.parent = levelObjectsContainer.transform;
     }
     #endregion
 }
