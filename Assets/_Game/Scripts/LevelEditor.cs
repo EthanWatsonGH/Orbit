@@ -574,6 +574,10 @@ public class LevelEditor : MonoBehaviour
     {
         LevelManager.Instance.DestroyAllExistingLevelObjects();
     }
+    public void CopyLevelCodeToClipboard()
+    {
+        LevelManager.Instance.CopyLevelCodeToClipboard();
+    }
 
     public void CloseObjectTransformControls()
     {

@@ -116,7 +116,7 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    public void SaveLevel()
+    Level GenerateLevelObject()
     {
         Level level = new Level();
         level.levelObjects = new List<Level.LevelObject>();
@@ -161,11 +161,27 @@ public class LevelManager : MonoBehaviour
                 endOfLevelObjects = true;
         }
 
+        return level;
+    }
+
+    public void CopyLevelCodeToClipboard()
+    {
+        Level level = GenerateLevelObject();
+
+        string json = JsonUtility.ToJson(level, false);
+
+        GUIUtility.systemCopyBuffer = json;
+    }
+
+    public void SaveLevel()
+    {
+        Level level = GenerateLevelObject();
+
         string json = JsonUtility.ToJson(level, true);
 
         EnsureLevelDirectoryExists();
 
-        string saveLocation = Path.Combine(levelDirectory, levelName + ".json");
+        string saveLocation = Path.Combine(levelDirectory, level.levelName + ".json");
 
         File.WriteAllText(saveLocation, json);
 
