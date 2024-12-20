@@ -392,10 +392,10 @@ public class LevelEditor : MonoBehaviour
             float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
             float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
 
-            float scaleToAdd = differenceX + differenceY;
+            //float scaleToAdd = differenceX + differenceY;
 
-            float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
-            float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
+            //float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
+            //float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
 
             // get scaling depending on which scale control was pressed
             switch (lastHitScaleControl.name)
@@ -412,6 +412,19 @@ public class LevelEditor : MonoBehaviour
                     //  then whatever percentage it just increased should be applied to the other smaller axis. say the y axis, the smaller axis, is 7m,
                     //  the x axis increased by (2.5 / 13 = 0.1923...) so the y axis should be increasing by the same percentage.
                     //  i dont even have to do any adding of the movement value to the smaller axis, just multiplying by the same percent
+
+                    // for getting the proper amount of length to add/subtract:
+                    // get pointer position at start scale
+                    // get selected object position
+                    // in the direction from pointer position at start scale to selected object position, create a vector 9999f away from selected object
+                    Vector3 scaleToPoint = pointerPositionAtStartScale + selectedObject.transform.right * 9999f;
+                    // get distance between pointer position at start scale and the created vector
+                    float distanceAtStartScale = Vector3.Distance(pointerPositionAtStartScale, scaleToPoint);
+                    // get difference between last calculation and (distance between current pointer position and created vector)
+                    float scaleToAdd = (Vector3.Distance(pointerPosition, scaleToPoint) - distanceAtStartScale) * 2f; // * 2 since it needs to add the length to both sides
+
+                    float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
+                    float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
 
                     float parentXScale = selectedObject.transform.parent.localScale.x;
                     float parentYScale = selectedObject.transform.parent.localScale.y;
