@@ -568,6 +568,7 @@ public class LevelEditor : MonoBehaviour
     }
     public void LoadLevel()
     {
+        LevelManager.Instance.GetLevelJsonFromFile();
         LevelManager.Instance.LoadLevel();
     }
     public void DeleteAllLevelObjects()
@@ -577,6 +578,11 @@ public class LevelEditor : MonoBehaviour
     public void CopyLevelCodeToClipboard()
     {
         LevelManager.Instance.CopyLevelCodeToClipboard();
+    }
+    public void LoadLevelFromClipboard()
+    {
+        LevelManager.Instance.GetLevelJsonFromClipboard();
+        LevelManager.Instance.LoadLevel();
     }
 
     public void CloseObjectTransformControls()

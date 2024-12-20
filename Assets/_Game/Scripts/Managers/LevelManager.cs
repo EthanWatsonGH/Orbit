@@ -80,6 +80,7 @@ public class LevelManager : MonoBehaviour
     public const byte LOADER_VERSION = 1;
 
     string levelDirectory;
+    string levelLoadJson;
 
     [Header("World Object References")]
     [SerializeField] GameObject levelObjectsContainer;
@@ -116,6 +117,7 @@ public class LevelManager : MonoBehaviour
         }
     }
 
+    #region Saving
     Level GenerateLevelObject()
     {
         Level level = new Level();
@@ -188,34 +190,43 @@ public class LevelManager : MonoBehaviour
         // TODO: display a message in game
         Debug.Log("Saved level.");
     }
+    #endregion
+
+    #region Loading
+    public void GetLevelJsonFromClipboard()
+    {
+        levelLoadJson = GUIUtility.systemCopyBuffer;
+    }
+
+    public void GetLevelJsonFromFile()
+    {
+        // TODO: make a level selection menu instead of it being through a text input
+        if (levelLoadNameInput.text.Trim() == string.Empty)
+        {
+            Debug.Log("ERROR: Enter a level to load.");
+        }
+
+        string levelFileName = levelLoadNameInput.text.Trim() + ".json";
+
+        string loadLocation = Path.Combine(levelDirectory, levelFileName);
+
+        // if level file is not found, send a message and cancel loading
+        if (!File.Exists(loadLocation))
+        {
+            // TODO: display a message in game
+            Debug.Log("ERROR: Level not found.");
+        }
+
+        levelLoadJson = File.ReadAllText(loadLocation);
+    }
 
     public void LoadLevel()
     {
         switch (LOADER_VERSION)
         {
             case 1:
-                // TODO: make a level selection menu instead of it being through a text input
-                if (levelLoadNameInput.text.Trim() == string.Empty)
-                {
-                    Debug.Log("ERROR: Enter a level to load.");
-                    break;
-                }
-
-                string levelFileName = levelLoadNameInput.text.Trim() + ".json";
-
-                string loadLocation = Path.Combine(levelDirectory, levelFileName);
-
-                // if level file is not found, send a message and cancel loading
-                if (!File.Exists(loadLocation))
-                {
-                    // TODO: display a message in game
-                    Debug.Log("ERROR: Level not found.");
-                    break;
-                }
-
-                string json = File.ReadAllText(loadLocation);
-
-                Level loadedLevel = JsonUtility.FromJson<Level>(json);
+                // TODO: handle invalid levelLoadJson and display a message in game
+                Level loadedLevel = JsonUtility.FromJson<Level>(levelLoadJson);
 
                 DestroyAllExistingLevelObjects();
 
@@ -282,4 +293,5 @@ public class LevelManager : MonoBehaviour
                 break;
         }
     }
+    #endregion
 }
