@@ -38,6 +38,7 @@ public class LevelEditor : MonoBehaviour
     bool isTryingToMoveSelectedObject = false;
     Transform lastHitMoveControl;
     Vector3 selectedObjectPositionAtStartMove;
+    Vector3 pointerPositionAtStartMove;
 
     // object rotation
     bool isTryingToRotateSelectedObject = false;
@@ -216,6 +217,7 @@ public class LevelEditor : MonoBehaviour
 
     void HandleMoveSelectedObject()
     {
+        
         // start trying to move selected object when the player presses on move control
         if (Input.GetButtonDown("Fire1"))
         {
@@ -231,11 +233,13 @@ public class LevelEditor : MonoBehaviour
                     if (hitName == "Duplicate")
                     {
                         selectedObject = Instantiate(selectedObject, levelObjectsCollection.transform);
+                        selectedObject.transform.name = selectedObject.transform.name.Replace("(Clone)", "");
                     }
 
                     isTryingToMoveSelectedObject = true;
                     lastHitMoveControl = hit.transform;
                     selectedObjectPositionAtStartMove = selectedObject.transform.position;
+                    pointerPositionAtStartMove = pointerPosition;
 
                     // get offset between selected object and pointer position to keep it while moving
                     moveOffset = selectedObject.transform.position - pointerPosition;
@@ -266,8 +270,12 @@ public class LevelEditor : MonoBehaviour
         {
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
-                // make selectedObject move with pointer
-                selectedObject.transform.position = pointerPosition + moveOffset;
+                // to prevent the object from moving when the player is trying to just duplicate it, don't move the object when the pointer has only moved a small distance
+                if (lastHitMoveControl.name == "Duplicate" && Vector3.Distance(pointerPositionAtStartMove, pointerPosition) < 0.2f)
+                    selectedObject.transform.position = selectedObjectPositionAtStartMove;
+                else
+                    // make selectedObject move with pointer
+                    selectedObject.transform.position = pointerPosition + moveOffset;
 
                 // if hovering over object selection bar, hide object placement preview and transform controls
                 if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint")) // TODO: make it so you can remove player start point, but must have one before you can play the level?
