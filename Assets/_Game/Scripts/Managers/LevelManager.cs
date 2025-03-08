@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using TMPro;
@@ -175,6 +176,23 @@ public class LevelManager : MonoBehaviour
         GUIUtility.systemCopyBuffer = json;
     }
 
+    IEnumerator SaveScreenshot(string screenshotLocation)
+    {
+        // TODO: will probably have to change this later when i move the save level button to a different menu. at that point just handle all UI stuff in a manager with events.
+        // hide level editor UI while taking screenshot
+        GameObject levelEditorUI = GameObject.Find("LevelEditor").transform.Find("Canvas").gameObject;
+        levelEditorUI.SetActive(false);
+
+        // wait until the end of the frame before taking the screenshot since the UI is actually hidden at the end of the frame
+        yield return new WaitForEndOfFrame();
+
+        // save screenshot for level preview image
+        ScreenCapture.CaptureScreenshot(screenshotLocation + ".png");
+
+        // unhide level editor UI
+        levelEditorUI.SetActive(true);
+    }
+
     public void SaveLevel()
     {
         Level level = GenerateLevelObject();
@@ -183,9 +201,11 @@ public class LevelManager : MonoBehaviour
 
         EnsureLevelDirectoryExists();
 
-        string saveLocation = Path.Combine(levelDirectory, level.levelName + ".json");
+        string saveLocation = Path.Combine(levelDirectory, level.levelName);
 
-        File.WriteAllText(saveLocation, json);
+        File.WriteAllText(saveLocation + ".json", json);
+
+        StartCoroutine(SaveScreenshot(saveLocation));
 
         // TODO: display a message in game
         Debug.Log("Saved level.");
