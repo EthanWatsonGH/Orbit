@@ -180,8 +180,10 @@ public class LevelManager : MonoBehaviour
     {
         // TODO: will probably have to change this later when i move the save level button to a different menu. at that point just handle all UI stuff in a manager with events.
         // hide level editor UI while taking screenshot
-        GameObject levelEditorUI = GameObject.Find("LevelEditor").transform.Find("Canvas").gameObject;
-        levelEditorUI.SetActive(false);
+        GameObject levelEditorCanvas = GameObject.Find("LevelEditor").transform.Find("Canvas").gameObject;
+        GameObject objectTransformControls = GameObject.Find("ObjectTransformControls");
+        levelEditorCanvas.SetActive(false);
+        objectTransformControls.SetActive(false);
 
         // wait until the end of the frame before taking the screenshot since the UI is actually hidden at the end of the frame
         yield return new WaitForEndOfFrame();
@@ -190,7 +192,8 @@ public class LevelManager : MonoBehaviour
         ScreenCapture.CaptureScreenshot(screenshotLocation + ".png");
 
         // unhide level editor UI
-        levelEditorUI.SetActive(true);
+        levelEditorCanvas.SetActive(true);
+        objectTransformControls.SetActive(true);
     }
 
     public void SaveLevel()
