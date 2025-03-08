@@ -221,12 +221,13 @@ public class LevelManager : MonoBehaviour
         levelLoadJson = GUIUtility.systemCopyBuffer;
     }
 
-    public void GetLevelJsonFromFile()
+    public bool GetLevelJsonFromFile()
     {
         // TODO: make a level selection menu instead of it being through a text input
         if (levelLoadNameInput.text.Trim() == string.Empty)
         {
             Debug.Log("ERROR: Enter a level to load.");
+            return false;
         }
 
         string levelFileName = levelLoadNameInput.text.Trim() + ".json";
@@ -238,9 +239,12 @@ public class LevelManager : MonoBehaviour
         {
             // TODO: display a message in game
             Debug.Log("ERROR: Level not found.");
+            return false;
         }
 
         levelLoadJson = File.ReadAllText(loadLocation);
+
+        return true;
     }
 
     public void LoadLevel()
@@ -248,71 +252,79 @@ public class LevelManager : MonoBehaviour
         switch (LOADER_VERSION)
         {
             case 1:
-                // TODO: handle invalid levelLoadJson and display a message in game
-                Level loadedLevel = JsonUtility.FromJson<Level>(levelLoadJson);
-
-                DestroyAllExistingLevelObjects();
-
-                // set the player start point position
-                playerStartPoint.transform.position = new Vector3(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
-
-                // loop through level objects, instantiating a new object in game for each object in the file, with the transforms of each
-                foreach (Level.LevelObject levelObject in loadedLevel.levelObjects)
+                try
                 {
-                    GameObject prefabToInstantiate = null;
-                    switch(levelObject.type)
+                    // TODO: handle invalid levelLoadJson and display a message in game
+                    Level loadedLevel = JsonUtility.FromJson<Level>(levelLoadJson);
+
+                    DestroyAllExistingLevelObjects();
+
+                    // set the player start point position
+                    playerStartPoint.transform.position = new Vector3(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
+
+                    // loop through level objects, instantiating a new object in game for each object in the file, with the transforms of each
+                    foreach (Level.LevelObject levelObject in loadedLevel.levelObjects)
                     {
-                        case "Booster":
-                            prefabToInstantiate = BoosterPrefab;
-                            break;
-                        case "BouncyWall":
-                            prefabToInstantiate = BouncyWallPrefab;
-                            break;
-                        case "ConstantPuller":
-                            prefabToInstantiate = ConstantPullerPrefab;
-                            break;
-                        case "ConstantPusher":
-                            prefabToInstantiate = ConstantPusherPrefab;
-                            break;
-                        case "Finish":
-                            prefabToInstantiate = FinishPrefab;
-                            break;
-                        case "KillCircle":
-                            prefabToInstantiate = KillCirclePrefab;
-                            break;
-                        case "KillWall":
-                            prefabToInstantiate = KillWallPrefab;
-                            break;
-                        case "Puller":
-                            prefabToInstantiate = PullerPrefab;
-                            break;
-                        case "Pusher":
-                            prefabToInstantiate = PusherPrefab;
-                            break;
-                        case "SlipperyWall":
-                            prefabToInstantiate = SlipperyWallPrefab;
-                            break;
-                        default:
-                            // TODO: display in game
-                            Debug.Log("ERROR: An object could not be loaded because its type is not valid.");
-                            break;
+                        GameObject prefabToInstantiate = null;
+                        switch(levelObject.type)
+                        {
+                            case "Booster":
+                                prefabToInstantiate = BoosterPrefab;
+                                break;
+                            case "BouncyWall":
+                                prefabToInstantiate = BouncyWallPrefab;
+                                break;
+                            case "ConstantPuller":
+                                prefabToInstantiate = ConstantPullerPrefab;
+                                break;
+                            case "ConstantPusher":
+                                prefabToInstantiate = ConstantPusherPrefab;
+                                break;
+                            case "Finish":
+                                prefabToInstantiate = FinishPrefab;
+                                break;
+                            case "KillCircle":
+                                prefabToInstantiate = KillCirclePrefab;
+                                break;
+                            case "KillWall":
+                                prefabToInstantiate = KillWallPrefab;
+                                break;
+                            case "Puller":
+                                prefabToInstantiate = PullerPrefab;
+                                break;
+                            case "Pusher":
+                                prefabToInstantiate = PusherPrefab;
+                                break;
+                            case "SlipperyWall":
+                                prefabToInstantiate = SlipperyWallPrefab;
+                                break;
+                            default:
+                                // TODO: display in game
+                                Debug.Log("ERROR: An object could not be loaded because its type is not valid.");
+                                break;
+                        }
+
+                        if (prefabToInstantiate != null)
+                        {
+                            Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
+                            Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
+
+                            GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, levelObjectsContainer.transform);
+
+                            lastPlacedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale);
+                        }
                     }
 
-                    if (prefabToInstantiate != null)
-                    {
-                        Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
-                        Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
+                    EventManager.Instance.RecenterCamera();
 
-                        GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, levelObjectsContainer.transform);
-
-                        lastPlacedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale);
-                    }
+                    // TODO: display a message in game
+                    Debug.Log("Loaded level.");
                 }
-
-                EventManager.Instance.RecenterCamera();
-
-                // TODO: display a message in game
-                Debug.Log("Loaded level.");
+                catch
+                {
+                    // TODO: display a message in game
+                    Debug.Log("ERROR: The input string is not valid JSON and can't be loaded.");
+                }
                 break;
         }
     }

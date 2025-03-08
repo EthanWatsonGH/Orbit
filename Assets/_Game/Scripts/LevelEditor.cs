@@ -589,8 +589,8 @@ public class LevelEditor : MonoBehaviour
     }
     public void LoadLevel()
     {
-        LevelManager.Instance.GetLevelJsonFromFile();
-        LevelManager.Instance.LoadLevel();
+        if (LevelManager.Instance.GetLevelJsonFromFile())
+            LevelManager.Instance.LoadLevel();
     }
     public void DeleteAllLevelObjects()
     {
