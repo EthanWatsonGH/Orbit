@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class LevelManager : MonoBehaviour
 {
@@ -80,7 +81,8 @@ public class LevelManager : MonoBehaviour
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
     public const byte LOADER_VERSION = 1;
 
-    string levelDirectory;
+    string playerLevelsDirectory;
+    string gameLevelsDirectory;
     string levelLoadJson;
 
     [Header("World Object References")]
@@ -89,19 +91,29 @@ public class LevelManager : MonoBehaviour
     [SerializeField] TMP_InputField levelSaveNameInput;
     [SerializeField] TMP_InputField levelLoadNameInput;
 
+    [Header("Level Preview References")]
+    [SerializeField] GameObject levelPreviewPrefab;
+    // TODO: i only need one of these and can just load from the selected folder
+    [SerializeField] GameObject playerLevelsPreviewPanel;
+    [SerializeField] GameObject gameLevelsPreviewPanel;
+
     void Start()
     {
         // get directory for player's levels
-        levelDirectory = Application.persistentDataPath + "/playerLevels";
-        EnsureLevelDirectoryExists();
+        playerLevelsDirectory = Application.persistentDataPath + "/playerLevels";
+        EnsureDirectoryExists(playerLevelsDirectory);
+
+        // get directory for game's levels
+        gameLevelsDirectory = Application.streamingAssetsPath + "/gameLevels";
+        EnsureDirectoryExists(gameLevelsDirectory);
     }
 
-    void EnsureLevelDirectoryExists()
+    void EnsureDirectoryExists(string directory)
     {
-        // create player levels directory if it doesn't already exist 
-        if (!Directory.Exists(levelDirectory))
+        // create directory if it doesn't already exist 
+        if (!Directory.Exists(directory))
         {
-            Directory.CreateDirectory(levelDirectory);
+            Directory.CreateDirectory(directory);
         }
     }
 
@@ -202,9 +214,9 @@ public class LevelManager : MonoBehaviour
 
         string json = JsonUtility.ToJson(level, true);
 
-        EnsureLevelDirectoryExists();
+        EnsureDirectoryExists(playerLevelsDirectory);
 
-        string saveLocation = Path.Combine(levelDirectory, level.levelName);
+        string saveLocation = Path.Combine(playerLevelsDirectory, level.levelName);
 
         File.WriteAllText(saveLocation + ".json", json);
 
@@ -232,7 +244,7 @@ public class LevelManager : MonoBehaviour
 
         string levelFileName = levelLoadNameInput.text.Trim() + ".json";
 
-        string loadLocation = Path.Combine(levelDirectory, levelFileName);
+        string loadLocation = Path.Combine(playerLevelsDirectory, levelFileName);
 
         // if level file is not found, send a message and cancel loading
         if (!File.Exists(loadLocation))
@@ -329,12 +341,89 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    public void LoadLevelPreviews(string levelsFolder)
+    public void LoadLevelPreviews(string levelsDirectory)
     {
-        if (levelsFolder == "player")
-            
-        else if (levelsFolder == "game")
+        string directory = string.Empty;
+        GameObject levelsPreviewPanel = null;
 
+        if (levelsDirectory == "player")
+        {
+            directory = playerLevelsDirectory;
+            levelsPreviewPanel = playerLevelsPreviewPanel;
+        }
+        else if (levelsDirectory == "game")
+        {
+            directory = gameLevelsDirectory;
+            levelsPreviewPanel = gameLevelsPreviewPanel;
+        }
+
+        if (!Directory.Exists(directory))
+        {
+            // TODO: show message in game
+            Debug.Log("ERROR: Folder could not be found when trying to load level previews at folder: " + directory);
+            return;
+        }
+
+        // TODO: also account for other file types like .dat for when i do the bult in levels with binary serialization
+        string[] levelFiles = Directory.GetFiles(directory, "*.json");
+
+        string[] levelImages = Directory.GetFiles(directory, "*.png");
+
+        // TODO: add error handling so if it hits a bad file it will continue and not just break out of the loop
+        foreach (string level in levelFiles)
+        {
+            try
+            {
+                string json = File.ReadAllText(level);
+
+                Level deserializedLevel = JsonUtility.FromJson<Level>(json);
+
+                if (!deserializedLevel.Equals(null))
+                {
+                    GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel.transform);
+
+                    string imageFile = Array.Find(levelImages, image => image.Contains(deserializedLevel.levelName)); // since im using the plain level name, the described error below can happen
+
+                    if (string.IsNullOrEmpty(imageFile)) // check if image was found
+                    {
+                        levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
+                        // TODO: show message in game
+                        Debug.Log("ERROR: Could not find image. Could be because the level's name was changed in its file, the image's file name was changed, or the image isn't in the level folder.");
+                    }
+                    else // load image
+                    {
+                        try
+                        {
+                            byte[] imageBytes = File.ReadAllBytes(imageFile);
+
+                            Texture2D imageTexture = new Texture2D(2, 2);
+                            imageTexture.LoadImage(imageBytes);
+
+                            Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
+
+                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().sprite = imageSprite;
+                        }
+                        catch
+                        {
+                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image could not be loaded";
+                        }
+                    }
+
+                    levelPreview.transform.GetChild(0).transform.Find("LevelName").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelName;
+                    levelPreview.transform.GetChild(0).transform.Find("LevelAuthor").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelAuthor;
+                }
+                else
+                {
+                    // TODO: show message in game
+                    Debug.Log("ERROR: A level preview failed to load");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // TODO: show message in game
+                Debug.Log("ERROR: A level preview failed to load or deserialize. Level: " + level + " . Exception message:" + ex.Message);
+            }
+        }
     }
     #endregion
 }

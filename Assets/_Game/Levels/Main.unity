@@ -128,6 +128,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1359302081106657919, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
   m_PrefabInstance: {fileID: 848703504}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &159883779 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7560339558180301626, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+  m_PrefabInstance: {fileID: 1343076315}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &207590488 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8576970350203874597, guid: 97c0e9a1449b0c445a495e85cb6ace9f, type: 3}
@@ -604,7 +609,19 @@ PrefabInstance:
     m_TransformParent: {fileID: 234237094}
     m_Modifications:
     - target: {fileID: -705915108942793679, guid: b977425c87d97cc4f98e249d51f6d559, type: 3}
+      propertyPath: playerHUD
+      value: 
+      objectReference: {fileID: 1561682368}
+    - target: {fileID: -705915108942793679, guid: b977425c87d97cc4f98e249d51f6d559, type: 3}
+      propertyPath: levelEditorHUD
+      value: 
+      objectReference: {fileID: 159883779}
+    - target: {fileID: -705915108942793679, guid: b977425c87d97cc4f98e249d51f6d559, type: 3}
       propertyPath: levelSelectionMenu
+      value: 
+      objectReference: {fileID: 207590488}
+    - target: {fileID: -705915108942793679, guid: b977425c87d97cc4f98e249d51f6d559, type: 3}
+      propertyPath: playerLevelSelectionMenu
       value: 
       objectReference: {fileID: 207590488}
     - target: {fileID: 6117115161722842698, guid: b977425c87d97cc4f98e249d51f6d559, type: 3}
@@ -1205,6 +1222,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8916877501187485870, guid: f5bdc09a4c4e08e47a729bf31bf72ce0, type: 3}
   m_PrefabInstance: {fileID: 1161199687}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1561682368 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6151453574519394481, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
+  m_PrefabInstance: {fileID: 804497419}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1770983902
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1423,6 +1445,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1343076316}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
+      propertyPath: levelPreviewPrefab
+      value: 
+      objectReference: {fileID: 6545384443319374544, guid: de7dbd34f31071b41a0b5fdc152eb4f0, type: 3}
+    - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelSaveNameInput
       value: 
       objectReference: {fileID: 1343076317}
@@ -1430,6 +1456,10 @@ PrefabInstance:
       propertyPath: levelObjectsContainer
       value: 
       objectReference: {fileID: 2036476585}
+    - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
+      propertyPath: playerLevelsPreviewPanel
+      value: 
+      objectReference: {fileID: 207590488}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

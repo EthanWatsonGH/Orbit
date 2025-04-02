@@ -58,3 +58,4 @@ MonoBehaviour:
   playerStartPoint: {fileID: 0}
   levelSaveNameInput: {fileID: 0}
   levelLoadNameInput: {fileID: 0}
+  levelPreviewPrefab: {fileID: 6545384443319374544, guid: de7dbd34f31071b41a0b5fdc152eb4f0, type: 3}
