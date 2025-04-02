@@ -328,5 +328,13 @@ public class LevelManager : MonoBehaviour
                 break;
         }
     }
+
+    public void LoadLevelPreviews(string levelsFolder)
+    {
+        if (levelsFolder == "player")
+            
+        else if (levelsFolder == "game")
+
+    }
     #endregion
 }
