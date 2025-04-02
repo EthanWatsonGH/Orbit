@@ -42,6 +42,7 @@ public class LevelManager : MonoBehaviour
     }
     #endregion
 
+    // TODO: should i track level save date in file?
     #region Level Struct
     // TODO: may need to make more of these for different loader versions, and check which one to use for each
     [System.Serializable]
@@ -234,28 +235,17 @@ public class LevelManager : MonoBehaviour
         levelLoadJson = GUIUtility.systemCopyBuffer;
     }
 
-    public bool GetLevelJsonFromFile()
+    public bool GetLevelJsonFromFile(string levelPath)
     {
-        // TODO: make a level selection menu instead of it being through a text input
-        if (levelLoadNameInput.text.Trim() == string.Empty)
-        {
-            Debug.Log("ERROR: Enter a level to load.");
-            return false;
-        }
-
-        string levelFileName = levelLoadNameInput.text.Trim() + ".json";
-
-        string loadLocation = Path.Combine(playerLevelsDirectory, levelFileName);
-
         // if level file is not found, send a message and cancel loading
-        if (!File.Exists(loadLocation))
+        if (!File.Exists(levelPath))
         {
             // TODO: display a message in game
             Debug.Log("ERROR: Level not found.");
             return false;
         }
 
-        levelLoadJson = File.ReadAllText(loadLocation);
+        levelLoadJson = File.ReadAllText(levelPath);
 
         return true;
     }
@@ -420,6 +410,7 @@ public class LevelManager : MonoBehaviour
 
                     levelPreview.transform.GetChild(0).transform.Find("LevelName").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelName;
                     levelPreview.transform.GetChild(0).transform.Find("LevelAuthor").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelAuthor;
+                    levelPreview.transform.GetChild(0).transform.Find("LevelPath").transform.GetComponent<TMP_Text>().text = level;
                 }
                 else
                 {

@@ -65,7 +65,7 @@ public class UIManager : MonoBehaviour
             lastActiveUiBeforeOpeningMenu = playerHUD;
     }
 
-    void ShowLastActiveUiBeforeOpeningMainMenu()
+    public void ShowLastActiveUiBeforeOpeningMainMenu()
     {
         HideAllUI();
         lastActiveUiBeforeOpeningMenu.SetActive(true);
@@ -84,6 +84,12 @@ public class UIManager : MonoBehaviour
         HideAllUI();
         playerLevelSelectionMenu.SetActive(true);
         StartCoroutine(LevelManager.Instance.LoadLevelPreviews("player"));
+    }
+
+    public void ShowPlayerHUD()
+    {
+        HideAllUI();
+        playerHUD.gameObject.SetActive(true);
     }
 
     void Update()

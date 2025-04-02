@@ -589,11 +589,6 @@ public class LevelEditor : MonoBehaviour
     {
         LevelManager.Instance.SaveLevel();
     }
-    public void LoadLevel()
-    {
-        if (LevelManager.Instance.GetLevelJsonFromFile())
-            LevelManager.Instance.LoadLevel();
-    }
     public void DeleteAllLevelObjects()
     {
         LevelManager.Instance.DestroyAllExistingLevelObjects();
