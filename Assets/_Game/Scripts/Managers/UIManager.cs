@@ -46,7 +46,7 @@ public class UIManager : MonoBehaviour
     {
         HideAllUI();
         playerLevelSelectionMenu.SetActive(true);
-        LevelManager.Instance.LoadLevelPreviews("player");
+        StartCoroutine(LevelManager.Instance.LoadLevelPreviews("player"));
     }
 
     void Update()

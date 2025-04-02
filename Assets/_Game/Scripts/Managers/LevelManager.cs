@@ -341,7 +341,7 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    public void LoadLevelPreviews(string levelsDirectory)
+    public IEnumerator LoadLevelPreviews(string levelsDirectory)
     {
         string directory = string.Empty;
         GameObject levelsPreviewPanel = null;
@@ -361,7 +361,13 @@ public class LevelManager : MonoBehaviour
         {
             // TODO: show message in game
             Debug.Log("ERROR: Folder could not be found when trying to load level previews at folder: " + directory);
-            return;
+            yield break;
+        }
+
+        // destroy all level previews in the previews panel in case it's not the first time loading
+        foreach (Transform levelPreview in levelsPreviewPanel.transform)
+        {
+            Destroy(levelPreview.gameObject);
         }
 
         // TODO: also account for other file types like .dat for when i do the bult in levels with binary serialization
@@ -369,7 +375,6 @@ public class LevelManager : MonoBehaviour
 
         string[] levelImages = Directory.GetFiles(directory, "*.png");
 
-        // TODO: add error handling so if it hits a bad file it will continue and not just break out of the loop
         foreach (string level in levelFiles)
         {
             try
@@ -387,6 +392,7 @@ public class LevelManager : MonoBehaviour
                     if (string.IsNullOrEmpty(imageFile)) // check if image was found
                     {
                         levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
+                        levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
                         // TODO: show message in game
                         Debug.Log("ERROR: Could not find image. Could be because the level's name was changed in its file, the image's file name was changed, or the image isn't in the level folder.");
                     }
@@ -406,6 +412,7 @@ public class LevelManager : MonoBehaviour
                         catch
                         {
                             levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image could not be loaded";
+                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
                         }
                     }
 
@@ -423,6 +430,8 @@ public class LevelManager : MonoBehaviour
                 // TODO: show message in game
                 Debug.Log("ERROR: A level preview failed to load or deserialize. Level: " + level + " . Exception message:" + ex.Message);
             }
+
+            yield return null;
         }
     }
     #endregion
