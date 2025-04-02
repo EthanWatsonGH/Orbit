@@ -4,6 +4,41 @@ using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
+    #region Singleton Setup
+    private static UIManager instance;
+
+    public static UIManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<UIManager>();
+
+                if (instance == null)
+                {
+                    GameObject newUIManager = new GameObject("UIManager");
+                    instance = newUIManager.AddComponent<UIManager>();
+                }
+            }
+            return instance;
+        }
+    }
+
+    private void Awake()
+    {
+        if (instance == null)
+        {
+            instance = this;
+            //DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            //Destroy(gameObject);
+        }
+    }
+    #endregion
+
     [Header("Prefab References")]
     [SerializeField] GameObject levelPreviewPrefab;
 
@@ -14,6 +49,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] GameObject playerHUD;
 
     GameObject lastActiveUiBeforeOpeningMenu;
+
+    public bool IsInControlBlockingMenu = false;
 
     void Start()
     {
@@ -34,7 +71,7 @@ public class UIManager : MonoBehaviour
         lastActiveUiBeforeOpeningMenu.SetActive(true);
     }
 
-    void HideAllUI()
+    public void HideAllUI()
     {
         playerLevelSelectionMenu.SetActive(false);
         //gameLevelSelectionMenu.SetActive(false);
@@ -61,5 +98,7 @@ public class UIManager : MonoBehaviour
         {
             ShowLastActiveUiBeforeOpeningMainMenu();
         }
+
+        IsInControlBlockingMenu = playerLevelSelectionMenu.activeSelf;
     }
 }

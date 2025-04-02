@@ -509,7 +509,9 @@ public class LevelEditor : MonoBehaviour
         // hide player start location icon
         startLocationIcon.SetActive(false);
 
+        UIManager.Instance.HideAllUI();
         player.SetActive(true);
+        player.transform.Find("Canvas").gameObject.SetActive(true);
         this.gameObject.SetActive(false);
     }
 

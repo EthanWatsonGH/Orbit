@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -370,8 +371,9 @@ public class LevelManager : MonoBehaviour
             Destroy(levelPreview.gameObject);
         }
 
-        // TODO: also account for other file types like .dat for when i do the bult in levels with binary serialization
+        // TODO: also account for other file types like .dat for when i do the built in levels with binary serialization
         string[] levelFiles = Directory.GetFiles(directory, "*.json");
+        levelFiles = levelFiles.OrderByDescending(file => new FileInfo(file).CreationTime).ToArray(); // order levels by creation time descending
 
         string[] levelImages = Directory.GetFiles(directory, "*.png");
 

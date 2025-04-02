@@ -44,7 +44,7 @@ public class CameraZoom : MonoBehaviour
 
         // desktop
         float desktopZoomRatio = cam.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
-        if (Input.GetAxisRaw("Mouse ScrollWheel") != 0)
+        if (Input.GetAxisRaw("Mouse ScrollWheel") != 0 && !UIManager.Instance.IsInControlBlockingMenu)
             newCameraZoom = cam.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * desktopZoomRatio * -1f;
 
         // apply new zoom

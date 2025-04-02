@@ -600,6 +600,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f5bdc09a4c4e08e47a729bf31bf72ce0, type: 3}
+--- !u!1 &1164220634 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8124953705162249084, guid: 97c0e9a1449b0c445a495e85cb6ace9f, type: 3}
+  m_PrefabInstance: {fileID: 1291252805}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1164600008
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1459,7 +1464,7 @@ PrefabInstance:
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: playerLevelsPreviewPanel
       value: 
-      objectReference: {fileID: 207590488}
+      objectReference: {fileID: 1164220634}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

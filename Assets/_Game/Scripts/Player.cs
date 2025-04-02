@@ -241,7 +241,9 @@ public class Player : MonoBehaviour
         // show player start location icon
         startLocationIcon.SetActive(true);
 
+        UIManager.Instance.HideAllUI();
         levelEditor.SetActive(true);
+        levelEditor.transform.Find("Canvas").gameObject.SetActive(true);
         this.gameObject.SetActive(false);
     }
 
