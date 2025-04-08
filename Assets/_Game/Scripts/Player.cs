@@ -49,7 +49,7 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        if (true) // TODO: add a check to disallow doing these things while in pause menu
+        if (!UIManager.Instance.IsInControlBlockingMenu)
         {
             TryLaunch();
 
@@ -75,6 +75,15 @@ public class Player : MonoBehaviour
     {
         isInWinState = false;
         RetryLevel();
+
+        EventManager.Instance.ShowPlayerInWorldUiElementsEvent.AddListener(ShowInWorldUiElements);
+        EventManager.Instance.HidePlayerInWorldUiElementsEvent.AddListener(HideInWorldUiElements);
+    }
+
+    private void OnDisable()
+    {
+        EventManager.Instance.ShowPlayerInWorldUiElementsEvent.RemoveListener(ShowInWorldUiElements);
+        EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
     }
 
     void TryLaunch()
@@ -295,6 +304,18 @@ public class Player : MonoBehaviour
                 ShowFinishTrailRenderer();
             }
         }
+    }
+
+    void ShowInWorldUiElements()
+    {
+        lr.enabled = true;
+        launchDirectionPoint.SetActive(true);
+    }
+
+    void HideInWorldUiElements()
+    {
+        lr.enabled = false;
+        launchDirectionPoint.SetActive(false);
     }
 
     // TODO: change these to proper events

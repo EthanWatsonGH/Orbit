@@ -77,6 +77,9 @@ public class UIManager : MonoBehaviour
         //gameLevelSelectionMenu.SetActive(false);
         levelEditorHUD.SetActive(false);
         playerHUD.SetActive(false);
+
+        EventManager.Instance.UnselectObject();
+        EventManager.Instance.HidePlayerInWorldUiElements();
     }
 
     void ShowPlayerLevelSelectionMenu()
@@ -90,6 +93,7 @@ public class UIManager : MonoBehaviour
     {
         HideAllUI();
         playerHUD.gameObject.SetActive(true);
+        EventManager.Instance.ShowPlayerInWorldUiElements();
     }
 
     void Update()
@@ -97,6 +101,7 @@ public class UIManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Escape) && (levelEditorHUD.activeSelf || playerHUD.activeSelf))
         {
             FindLastActiveUiBeforeOpeningMainMenu();
+            HideAllUI();
             // TODO: make this just the root main menu when i have that
             ShowPlayerLevelSelectionMenu();
         }

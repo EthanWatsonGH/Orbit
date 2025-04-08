@@ -40,19 +40,27 @@ public class EventManager : MonoBehaviour
     #endregion
 
     public UnityEvent RecenterCameraEvent;
-
-    void Start()
-    {
-        
-    }
-
-    void Update()
-    {
-
-    }
+    public UnityEvent UnselectObjectEvent;
+    public UnityEvent ShowPlayerInWorldUiElementsEvent;
+    public UnityEvent HidePlayerInWorldUiElementsEvent;
 
     public void RecenterCamera()
     {
         RecenterCameraEvent?.Invoke();
+    }
+
+    public void UnselectObject()
+    {
+        UnselectObjectEvent?.Invoke();
+    }
+
+    public void ShowPlayerInWorldUiElements()
+    {
+        ShowPlayerInWorldUiElementsEvent?.Invoke();
+    }
+
+    public void HidePlayerInWorldUiElements() 
+    {
+        HidePlayerInWorldUiElementsEvent?.Invoke();
     }
 }

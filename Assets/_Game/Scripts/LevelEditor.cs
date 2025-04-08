@@ -85,6 +85,8 @@ public class LevelEditor : MonoBehaviour
         canvas.gameObject.SetActive(true);
 
         objectTransformControls.SetActive(false);
+
+
     }
 
     void Update()
@@ -96,6 +98,17 @@ public class LevelEditor : MonoBehaviour
         HandleRotateSelectedObject();
         HandleMoveSelectedObject();
         HandleShowObjectTransformControls();
+    }
+
+    private void OnEnable()
+    {
+        EventManager.Instance.UnselectObjectEvent.AddListener(UnselectObject);
+    }
+
+    private void OnDisable()
+    {
+        UnselectObject();
+        EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
     }
 
     void UpdatePointerPosition()
@@ -150,7 +163,7 @@ public class LevelEditor : MonoBehaviour
     void HandleSelectObject()
     {
         // set the object the player clicks as selected if it's allowed to be selected
-        if (Input.GetButtonDown("Fire1"))
+        if (Input.GetButtonDown("Fire1") && !UIManager.Instance.IsInControlBlockingMenu)
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -177,6 +190,11 @@ public class LevelEditor : MonoBehaviour
         {
             objectTransformControls.transform.position = new Vector3(selectedObject.transform.position.x, selectedObject.transform.position.y, objectTransformControls.transform.position.z);
         }
+    }
+
+    void UnselectObject()
+    {
+        selectedObject = null;
     }
 
     void AlignScaleControlsWithSelectedObject()
