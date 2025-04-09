@@ -1,0 +1,33 @@
+{
+    "levelName": "1",
+    "levelAuthor": "TO ADD",
+    "loaderVersion": 1,
+    "playerStartPointXPosition": 0.0,
+    "playerStartPointYPosition": 0.0,
+    "levelObjects": [
+        {
+            "type": "Puller",
+            "xPosition": 2.5,
+            "yPosition": 7.5,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 2.5,
+            "yPosition": 0.0,
+            "xScale": 1.0,
+            "yScale": 3.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Finish",
+            "xPosition": 5.0,
+            "yPosition": 0.0,
+            "xScale": 3.0,
+            "yScale": 1.0,
+            "rotation": 0.0
+        }
+    ]
+}

@@ -100,9 +100,8 @@ public class LevelManager : MonoBehaviour
 
     [Header("Level Preview References")]
     [SerializeField] GameObject levelPreviewPrefab;
-    // TODO: i only need one of these and can just load from the selected folder
-    [SerializeField] GameObject playerLevelsPreviewPanel;
-    [SerializeField] GameObject gameLevelsPreviewPanel;
+    [SerializeField] GameObject levelsPreviewPanel;
+    [SerializeField] TMP_Text noLevelsFoundText;
 
     void Start()
     {
@@ -186,9 +185,10 @@ public class LevelManager : MonoBehaviour
         return level;
     }
 
+    #region Copy Level To Clipboard
     #if UNITY_WEBGL && !UNITY_EDITOR
-        [System.Runtime.InteropServices.DllImport("__Internal")]
-        private static extern void CopyToClipboard(string str);
+            [System.Runtime.InteropServices.DllImport("__Internal")]
+            private static extern void CopyToClipboard(string str);
     #endif
 
     public void CopyLevelCodeToClipboard()
@@ -203,6 +203,7 @@ public class LevelManager : MonoBehaviour
             GUIUtility.systemCopyBuffer = json;
         #endif
     }
+    #endregion
 
     IEnumerator SaveScreenshot(string screenshotLocation)
     {
@@ -350,6 +351,7 @@ public class LevelManager : MonoBehaviour
                     }
 
                     EventManager.Instance.RecenterCamera();
+                    EventManager.Instance.OnLevelLoad();
 
                     // TODO: display a message in game
                     Debug.Log("Loaded level.");
@@ -366,17 +368,14 @@ public class LevelManager : MonoBehaviour
     public IEnumerator LoadLevelPreviews(string levelsDirectory)
     {
         string directory = string.Empty;
-        GameObject levelsPreviewPanel = null;
 
         if (levelsDirectory == "player")
         {
             directory = playerLevelsDirectory;
-            levelsPreviewPanel = playerLevelsPreviewPanel;
         }
         else if (levelsDirectory == "game")
         {
             directory = gameLevelsDirectory;
-            levelsPreviewPanel = gameLevelsPreviewPanel;
         }
 
         if (!Directory.Exists(directory))
@@ -386,76 +385,95 @@ public class LevelManager : MonoBehaviour
             yield break;
         }
 
-        // destroy all level previews in the previews panel in case it's not the first time loading
+        // reset previews panel for next load
         foreach (Transform levelPreview in levelsPreviewPanel.transform)
         {
             Destroy(levelPreview.gameObject);
         }
+        noLevelsFoundText.text = string.Empty;
+        
 
         // TODO: also account for other file types like .dat for when i do the built in levels with binary serialization
         string[] levelFiles = Directory.GetFiles(directory, "*.json");
-        levelFiles = levelFiles.OrderByDescending(file => new FileInfo(file).CreationTime).ToArray(); // order levels by creation time descending
 
-        string[] levelImages = Directory.GetFiles(directory, "*.png");
-
-        foreach (string level in levelFiles)
+        if (levelFiles.Length <= 0) // if no levels found, show message where levels would have been displayed
         {
-            try
+            noLevelsFoundText.text = "No levels found";
+            noLevelsFoundText.color = Color.white;
+        }
+        else // display levels
+        {
+            if (levelsDirectory == "player")
             {
-                string json = File.ReadAllText(level);
+                levelFiles = levelFiles.OrderByDescending(file => new FileInfo(file).CreationTime).ToArray(); // order levels by creation time descending
+            }
+            else if (levelsDirectory == "game")
+            {
+                levelFiles = levelFiles.OrderBy(file => Path.GetFileName(file)).ToArray(); // order levels by alphabetical name
+            }
+            
 
-                Level deserializedLevel = JsonUtility.FromJson<Level>(json);
+            string[] levelImages = Directory.GetFiles(directory, "*.png");
 
-                if (!deserializedLevel.Equals(null))
+            foreach (string level in levelFiles)
+            {
+                try
                 {
-                    GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel.transform);
+                    string json = File.ReadAllText(level);
 
-                    string imageFile = Array.Find(levelImages, image => image.Contains(deserializedLevel.levelName)); // since im using the plain level name, the described error below can happen
+                    Level deserializedLevel = JsonUtility.FromJson<Level>(json);
 
-                    if (string.IsNullOrEmpty(imageFile)) // check if image was found
+                    if (!deserializedLevel.Equals(null))
                     {
-                        levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
-                        levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
-                        // TODO: show message in game
-                        Debug.Log("ERROR: Could not find image. Could be because the level's name was changed in its file, the image's file name was changed, or the image isn't in the level folder.");
-                    }
-                    else // load image
-                    {
-                        try
+                        GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel.transform);
+
+                        string imageFile = Array.Find(levelImages, image => image.Contains(deserializedLevel.levelName)); // since im using the plain level name, the error described below can happen
+
+                        if (string.IsNullOrEmpty(imageFile)) // if image wasn't found, show message where it would have been displayed
                         {
-                            byte[] imageBytes = File.ReadAllBytes(imageFile);
-
-                            Texture2D imageTexture = new Texture2D(2, 2);
-                            imageTexture.LoadImage(imageBytes);
-
-                            Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
-
-                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().sprite = imageSprite;
-                        }
-                        catch
-                        {
-                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image could not be loaded";
+                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
                             levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
+                            // TODO: show message in game
+                            Debug.Log("ERROR: Could not find image. Level file name, image file name, and level name in level file must all match. And image must be in same folder as level.");
                         }
-                    }
+                        else // show display
+                        {
+                            try
+                            {
+                                byte[] imageBytes = File.ReadAllBytes(imageFile);
 
-                    levelPreview.transform.GetChild(0).transform.Find("LevelName").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelName;
-                    levelPreview.transform.GetChild(0).transform.Find("LevelAuthor").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelAuthor;
-                    levelPreview.transform.GetChild(0).transform.Find("LevelPath").transform.GetComponent<TMP_Text>().text = level;
+                                Texture2D imageTexture = new Texture2D(2, 2);
+                                imageTexture.LoadImage(imageBytes);
+
+                                Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
+
+                                levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().sprite = imageSprite;
+                            }
+                            catch
+                            {
+                                levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image could not be loaded";
+                                levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
+                            }
+                        }
+
+                        levelPreview.transform.GetChild(0).transform.Find("LevelName").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelName;
+                        levelPreview.transform.GetChild(0).transform.Find("LevelAuthor").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelAuthor;
+                        levelPreview.transform.GetChild(0).transform.Find("LevelPath").transform.GetComponent<TMP_Text>().text = level;
+                    }
+                    else
+                    {
+                        // TODO: show message in game
+                        Debug.Log("ERROR: A level preview failed to load");
+                    }
                 }
-                else
+                catch (System.Exception ex)
                 {
                     // TODO: show message in game
-                    Debug.Log("ERROR: A level preview failed to load");
+                    Debug.Log("ERROR: A level preview failed to load or deserialize. Level: " + level + " . Exception message:" + ex.Message);
                 }
-            }
-            catch (System.Exception ex)
-            {
-                // TODO: show message in game
-                Debug.Log("ERROR: A level preview failed to load or deserialize. Level: " + level + " . Exception message:" + ex.Message);
-            }
 
-            yield return null;
+                yield return null;
+            }
         }
     }
     #endregion

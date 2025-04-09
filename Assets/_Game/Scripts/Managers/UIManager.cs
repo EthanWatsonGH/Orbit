@@ -43,8 +43,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] GameObject levelPreviewPrefab;
 
     [Header("World Object References")]
-    [SerializeField] GameObject playerLevelSelectionMenu;
-    //[SerializeField] GameObject gameLevelSelectionMenu;
+    [SerializeField] GameObject levelSelectionMenu;
     [SerializeField] GameObject levelEditorHUD;
     [SerializeField] GameObject playerHUD;
 
@@ -73,7 +72,7 @@ public class UIManager : MonoBehaviour
 
     public void HideAllUI()
     {
-        playerLevelSelectionMenu.SetActive(false);
+        levelSelectionMenu.SetActive(false);
         //gameLevelSelectionMenu.SetActive(false);
         levelEditorHUD.SetActive(false);
         playerHUD.SetActive(false);
@@ -82,11 +81,23 @@ public class UIManager : MonoBehaviour
         EventManager.Instance.HidePlayerInWorldUiElements();
     }
 
-    void ShowPlayerLevelSelectionMenu()
+    private void ShowLevelPreviewPanel()
     {
+        FindLastActiveUiBeforeOpeningMainMenu();
         HideAllUI();
-        playerLevelSelectionMenu.SetActive(true);
+        levelSelectionMenu.SetActive(true);
+    }
+
+    public void ShowPlayerLevelSelectionMenu()
+    {
+        ShowLevelPreviewPanel();
         StartCoroutine(LevelManager.Instance.LoadLevelPreviews("player"));
+    }
+
+    public void ShowGameLevelSelectionMenu()
+    {
+        ShowLevelPreviewPanel();
+        StartCoroutine(LevelManager.Instance.LoadLevelPreviews("game"));
     }
 
     public void ShowPlayerHUD()
@@ -100,8 +111,6 @@ public class UIManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape) && (levelEditorHUD.activeSelf || playerHUD.activeSelf))
         {
-            FindLastActiveUiBeforeOpeningMainMenu();
-            HideAllUI();
             // TODO: make this just the root main menu when i have that
             ShowPlayerLevelSelectionMenu();
         }
@@ -110,6 +119,6 @@ public class UIManager : MonoBehaviour
             ShowLastActiveUiBeforeOpeningMainMenu();
         }
 
-        IsInControlBlockingMenu = playerLevelSelectionMenu.activeSelf;
+        IsInControlBlockingMenu = levelSelectionMenu.activeSelf;
     }
 }

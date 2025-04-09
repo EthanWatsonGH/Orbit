@@ -1212,7 +1212,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8576970350203874597, guid: 97c0e9a1449b0c445a495e85cb6ace9f, type: 3}
       propertyPath: m_Name
-      value: PlayerLevelSelectionMenu
+      value: LevelSelectionMenu
       objectReference: {fileID: 0}
     - target: {fileID: 8576970350203874597, guid: 97c0e9a1449b0c445a495e85cb6ace9f, type: 3}
       propertyPath: m_IsActive
@@ -1819,6 +1819,10 @@ PrefabInstance:
       propertyPath: levelSaveNameInput
       value: 
       objectReference: {fileID: 1343076317}
+    - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
+      propertyPath: levelsPreviewPanel
+      value: 
+      objectReference: {fileID: 1164220634}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelObjectsContainer
       value: 

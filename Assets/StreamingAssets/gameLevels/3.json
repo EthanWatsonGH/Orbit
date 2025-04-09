@@ -1,0 +1,113 @@
+{
+    "levelName": "3",
+    "levelAuthor": "TO ADD",
+    "loaderVersion": 1,
+    "playerStartPointXPosition": 5.3467206954956059,
+    "playerStartPointYPosition": 9.522624969482422,
+    "levelObjects": [
+        {
+            "type": "Puller",
+            "xPosition": 7.838153839111328,
+            "yPosition": 0.07923553884029389,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 17.907161712646486,
+            "yPosition": 0.07923507690429688,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 27.97616958618164,
+            "yPosition": 0.07923507690429688,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 38.00614547729492,
+            "yPosition": 0.07923507690429688,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 48.23126220703125,
+            "yPosition": 0.07923507690429688,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Finish",
+            "xPosition": 54.2414436340332,
+            "yPosition": 0.3134002685546875,
+            "xScale": 1.0,
+            "yScale": 12.591062545776368,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 7.799130439758301,
+            "yPosition": 3.0843305587768556,
+            "xScale": 1.0,
+            "yScale": 6.03449821472168,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 27.976173400878908,
+            "yPosition": 3.0843305587768556,
+            "xScale": 1.0,
+            "yScale": 6.03449821472168,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 38.00614547729492,
+            "yPosition": 6.245526313781738,
+            "xScale": 61.453060150146487,
+            "yScale": 1.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 38.00614547729492,
+            "yPosition": -5.579702377319336,
+            "xScale": 61.453060150146487,
+            "yScale": 1.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 17.86813735961914,
+            "yPosition": -2.886824131011963,
+            "xScale": 1.0,
+            "yScale": 6.03449821472168,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 48.270294189453128,
+            "yPosition": 3.0843305587768556,
+            "xScale": 1.0,
+            "yScale": 6.03449821472168,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 37.967124938964847,
+            "yPosition": -2.886824607849121,
+            "xScale": 1.0,
+            "yScale": 6.03449821472168,
+            "rotation": 0.0
+        }
+    ]
+}

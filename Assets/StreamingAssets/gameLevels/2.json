@@ -1,0 +1,129 @@
+{
+    "levelName": "2",
+    "levelAuthor": "TO ADD",
+    "loaderVersion": 1,
+    "playerStartPointXPosition": 0.0,
+    "playerStartPointYPosition": 0.0,
+    "levelObjects": [
+        {
+            "type": "Puller",
+            "xPosition": 6.533910751342773,
+            "yPosition": -0.03439057618379593,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Finish",
+            "xPosition": 64.48918151855469,
+            "yPosition": 0.7253565788269043,
+            "xScale": 1.0,
+            "yScale": 8.094627380371094,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 14.094503402709961,
+            "yPosition": 9.181682586669922,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 16.039804458618165,
+            "yPosition": -7.410566806793213,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 26.567296981811525,
+            "yPosition": 12.843422889709473,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 23.9354248046875,
+            "yPosition": 1.5149188041687012,
+            "xScale": 15.5390625,
+            "yScale": 15.5390625,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 30.10316276550293,
+            "yPosition": -7.547880172729492,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 41.683414459228519,
+            "yPosition": 8.437898635864258,
+            "xScale": 16.041015625,
+            "yScale": 16.041015625,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 44.20085906982422,
+            "yPosition": -9.939453125,
+            "xScale": 10.50390625,
+            "yScale": 10.50390625,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 44.20085906982422,
+            "yPosition": -2.8906078338623049,
+            "xScale": 10.755859375,
+            "yScale": 10.755859375,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 55.529361724853519,
+            "yPosition": 7.305044174194336,
+            "xScale": 10.755859375,
+            "yScale": 10.755859375,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 56.66221237182617,
+            "yPosition": -6.415031433105469,
+            "xScale": 10.755859375,
+            "yScale": 10.755859375,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 37.90725326538086,
+            "yPosition": 22.409717559814454,
+            "xScale": 10.755859375,
+            "yScale": 10.755859375,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 49.99099349975586,
+            "yPosition": 15.864358901977539,
+            "xScale": 10.755859375,
+            "yScale": 10.755859375,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 36.01918029785156,
+            "yPosition": -16.35894012451172,
+            "xScale": 14.279296875,
+            "yScale": 14.279296875,
+            "rotation": 0.0
+        }
+    ]
+}

@@ -1,0 +1,185 @@
+{
+    "levelName": "4",
+    "levelAuthor": "TO ADD",
+    "loaderVersion": 1,
+    "playerStartPointXPosition": -28.227630615234376,
+    "playerStartPointYPosition": 3.514885902404785,
+    "levelObjects": [
+        {
+            "type": "KillWall",
+            "xPosition": 9.281932830810547,
+            "yPosition": -8.151463508605957,
+            "xScale": 1.0,
+            "yScale": 85.49927520751953,
+            "rotation": 270.07470703125
+        },
+        {
+            "type": "Finish",
+            "xPosition": 50.87596893310547,
+            "yPosition": 3.8114490509033205,
+            "xScale": 2.339813709259033,
+            "yScale": 22.950563430786134,
+            "rotation": 180.02020263671876
+        },
+        {
+            "type": "Puller",
+            "xPosition": -21.685091018676759,
+            "yPosition": -1.9482111930847169,
+            "xScale": 7.264288902282715,
+            "yScale": 7.264288902282715,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 9.281932830810547,
+            "yPosition": 15.710454940795899,
+            "xScale": 1.0,
+            "yScale": 85.49927520751953,
+            "rotation": 270.07470703125
+        },
+        {
+            "type": "KillWall",
+            "xPosition": -13.097026824951172,
+            "yPosition": 12.163747787475586,
+            "xScale": 2.0495944023132326,
+            "yScale": 6.172214508056641,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": -13.097026824951172,
+            "yPosition": -4.629702568054199,
+            "xScale": 2.0495944023132326,
+            "yScale": 6.172214508056641,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": -13.113431930541993,
+            "yPosition": 3.474675178527832,
+            "xScale": 7.264288902282715,
+            "yScale": 7.264288902282715,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": -21.685091018676759,
+            "yPosition": 9.247420310974121,
+            "xScale": 7.264288902282715,
+            "yScale": 7.264288902282715,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": -21.726999282836915,
+            "yPosition": 3.8836445808410646,
+            "xScale": 4.805755615234375,
+            "yScale": 1.5247974395751954,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": -0.21712398529052735,
+            "yPosition": -1.9482107162475587,
+            "xScale": 7.264288902282715,
+            "yScale": 7.264288902282715,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": -0.21712398529052735,
+            "yPosition": 9.628186225891114,
+            "xScale": 7.264288902282715,
+            "yScale": 7.264288902282715,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillCircle",
+            "xPosition": -5.5000104904174809,
+            "yPosition": 3.5519042015075685,
+            "xScale": 3.9892120361328127,
+            "yScale": 3.9892120361328127,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillCircle",
+            "xPosition": 7.86992073059082,
+            "yPosition": 11.10645580291748,
+            "xScale": 3.3913707733154299,
+            "yScale": 3.3913707733154299,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillCircle",
+            "xPosition": 7.86992073059082,
+            "yPosition": -3.8395943641662599,
+            "xScale": 3.3913707733154299,
+            "yScale": 3.3913707733154299,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillCircle",
+            "xPosition": 7.86992073059082,
+            "yPosition": 3.714949607849121,
+            "xScale": 3.3913707733154299,
+            "yScale": 3.3913707733154299,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 18.735254287719728,
+            "yPosition": 3.474675178527832,
+            "xScale": 11.23177719116211,
+            "yScale": 11.23177719116211,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 34.26681900024414,
+            "yPosition": 9.941446304321289,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 34.26681900024414,
+            "yPosition": -2.194974899291992,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 27.028064727783204,
+            "yPosition": 3.6458301544189455,
+            "xScale": 1.0,
+            "yScale": 6.501718521118164,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 42.57014083862305,
+            "yPosition": 12.135125160217286,
+            "xScale": 1.7332515716552735,
+            "yScale": 6.262144088745117,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 42.57014083862305,
+            "yPosition": -4.815892696380615,
+            "xScale": 1.7332515716552735,
+            "yScale": 6.262144088745117,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": -32.9666633605957,
+            "yPosition": 3.965930461883545,
+            "xScale": 1.0,
+            "yScale": 23.847394943237306,
+            "rotation": 0.0
+        }
+    ]
+}

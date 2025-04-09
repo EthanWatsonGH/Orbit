@@ -43,6 +43,7 @@ public class EventManager : MonoBehaviour
     public UnityEvent UnselectObjectEvent;
     public UnityEvent ShowPlayerInWorldUiElementsEvent;
     public UnityEvent HidePlayerInWorldUiElementsEvent;
+    public UnityEvent OnLevelLoadEvent;
 
     public void RecenterCamera()
     {
@@ -62,5 +63,10 @@ public class EventManager : MonoBehaviour
     public void HidePlayerInWorldUiElements() 
     {
         HidePlayerInWorldUiElementsEvent?.Invoke();
+    }
+
+    public void OnLevelLoad()
+    {
+        OnLevelLoadEvent?.Invoke();
     }
 }

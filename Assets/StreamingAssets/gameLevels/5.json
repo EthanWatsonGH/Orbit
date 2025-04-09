@@ -1,0 +1,73 @@
+{
+    "levelName": "5",
+    "levelAuthor": "TO ADD",
+    "loaderVersion": 1,
+    "playerStartPointXPosition": 0.0,
+    "playerStartPointYPosition": 0.0,
+    "levelObjects": [
+        {
+            "type": "Puller",
+            "xPosition": -2.2810709476470949,
+            "yPosition": 7.843950271606445,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 3.3112425804138185,
+            "yPosition": 7.623200416564941,
+            "xScale": 10.0,
+            "yScale": 10.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 7.137576103210449,
+            "yPosition": 22.045475006103517,
+            "xScale": 18.9765625,
+            "yScale": 18.9765625,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 23.178682327270509,
+            "yPosition": 33.96593475341797,
+            "xScale": 10.1484375,
+            "yScale": 10.1484375,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 23.47301483154297,
+            "yPosition": 28.005708694458009,
+            "xScale": 10.1484375,
+            "yScale": 10.1484375,
+            "rotation": 0.0
+        },
+        {
+            "type": "KillWall",
+            "xPosition": 19.59541130065918,
+            "yPosition": 8.100544929504395,
+            "xScale": 1.0,
+            "yScale": 22.742469787597658,
+            "rotation": 0.0
+        },
+        {
+            "type": "Finish",
+            "xPosition": 56.3291130065918,
+            "yPosition": 6.627038955688477,
+            "xScale": 7.522735595703125,
+            "yScale": 1.0,
+            "rotation": 0.0
+        },
+        {
+            "type": "Puller",
+            "xPosition": 39.58151626586914,
+            "yPosition": 22.757596969604493,
+            "xScale": 20.578125,
+            "yScale": 20.578125,
+            "rotation": 0.0
+        }
+    ]
+}

@@ -77,12 +77,14 @@ public class Player : MonoBehaviour
 
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.AddListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.AddListener(HideInWorldUiElements);
+        EventManager.Instance.OnLevelLoadEvent.AddListener(RetryLevel);
     }
 
     private void OnDisable()
     {
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.RemoveListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
+        EventManager.Instance.OnLevelLoadEvent.RemoveListener(RetryLevel);
     }
 
     void TryLaunch()
