@@ -670,6 +670,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1746616735342268817, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
   m_PrefabInstance: {fileID: 3705061719059457361}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1015071309 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1835712362188105375, guid: 97c0e9a1449b0c445a495e85cb6ace9f, type: 3}
+  m_PrefabInstance: {fileID: 1291252805}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1151352848
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1807,6 +1818,10 @@ PrefabInstance:
       propertyPath: playerStartPoint
       value: 
       objectReference: {fileID: 1981640280}
+    - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
+      propertyPath: noLevelsFoundText
+      value: 
+      objectReference: {fileID: 1015071309}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelLoadNameInput
       value: 

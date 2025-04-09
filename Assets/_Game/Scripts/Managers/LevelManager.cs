@@ -87,7 +87,7 @@ public class LevelManager : MonoBehaviour
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
     public const byte LOADER_VERSION = 1;
 
-    string playerLevelsDirectory;
+    public string playerLevelsDirectory { get; private set; }
     string gameLevelsDirectory;
     string levelLoadJson;
 
