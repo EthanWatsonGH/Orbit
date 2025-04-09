@@ -1824,6 +1824,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2036476585}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
+      propertyPath: objectTransformControls
+      value: 
+      objectReference: {fileID: 1253719621}
+    - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: playerLevelsPreviewPanel
       value: 
       objectReference: {fileID: 1164220634}
