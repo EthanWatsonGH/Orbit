@@ -7,6 +7,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+using System.Runtime.InteropServices;
+#endif
+
 public class LevelManager : MonoBehaviour
 {
     #region Singleton Setup
@@ -181,13 +185,22 @@ public class LevelManager : MonoBehaviour
         return level;
     }
 
+    #if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern void CopyToClipboard(string str);
+    #endif
+
     public void CopyLevelCodeToClipboard()
     {
         Level level = GenerateLevelObject();
 
         string json = JsonUtility.ToJson(level, false);
 
-        GUIUtility.systemCopyBuffer = json;
+        #if UNITY_WEBGL && !UNITY_EDITOR
+            CopyToClipboard(json);
+        #else
+            GUIUtility.systemCopyBuffer = json;
+        #endif
     }
 
     IEnumerator SaveScreenshot(string screenshotLocation)
@@ -230,10 +243,28 @@ public class LevelManager : MonoBehaviour
     #endregion
 
     #region Loading
+
+    #region Load From Clipboard
+    #if UNITY_WEBGL && !UNITY_EDITOR
+            [DllImport("__Internal")]
+            private static extern void ReadFromClipboard();
+    #endif
+
+    public void ReceiveClipboardText(string text)
+    {
+        levelLoadJson = text;
+        Debug.Log("Clipboard text received: " + text);
+    }
+
     public void GetLevelJsonFromClipboard()
     {
-        levelLoadJson = GUIUtility.systemCopyBuffer;
+        #if UNITY_WEBGL && !UNITY_EDITOR
+            ReadFromClipboard();
+        #else
+            levelLoadJson = GUIUtility.systemCopyBuffer;
+        #endif
     }
+    #endregion
 
     public bool GetLevelJsonFromFile(string levelPath)
     {
@@ -326,7 +357,7 @@ public class LevelManager : MonoBehaviour
                 catch
                 {
                     // TODO: display a message in game
-                    Debug.Log("ERROR: The input string is not valid JSON and can't be loaded.");
+                    Debug.Log("ERROR: The input string is not valid JSON and can't be loaded. Input: " + levelLoadJson);
                 }
                 break;
         }
