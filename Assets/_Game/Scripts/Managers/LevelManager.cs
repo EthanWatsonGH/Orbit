@@ -96,6 +96,7 @@ public class LevelManager : MonoBehaviour
     [SerializeField] GameObject playerStartPoint;
     [SerializeField] TMP_InputField levelSaveNameInput;
     [SerializeField] TMP_InputField levelLoadNameInput;
+    [SerializeField] GameObject objectTransformControls;
 
     [Header("Level Preview References")]
     [SerializeField] GameObject levelPreviewPrefab;
@@ -208,7 +209,6 @@ public class LevelManager : MonoBehaviour
         // TODO: will probably have to change this later when i move the save level button to a different menu. at that point just handle all UI stuff in a manager with events.
         // hide level editor UI while taking screenshot
         GameObject levelEditorCanvas = GameObject.Find("LevelEditor").transform.Find("Canvas").gameObject;
-        GameObject objectTransformControls = GameObject.Find("ObjectTransformControls");
         levelEditorCanvas.SetActive(false);
         objectTransformControls.SetActive(false);
 
