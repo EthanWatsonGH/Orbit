@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -51,11 +52,6 @@ public class UIManager : MonoBehaviour
 
     public bool IsInControlBlockingMenu = false;
 
-    void Start()
-    {
-        
-    }
-
     void FindLastActiveUiBeforeOpeningMainMenu()
     {
         if (levelEditorHUD.activeSelf)
@@ -70,18 +66,23 @@ public class UIManager : MonoBehaviour
         lastActiveUiBeforeOpeningMenu.SetActive(true);
     }
 
-    public void HideAllUI()
+    private IEnumerator HideInWorldUI()
     {
-        levelSelectionMenu.SetActive(false);
-        //gameLevelSelectionMenu.SetActive(false);
-        levelEditorHUD.SetActive(false);
-        playerHUD.SetActive(false);
-
         EventManager.Instance.UnselectObject();
+        yield return null;
         EventManager.Instance.HidePlayerInWorldUiElements();
     }
 
-    private void ShowLevelPreviewPanel()
+    public void HideAllUI()
+    {
+        StartCoroutine(HideInWorldUI());
+
+        levelSelectionMenu.SetActive(false);
+        levelEditorHUD.SetActive(false);
+        playerHUD.SetActive(false);
+    }
+
+    void ShowLevelPreviewPanel()
     {
         FindLastActiveUiBeforeOpeningMainMenu();
         HideAllUI();
@@ -109,16 +110,6 @@ public class UIManager : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape) && (levelEditorHUD.activeSelf || playerHUD.activeSelf))
-        {
-            // TODO: make this just the root main menu when i have that
-            ShowPlayerLevelSelectionMenu();
-        }
-        else if (Input.GetKeyDown(KeyCode.Escape) && !(levelEditorHUD.activeSelf || playerHUD.activeSelf))
-        {
-            ShowLastActiveUiBeforeOpeningMainMenu();
-        }
-
         IsInControlBlockingMenu = levelSelectionMenu.activeSelf;
     }
 }

@@ -925,19 +925,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 3857619968817466289}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 8985586881521250348}
-        m_TargetAssemblyTypeName: ButtonEventCaller, Assembly-CSharp
-        m_MethodName: ShowGameLevelSelectionMenu
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &5203136926193469379
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -974,6 +962,22 @@ MonoBehaviour:
         - m_Target: {fileID: 1582589389475793930, guid: a750cb96939758d40a0b972111cb27ff, type: 3}
           m_TargetAssemblyTypeName: GameManager, Assembly-CSharp
           m_MethodName: SetTouchPointIsOverButtonFalse
+          m_Mode: 1
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument: 
+            m_BoolArgument: 0
+          m_CallState: 2
+  - eventID: 2
+    callback:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 8985586881521250348}
+          m_TargetAssemblyTypeName: ButtonEventCaller, Assembly-CSharp
+          m_MethodName: ShowGameLevelSelectionMenu
           m_Mode: 1
           m_Arguments:
             m_ObjectArgument: {fileID: 0}
