@@ -61,7 +61,7 @@ public class Player : MonoBehaviour
                 }
 
                 // update speed display
-                speedDisplay.text = rb.velocity.magnitude.ToString("F2");
+                speedDisplay.text = rb.linearVelocity.magnitude.ToString("F2");
 
                 // hide launch direction UI when not in aiming mode
                 lr.enabled = false;
@@ -110,13 +110,13 @@ public class Player : MonoBehaviour
             UpdateLineRenderer();
 
             // ensure velocity is zero
-            rb.velocity = Vector2.zero;
+            rb.linearVelocity = Vector2.zero;
 
             // launch player in direction of launchDirectionPoint when they press launch
             if ((Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4) || playerPressedLaunch) && Time.time > timeAtLastRetry + 0.1f) // since launch and retry are on the same key, check a delay to not let them happen on the same frame
             {
                 Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
-                rb.velocity = launchDirection.normalized * launchForce;
+                rb.linearVelocity = launchDirection.normalized * launchForce;
 
                 // for timer calculation
                 timeAtLastLaunch = Time.time;
@@ -225,7 +225,7 @@ public class Player : MonoBehaviour
         playerPressedLaunch = false;
 
         // ensure velocity is zero
-        rb.velocity = Vector2.zero;
+        rb.linearVelocity = Vector2.zero;
 
         // reset to start location, ensuring z = 0
         gameObject.transform.position = new Vector3(startLocation.transform.position.x, startLocation.transform.position.y, 0f);
