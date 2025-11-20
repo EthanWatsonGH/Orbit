@@ -69,6 +69,11 @@ public class LevelEditor : MonoBehaviour
         // enable this for a frame to let the scaling initialize
         // TODO: change this to false once i change them to real buttons
         objectTransformControls.SetActive(true);
+
+        // ensure toggleable elements are at proper default show/hide
+        closeObjectTransformControlsButton.SetActive(false);
+        worldTransformButton.SetActive(true);
+        localTransformButton.SetActive(false);
     }
 
     void Start()
@@ -81,8 +86,6 @@ public class LevelEditor : MonoBehaviour
         canvas.gameObject.SetActive(true);
 
         objectTransformControls.SetActive(false);
-
-
     }
 
     void Update()
