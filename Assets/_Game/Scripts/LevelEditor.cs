@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class LevelEditor : MonoBehaviour
 {
@@ -17,6 +19,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] LineRenderer verticalLine;
     [SerializeField] LineRenderer horizontalLine;
     [SerializeField] LineRenderer rotationLine;
+    [SerializeField] TMP_Dropdown moveIncrementDropdown;
 
     // world object references
     [Header("World Objects")]
@@ -35,11 +38,13 @@ public class LevelEditor : MonoBehaviour
     Transform lastHitMoveControl;
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
+    float moveIncrement = 0f;
 
     // object rotation
     bool isTryingToRotateSelectedObject = false;
     float selectedObjectRotationAtStartRotate;
     float angleToPointerAtStartRotate;
+    float rotateIncrement = 0f;
 
     // object scaling
     bool isTryingToScaleSelectedObject = false;
@@ -50,6 +55,7 @@ public class LevelEditor : MonoBehaviour
     float maximumScale = 999999f;
     float selectedObjectXScaleAtStartScale;
     float selectedObjectYScaleAtStartScale;
+    float scaleIncrement = 0f;
 
     // TODO: if i turn the in world buttons into UI buttons i won't need this
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
@@ -86,6 +92,9 @@ public class LevelEditor : MonoBehaviour
         canvas.gameObject.SetActive(true);
 
         objectTransformControls.SetActive(false);
+
+        // setup increment dropdown listeners
+        moveIncrementDropdown.onValueChanged.AddListener(OnMoveIncrementDropdownChanged);
     }
 
     void Update()
@@ -109,6 +118,26 @@ public class LevelEditor : MonoBehaviour
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
     }
+
+    #region Increment Dropdown Listeners
+
+    string SanitizeSelectedValue(string selected)
+    {
+        selected = selected.Replace("°", "");
+        if (selected.Length > 0 && (char.IsDigit(selected[0]) || selected[0] == '.'))
+            selected = selected.Split(' ')[0];
+        else
+            selected = "0";
+        return selected;
+    }
+
+    void OnMoveIncrementDropdownChanged(int index)
+    {
+        string selected = SanitizeSelectedValue(moveIncrementDropdown.options[index].text);
+        moveIncrement = float.Parse(selected);
+    }
+
+    #endregion
 
     void UpdatePointerPosition()
     {
@@ -232,6 +261,14 @@ public class LevelEditor : MonoBehaviour
             minimumScale = 0.2f;
     }
 
+    float RoundToIncrement(float val, float increment)
+    {
+        if (increment == 0)
+            return val;
+        else
+            return Mathf.Round(val / increment) * increment;
+    }
+
     void HandleMoveSelectedObject()
     {
         
@@ -292,7 +329,7 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
                 else
                     // make selectedObject move with pointer
-                    selectedObject.transform.position = pointerPosition + moveOffset;
+                    selectedObject.transform.position = new Vector3(RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement), RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement), 0f);
 
                 // if hovering over object selection bar, hide object placement preview and transform controls
                 if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint")) // TODO: make it so you can remove player start point, but must have one before you can play the level?
@@ -306,7 +343,9 @@ public class LevelEditor : MonoBehaviour
 
                 if (lastHitMoveControl.name == "Move X")
                 {
-                    selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, selectedObjectPositionAtStartMove.y, 0f);
+                    // move
+                    selectedObject.transform.position = new Vector3(RoundToIncrement(selectedObject.transform.position.x, moveIncrement), selectedObjectPositionAtStartMove.y, 0f);
+                    // show guide
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.transform.position = selectedObject.transform.position;
                     horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 9999f, horizontalLine.transform.position.y, 0f));
@@ -315,7 +354,9 @@ public class LevelEditor : MonoBehaviour
 
                 if (lastHitMoveControl.name == "Move Y")
                 {
-                    selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, selectedObject.transform.position.y, 0f);
+                    //move
+                    selectedObject.transform.position = new Vector3(RoundToIncrement(selectedObjectPositionAtStartMove.x, moveIncrement), selectedObject.transform.position.y, 0f);
+                    // show guide
                     verticalLine.gameObject.SetActive(true);
                     verticalLine.transform.position = selectedObject.transform.position;
                     verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 9999f, 0f));
