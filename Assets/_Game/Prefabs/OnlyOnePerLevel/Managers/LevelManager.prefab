@@ -46,6 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   BoosterPrefab: {fileID: 7371955477703335682, guid: cd605178f3c2e734881068ec440535dd, type: 3}
   BouncyWallPrefab: {fileID: 7549290468294039972, guid: db9d16062871595409ac535a12e30be0, type: 3}
+  ConstantBoosterPrefab: {fileID: 7371955477703335682, guid: 8cb7e965ad802554199d2ad26eda3512, type: 3}
   ConstantPullerPrefab: {fileID: 8500869918223004119, guid: 8ecc632b1c3e68241b5c67a1928f9c04, type: 3}
   ConstantPusherPrefab: {fileID: 4880512832065971193, guid: 9d69bd946f801044eaa939afc6b7b9f8, type: 3}
   FinishPrefab: {fileID: 3231205412921919817, guid: 5b09830af234e9543940bddb4e88ec04, type: 3}
@@ -58,4 +59,7 @@ MonoBehaviour:
   playerStartPoint: {fileID: 0}
   levelSaveNameInput: {fileID: 0}
   levelLoadNameInput: {fileID: 0}
+  objectTransformControls: {fileID: 0}
   levelPreviewPrefab: {fileID: 6545384443319374544, guid: de7dbd34f31071b41a0b5fdc152eb4f0, type: 3}
+  levelsPreviewPanel: {fileID: 0}
+  noLevelsFoundText: {fileID: 0}

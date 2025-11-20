@@ -75,6 +75,7 @@ public class LevelManager : MonoBehaviour
     [Header("Level Editor Placable Objects Prefabs")]
     public GameObject BoosterPrefab;
     public GameObject BouncyWallPrefab;
+    public GameObject ConstantBoosterPrefab;
     public GameObject ConstantPullerPrefab;
     public GameObject ConstantPusherPrefab;
     public GameObject FinishPrefab;
@@ -308,6 +309,9 @@ public class LevelManager : MonoBehaviour
                                 break;
                             case "BouncyWall":
                                 prefabToInstantiate = BouncyWallPrefab;
+                                break;
+                            case "ConstantBooster":
+                                prefabToInstantiate = ConstantBoosterPrefab;
                                 break;
                             case "ConstantPuller":
                                 prefabToInstantiate = ConstantPullerPrefab;
