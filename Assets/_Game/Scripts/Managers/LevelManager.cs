@@ -158,7 +158,7 @@ public class LevelManager : MonoBehaviour
         level.levelObjects = new List<Level.LevelObject>();
 
         // get level name input, or just create one if nothing was input
-        string levelName = "Custom Level " + DateTime.Now.ToString("yyyyMMdd HHmmss");
+        string levelName = "Custom Level " + DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
         if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
             levelName = levelSaveNameInput.text.Trim();
 
@@ -291,7 +291,6 @@ public class LevelManager : MonoBehaviour
         // if level file is not found, send a message and cancel loading
         if (!File.Exists(levelPath))
         {
-            // TODO: display a message in game
             Debug.Log("ERROR: Level not found.");
             return false;
         }
@@ -356,7 +355,6 @@ public class LevelManager : MonoBehaviour
                                 prefabToInstantiate = SlipperyWallPrefab;
                                 break;
                             default:
-                                // TODO: display in game
                                 Debug.Log("ERROR: An object could not be loaded because its type is not valid.");
                                 break;
                         }
@@ -375,13 +373,14 @@ public class LevelManager : MonoBehaviour
                     EventManager.Instance.RecenterCamera();
                     EventManager.Instance.OnLevelLoad();
 
-                    // TODO: display a message in game
                     Debug.Log("Loaded level.");
                 }
                 catch
                 {
-                    // TODO: display a message in game
-                    Debug.Log("ERROR: The input string is not valid JSON and can't be loaded. Input: " + levelLoadJson);
+                    if (string.IsNullOrEmpty(levelLoadJson))
+                        Debug.Log("ERROR: The input string is empty.");
+                    else 
+                        Debug.Log("ERROR: The input string is not valid JSON and can't be loaded. Input: " + levelLoadJson);
                 }
                 break;
         }
@@ -402,7 +401,6 @@ public class LevelManager : MonoBehaviour
 
         if (!Directory.Exists(directory))
         {
-            // TODO: show message in game
             Debug.Log("ERROR: Folder could not be found when trying to load level previews at folder: " + directory);
             yield break;
         }
@@ -455,7 +453,7 @@ public class LevelManager : MonoBehaviour
                         {
                             levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
                             levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
-                            // TODO: show message in game
+
                             Debug.Log("ERROR: Could not find image. Level file name, image file name, and level name in level file must all match. And image must be in same folder as level.");
                         }
                         else // show display
@@ -484,13 +482,11 @@ public class LevelManager : MonoBehaviour
                     }
                     else
                     {
-                        // TODO: show message in game
                         Debug.Log("ERROR: A level preview failed to load");
                     }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
-                    // TODO: show message in game
                     Debug.Log("ERROR: A level preview failed to load or deserialize. Level: " + level + " . Exception message:" + ex.Message);
                 }
 
