@@ -91,6 +91,7 @@ public class LevelManager : MonoBehaviour
     public string playerLevelsDirectory { get; private set; }
     string gameLevelsDirectory;
     string levelLoadJson;
+    string lastSavedLevelJson = string.Empty;
 
     [Header("World Object References")]
     [SerializeField] GameObject levelObjectsContainer;
@@ -98,6 +99,8 @@ public class LevelManager : MonoBehaviour
     [SerializeField] TMP_InputField levelSaveNameInput;
     [SerializeField] TMP_InputField levelLoadNameInput;
     [SerializeField] GameObject objectTransformControls;
+    [SerializeField] TMP_InputField levelCodeToCopyInput;
+    [SerializeField] TMP_InputField levelCodeInput;
 
     [Header("Level Preview References")]
     [SerializeField] GameObject levelPreviewPrefab;
@@ -135,6 +138,17 @@ public class LevelManager : MonoBehaviour
         {
             Destroy(levelObject.gameObject);
         }
+    }
+
+    public void SetLevelCodeToCopyInputToLastSavedLevelJson()
+    {
+        levelCodeToCopyInput.text = lastSavedLevelJson;
+    }
+
+    public void LoadLevelFromLevelCodeInput()
+    {
+        levelLoadJson = levelCodeInput.text;
+        LoadLevel();
     }
 
     #region Saving
@@ -238,6 +252,10 @@ public class LevelManager : MonoBehaviour
         File.WriteAllText(saveLocation + ".json", json);
 
         StartCoroutine(SaveScreenshot(saveLocation));
+
+        lastSavedLevelJson = json;
+
+        SetLevelCodeToCopyInputToLastSavedLevelJson();
 
         // TODO: display a message in game
         Debug.Log("Saved level.");
