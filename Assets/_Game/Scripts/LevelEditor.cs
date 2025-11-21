@@ -16,9 +16,13 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject localTransformButton;
     [SerializeField] GameObject worldTransformButton;
     [SerializeField] GameObject closeObjectTransformControlsButton;
+    [SerializeField] GameObject snapVerticalButton;
+    [SerializeField] GameObject snapHorizontalButton;
     [SerializeField] LineRenderer verticalLine;
     [SerializeField] LineRenderer horizontalLine;
     [SerializeField] LineRenderer rotationLine;
+    [SerializeField] TMP_Dropdown scaleIncrementDropdown;
+    [SerializeField] TMP_Dropdown rotateIncrementDropdown;
     [SerializeField] TMP_Dropdown moveIncrementDropdown;
 
     // world object references
@@ -31,6 +35,8 @@ public class LevelEditor : MonoBehaviour
     Vector3 pointerPosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
+    GameObject lastSelectedObject = null;
+    bool isWorldTransform = true;
 
     // object movement
     Vector3 moveOffset;
@@ -80,6 +86,8 @@ public class LevelEditor : MonoBehaviour
         closeObjectTransformControlsButton.SetActive(false);
         worldTransformButton.SetActive(true);
         localTransformButton.SetActive(false);
+        snapVerticalButton.SetActive(false);
+        snapHorizontalButton.SetActive(false);
     }
 
     void Start()
@@ -95,6 +103,8 @@ public class LevelEditor : MonoBehaviour
 
         // setup increment dropdown listeners
         moveIncrementDropdown.onValueChanged.AddListener(OnMoveIncrementDropdownChanged);
+        rotateIncrementDropdown.onValueChanged.AddListener(OnRotateIncrementDropdownChanged);
+        scaleIncrementDropdown.onValueChanged.AddListener(OnScaleIncrementDropdownChanged);
     }
 
     void Update()
@@ -137,6 +147,38 @@ public class LevelEditor : MonoBehaviour
         moveIncrement = float.Parse(selected);
     }
 
+    void OnRotateIncrementDropdownChanged(int index)
+    {
+        string selected = SanitizeSelectedValue(rotateIncrementDropdown.options[index].text);
+        rotateIncrement = float.Parse(selected);
+    }
+
+    void OnScaleIncrementDropdownChanged(int index)
+    {
+        string selected = SanitizeSelectedValue(scaleIncrementDropdown.options[index].text);
+        scaleIncrement = float.Parse(selected);
+    }
+
+    #endregion
+
+    #region Snap Selected Object To Last Selected Functions
+
+    public void SnapSelectedObjectToLastHorizontal()
+    {
+        if (selectedObject != null && lastSelectedObject != null)
+        {
+            selectedObject.transform.position = new Vector3(lastSelectedObject.transform.position.x, selectedObject.transform.position.y, 0f);
+        }
+    }
+
+    public void SnapSelectedObjectToLastVertical()
+    {
+        if (selectedObject != null && lastSelectedObject != null)
+        {
+            selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, lastSelectedObject.transform.position.y, 0f);
+        }
+    }
+
     #endregion
 
     void UpdatePointerPosition()
@@ -177,7 +219,7 @@ public class LevelEditor : MonoBehaviour
                 }
                 else // place object
                 {
-                    selectedObject = objectCurrentlyTryingToPlace;
+                    SelectObject(objectCurrentlyTryingToPlace);
                     SetWhichObjectTransformControlsToShow();
                     AlignScaleControlsWithSelectedObject();
                     SetMinimumScale();
@@ -200,17 +242,26 @@ public class LevelEditor : MonoBehaviour
             {
                 if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any UI objects to be set as selected object
                 {
-                    selectedObject = hit.collider.gameObject;
+                    SelectObject(hit.collider.gameObject);
 
                     AlignScaleControlsWithSelectedObject();
                     SetWhichObjectTransformControlsToShow();
                     SetMinimumScale();
                 }
             }
-            else // no object / background hit
+            else // no object hit
             {
-                // deselect current object, if any
-                selectedObject = null;
+                // check if any UI elements were hit
+                PointerEventData data = new PointerEventData(EventSystem.current);
+                data.position = Input.mousePosition;
+
+                List<RaycastResult> hits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(data, hits);
+
+                if (hits.Count == 1) // if only 1 UI object was hit, meaning the player just clicked the background and the canvas got hit, unselect object
+                {
+                    UnselectObject();
+                }
             }
         }
 
@@ -220,8 +271,17 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void SelectObject(GameObject objectToSelect)
+    {
+        if (selectedObject != null)
+            lastSelectedObject = selectedObject;
+        selectedObject = objectToSelect;
+    }
+
     void UnselectObject()
     {
+        if (selectedObject != null)
+            lastSelectedObject = selectedObject;
         selectedObject = null;
     }
 
@@ -286,7 +346,7 @@ public class LevelEditor : MonoBehaviour
                 {
                     if (hitName == "Duplicate")
                     {
-                        selectedObject = Instantiate(selectedObject, levelObjectsCollection.transform);
+                        SelectObject(Instantiate(selectedObject, levelObjectsCollection.transform));
                         selectedObject.transform.name = selectedObject.transform.name.Replace("(Clone)", "");
                     }
 
@@ -311,7 +371,7 @@ public class LevelEditor : MonoBehaviour
             isTryingToMoveSelectedObject = false;
             lastHitMoveControl = null;
 
-            // if object is dropped while pointer is over object selection bar, destroy it
+            // if object is dropped while pointer is over object selection bar, destroy and deselect it
             if (selectedObject != null && pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
             {
                 Destroy(selectedObject);
@@ -328,8 +388,24 @@ public class LevelEditor : MonoBehaviour
                 if (lastHitMoveControl.name == "Duplicate" && Vector3.Distance(pointerPositionAtStartMove, pointerPosition) < 0.2f)
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
                 else
+                {
+                    float newX;
+                    float newY;
+
+                    if (isWorldTransform)
+                    {
+                        newX = RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement);
+                        newY = RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement);
+                    }
+                    else // local transform: snap relative to start position
+                    {
+                        newX = RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement);
+                        newY = RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement);
+                    }
+
                     // make selectedObject move with pointer
-                    selectedObject.transform.position = new Vector3(RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement), RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement), 0f);
+                    selectedObject.transform.position = new Vector3(newX, newY, 0f);
+                }
 
                 // if hovering over object selection bar, hide object placement preview and transform controls
                 if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint")) // TODO: make it so you can remove player start point, but must have one before you can play the level?
@@ -344,7 +420,12 @@ public class LevelEditor : MonoBehaviour
                 if (lastHitMoveControl.name == "Move X")
                 {
                     // move
-                    selectedObject.transform.position = new Vector3(RoundToIncrement(selectedObject.transform.position.x, moveIncrement), selectedObjectPositionAtStartMove.y, 0f);
+                    float newX;
+                    if (isWorldTransform)
+                        newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement);
+                    else
+                        newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement);
+                    selectedObject.transform.position = new Vector3(newX, selectedObjectPositionAtStartMove.y, 0f);
                     // show guide
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.transform.position = selectedObject.transform.position;
@@ -557,9 +638,11 @@ public class LevelEditor : MonoBehaviour
 
     void HandleShowObjectTransformControls()
     {
-        bool show = selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject);
+        bool show = selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject || isTryingToPlace);
         objectTransformControls.SetActive(show);
         closeObjectTransformControlsButton.SetActive(show);
+        snapVerticalButton.SetActive(show);
+        snapHorizontalButton.SetActive(show);
     }
 
     public void SwitchToPlayMode()
@@ -587,6 +670,11 @@ public class LevelEditor : MonoBehaviour
     public void PlaceBouncyWall()
     {
         prefabToPlace = LevelManager.Instance.BouncyWallPrefab;
+        StartTryingToPlaceObject();
+    }
+    public void PlaceConstantBooster()
+    {
+        prefabToPlace = LevelManager.Instance.ConstantBoosterPrefab;
         StartTryingToPlaceObject();
     }
     public void PlaceConstantPuller()
@@ -663,7 +751,7 @@ public class LevelEditor : MonoBehaviour
 
     public void CloseObjectTransformControls()
     {
-        selectedObject = null;
+        UnselectObject();
     }
 
     public void SwitchToLocalTransformMode()
@@ -671,6 +759,7 @@ public class LevelEditor : MonoBehaviour
         // change to opposite button
         worldTransformButton.SetActive(false);
         localTransformButton.SetActive(true);
+        isWorldTransform = false;
     }
 
     public void SwitchToWorldTransformMode()
@@ -678,5 +767,6 @@ public class LevelEditor : MonoBehaviour
         // change to opposite button
         localTransformButton.SetActive(false);
         worldTransformButton.SetActive(true);
+        isWorldTransform = true;
     }
 }
