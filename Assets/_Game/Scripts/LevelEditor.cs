@@ -232,8 +232,15 @@ public class LevelEditor : MonoBehaviour
 
     void HandleSelectObject()
     {
+        // check if any UI elements were hit
+        PointerEventData data = new PointerEventData(EventSystem.current);
+        data.position = Input.mousePosition;
+
+        List<RaycastResult> uiHits = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(data, uiHits);
+
         // set the object the player clicks as selected if it's allowed to be selected
-        if (Input.GetButtonDown("Fire1") && !UIManager.Instance.IsInControlBlockingMenu)
+        if (Input.GetButtonDown("Fire1") && !UIManager.Instance.IsInControlBlockingMenu && uiHits.Count <= 1) // if uiHits > 1, a UI element other than just the canvas was hit, so don't try to change selected object
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -251,14 +258,7 @@ public class LevelEditor : MonoBehaviour
             }
             else // no object hit
             {
-                // check if any UI elements were hit
-                PointerEventData data = new PointerEventData(EventSystem.current);
-                data.position = Input.mousePosition;
-
-                List<RaycastResult> hits = new List<RaycastResult>();
-                EventSystem.current.RaycastAll(data, hits);
-
-                if (hits.Count == 1) // if only 1 UI object was hit, meaning the player just clicked the background and the canvas got hit, unselect object
+                if (uiHits.Count == 1) // if only 1 UI object was hit, meaning the player just clicked the background and the canvas got hit, unselect object
                 {
                     UnselectObject();
                 }
@@ -331,7 +331,6 @@ public class LevelEditor : MonoBehaviour
 
     void HandleMoveSelectedObject()
     {
-        
         // start trying to move selected object when the player presses on move control
         if (Input.GetButtonDown("Fire1"))
         {
