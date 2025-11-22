@@ -37,6 +37,7 @@ public class LevelEditor : MonoBehaviour
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
     bool isWorldTransform = true;
+    bool wasLastPointerDownOverUi = false;
 
     // object movement
     Vector3 moveOffset;
@@ -109,8 +110,9 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
-        HandlePlacePrefab();
+        CheckIfLastPointerDownWasOverUi();
         UpdatePointerPosition();
+        HandlePlacePrefab();
         HandleSelectObject();
         HandleScaleSelectedObject();
         HandleRotateSelectedObject();
@@ -230,18 +232,29 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void CheckIfLastPointerDownWasOverUi()
+    {
+        if (Input.GetButtonDown("Fire1"))
+        {
+            // check if any UI elements were hit
+            PointerEventData data = new PointerEventData(EventSystem.current);
+            data.position = Input.mousePosition;
+
+            List<RaycastResult> uiHits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(data, uiHits);
+
+            wasLastPointerDownOverUi = uiHits.Count > 1;
+        }
+    }
+
     void HandleSelectObject()
     {
-        // check if any UI elements were hit
-        PointerEventData data = new PointerEventData(EventSystem.current);
-        data.position = Input.mousePosition;
-
-        List<RaycastResult> uiHits = new List<RaycastResult>();
-        EventSystem.current.RaycastAll(data, uiHits);
-
         // set the object the player clicks as selected if it's allowed to be selected
-        if (Input.GetButtonDown("Fire1") && !UIManager.Instance.IsInControlBlockingMenu && uiHits.Count <= 1) // if uiHits > 1, a UI element other than just the canvas was hit, so don't try to change selected object
+        if (Input.GetButtonDown("Fire1") && !UIManager.Instance.IsInControlBlockingMenu) 
         {
+            if (wasLastPointerDownOverUi) // click was on a UI element, so don't try to change selected object
+                return;
+
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
@@ -258,7 +271,7 @@ public class LevelEditor : MonoBehaviour
             }
             else // no object hit
             {
-                if (uiHits.Count == 1) // if only 1 UI object was hit, meaning the player just clicked the background and the canvas got hit, unselect object
+                if (!wasLastPointerDownOverUi) // if player clicks just the background, unselect object
                 {
                     UnselectObject();
                 }
@@ -332,7 +345,7 @@ public class LevelEditor : MonoBehaviour
     void HandleMoveSelectedObject()
     {
         // start trying to move selected object when the player presses on move control
-        if (Input.GetButtonDown("Fire1"))
+        if (Input.GetButtonDown("Fire1") && !wasLastPointerDownOverUi)
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -407,7 +420,7 @@ public class LevelEditor : MonoBehaviour
                 }
 
                 // if hovering over object selection bar, hide object placement preview and transform controls
-                if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint")) // TODO: make it so you can remove player start point, but must have one before you can play the level?
+                if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
                 {
                     selectedObject.SetActive(false);
                 }
@@ -448,7 +461,7 @@ public class LevelEditor : MonoBehaviour
 
     void HandleRotateSelectedObject()
     {
-        if (Input.GetButtonDown("Fire1")) // start rotate
+        if (Input.GetButtonDown("Fire1") && !wasLastPointerDownOverUi) // start rotate
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -501,7 +514,7 @@ public class LevelEditor : MonoBehaviour
 
     void HandleScaleSelectedObject()
     {
-        if (Input.GetButtonDown("Fire1")) // start scale
+        if (Input.GetButtonDown("Fire1") && !wasLastPointerDownOverUi) // start scale
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
