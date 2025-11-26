@@ -131,6 +131,7 @@ public class LevelEditor : MonoBehaviour
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
     }
 
+    
     #region Increment Dropdown Listeners
 
     string SanitizeSelectedValue(string selected)
@@ -503,6 +504,11 @@ public class LevelEditor : MonoBehaviour
 
             // add the difference between start and end rotate to the selected object's rotation when the player started rotating
             float newRotation = selectedObjectRotationAtStartRotate + deltaAngle;
+
+            if (isWorldTransform)
+            {
+                newRotation = RoundToIncrement(newRotation, rotateIncrement);
+            }
 
             // apply new rotation to selected object
             selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, newRotation));
