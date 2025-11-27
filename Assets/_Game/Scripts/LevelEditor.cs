@@ -46,6 +46,7 @@ public class LevelEditor : MonoBehaviour
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
     float moveIncrement = 0f;
+    Vector3 moveIncrementOffset = new Vector3(0f, 0f, 0f);
 
     // object rotation
     bool isTryingToRotateSelectedObject = false;
@@ -340,7 +341,9 @@ public class LevelEditor : MonoBehaviour
         if (increment == 0)
             return val;
         else
+        {
             return Mathf.Round(val / increment) * increment;
+        }
     }
 
     void HandleMoveSelectedObject()
@@ -368,8 +371,19 @@ public class LevelEditor : MonoBehaviour
                     selectedObjectPositionAtStartMove = selectedObject.transform.position;
                     pointerPositionAtStartMove = pointerPosition;
 
-                    // get offset between selected object and pointer position to keep it while moving
-                    moveOffset = selectedObject.transform.position - pointerPosition;
+                    if (isWorldTransform)
+                    {
+                        moveIncrementOffset = new Vector3(0f, 0f, 0f);
+                    }
+                    else // local transform
+                    {
+                        moveIncrementOffset = new Vector3(selectedObjectPositionAtStartMove.x - RoundToIncrement(selectedObjectPositionAtStartMove.x, moveIncrement),
+                                                            selectedObjectPositionAtStartMove.y - RoundToIncrement(selectedObjectPositionAtStartMove.y, moveIncrement),
+                                                            0f);
+                    }
+
+                        // get offset between selected object and pointer position to keep it while moving
+                        moveOffset = selectedObject.transform.position - pointerPosition;
                 }
             }
         }
@@ -402,19 +416,8 @@ public class LevelEditor : MonoBehaviour
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
                 else
                 {
-                    float newX;
-                    float newY;
-
-                    if (isWorldTransform)
-                    {
-                        newX = RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement);
-                        newY = RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement);
-                    }
-                    else // local transform: snap relative to start position
-                    {
-                        newX = RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement);
-                        newY = RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement);
-                    }
+                    float newX = RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement) + moveIncrementOffset.x;
+                    float newY = RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement) + moveIncrementOffset.y;
 
                     // make selectedObject move with pointer
                     selectedObject.transform.position = new Vector3(newX, newY, 0f);
@@ -433,12 +436,9 @@ public class LevelEditor : MonoBehaviour
                 if (lastHitMoveControl.name == "Move X")
                 {
                     // move
-                    float newX;
-                    if (isWorldTransform)
-                        newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement);
-                    else
-                        newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement);
+                    float newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement) + moveIncrementOffset.x;
                     selectedObject.transform.position = new Vector3(newX, selectedObjectPositionAtStartMove.y, 0f);
+
                     // show guide
                     horizontalLine.gameObject.SetActive(true);
                     horizontalLine.transform.position = selectedObject.transform.position;
@@ -448,8 +448,10 @@ public class LevelEditor : MonoBehaviour
 
                 if (lastHitMoveControl.name == "Move Y")
                 {
-                    //move
-                    selectedObject.transform.position = new Vector3(RoundToIncrement(selectedObjectPositionAtStartMove.x, moveIncrement), selectedObject.transform.position.y, 0f);
+                    // move
+                    float newY = RoundToIncrement(selectedObject.transform.position.y, moveIncrement) + moveIncrementOffset.y;
+                    selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, newY, 0f);
+
                     // show guide
                     verticalLine.gameObject.SetActive(true);
                     verticalLine.transform.position = selectedObject.transform.position;
@@ -503,11 +505,16 @@ public class LevelEditor : MonoBehaviour
             float deltaAngle = currentAngleToPointer - angleToPointerAtStartRotate;
 
             // add the difference between start and end rotate to the selected object's rotation when the player started rotating
-            float newRotation = selectedObjectRotationAtStartRotate + deltaAngle;
+            float newRotation;
 
             if (isWorldTransform)
             {
-                newRotation = RoundToIncrement(newRotation, rotateIncrement);
+                newRotation = RoundToIncrement(selectedObjectRotationAtStartRotate + deltaAngle, rotateIncrement);
+            }
+            else // local transform
+            {
+                float incrementOffset = selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
+                newRotation = RoundToIncrement(selectedObjectRotationAtStartRotate + deltaAngle, rotateIncrement) + incrementOffset;
             }
 
             // apply new rotation to selected object
