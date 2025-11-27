@@ -53,6 +53,7 @@ public class LevelEditor : MonoBehaviour
     float selectedObjectRotationAtStartRotate;
     float angleToPointerAtStartRotate;
     float rotateIncrement = 0f;
+    float rotationIncrementOffset = 0f;
 
     // object scaling
     bool isTryingToScaleSelectedObject = false;
@@ -382,8 +383,8 @@ public class LevelEditor : MonoBehaviour
                                                             0f);
                     }
 
-                        // get offset between selected object and pointer position to keep it while moving
-                        moveOffset = selectedObject.transform.position - pointerPosition;
+                    // get offset between selected object and pointer position to keep it while moving
+                    moveOffset = selectedObject.transform.position - pointerPosition;
                 }
             }
         }
@@ -476,12 +477,21 @@ public class LevelEditor : MonoBehaviour
 
                 // initiate rotation
                 isTryingToRotateSelectedObject = true;
-                        
+                
                 // remember values at start rotate to later make the rotation relative to the selected object's starting rotation
                 selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
                 // get the angle to the pointer when the player starts rotating the object
                 Vector3 direction = Camera.main.ScreenToWorldPoint(Input.mousePosition) - selectedObject.transform.position;
                 angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+
+                if (isWorldTransform)
+                {
+                    rotationIncrementOffset = 0f;
+                }
+                else
+                {
+                    rotationIncrementOffset = selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
+                }
             }
         }
 
@@ -513,8 +523,7 @@ public class LevelEditor : MonoBehaviour
             }
             else // local transform
             {
-                float incrementOffset = selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
-                newRotation = RoundToIncrement(selectedObjectRotationAtStartRotate + deltaAngle, rotateIncrement) + incrementOffset;
+                newRotation = RoundToIncrement(selectedObjectRotationAtStartRotate + deltaAngle, rotateIncrement) + rotationIncrementOffset;
             }
 
             // apply new rotation to selected object

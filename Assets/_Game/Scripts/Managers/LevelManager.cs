@@ -52,9 +52,11 @@ public class LevelManager : MonoBehaviour
     [System.Serializable]
     struct Level
     {
-        public string levelName;
-        public string levelAuthor;
         public byte loaderVersion;
+        public string levelName;
+        //public string levelDescription;
+        //public string levelAuthorType; // TODO: change to enum?
+        public string levelAuthor;
         public float playerStartPointXPosition;
         public float playerStartPointYPosition;
         public List<LevelObject> levelObjects;
