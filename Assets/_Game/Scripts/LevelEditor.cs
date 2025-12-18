@@ -670,6 +670,17 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    #region Scale Object From Edge
+
+
+
+    void HandleScaleSelectedObjectFromEdge()
+    {
+
+    }
+
+    #endregion
+
     void HandleShowObjectTransformControls()
     {
         bool show = selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject || isTryingToPlace);

@@ -36,4 +36,9 @@ public class ButtonEventCaller : MonoBehaviour
     {
         LevelManager.Instance.LoadLevelFromLevelCodeInput();
     }
+
+    public void StartScalingFromEdge()
+    {
+        
+    }
 }
