@@ -38,6 +38,8 @@ public class LevelEditor : MonoBehaviour
     GameObject lastSelectedObject = null;
     bool isWorldTransform = true;
     bool wasLastPointerDownOverUi = false;
+    bool wasLastPointerUpOverUi = false;
+    Vector3 pointerPositionAtLastPointerDown;
 
     // object movement
     Vector3 moveOffset;
@@ -112,8 +114,10 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
-        CheckIfLastPointerDownWasOverUi();
         UpdatePointerPosition();
+        CheckPointerPositionAtLastPointerDown();
+        CheckIfLastPointerDownWasOverUi();
+        CheckIfLastPointerUpWasOverUi();
         HandlePlacePrefab();
         HandleSelectObject();
         HandleScaleSelectedObject();
@@ -200,6 +204,14 @@ public class LevelEditor : MonoBehaviour
         pointerPosition.z = 0;
     }
 
+    void CheckPointerPositionAtLastPointerDown()
+    {
+        if (Input.GetButtonDown("Fire1"))
+        {
+            pointerPositionAtLastPointerDown = pointerPosition;
+        }
+    }
+
     void HandlePlacePrefab()
     {
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
@@ -250,34 +262,57 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void CheckIfLastPointerUpWasOverUi()
+    {
+        if (Input.GetButtonUp("Fire1"))
+        {
+            // check if any UI elements were hit
+            PointerEventData data = new PointerEventData(EventSystem.current);
+            data.position = Input.mousePosition;
+
+            List<RaycastResult> uiHits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(data, uiHits);
+
+            wasLastPointerUpOverUi = uiHits.Count > 1;
+        }
+    }
+
     void HandleSelectObject()
     {
         // set the object the player clicks as selected if it's allowed to be selected
-        if (Input.GetButtonDown("Fire1") && !UIManager.Instance.IsInControlBlockingMenu) 
+        if (Input.GetButtonUp("Fire1") && !UIManager.Instance.IsInControlBlockingMenu)
         {
-            if (wasLastPointerDownOverUi) // click was on a UI element, so don't try to change selected object
+            if (wasLastPointerUpOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
+            if (Vector3.Distance(pointerPositionAtLastPointerDown, pointerPosition) >= 1f) // box select // TODO: make this based on screen width, not world distance
+            { 
 
-            if (hit.collider != null) // object hit
-            {
-                if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any UI objects to be set as selected object
-                {
-                    SelectObject(hit.collider.gameObject);
-
-                    AlignScaleControlsWithSelectedObject();
-                    SetWhichObjectTransformControlsToShow();
-                    SetMinimumScale();
-                }
             }
-            else // no object hit
+            else // click select
             {
-                if (!wasLastPointerDownOverUi) // if player clicks just the background, unselect object
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
+
+                if (hit.collider != null) // object hit
                 {
-                    UnselectObject();
+                    if (!UNSELECTABLE_OBJECTS.Contains(hit.collider.gameObject.transform.name)) // don't allow any UI objects to be set as selected object
+                    {
+                        SelectObject(hit.collider.gameObject);
+
+                        AlignScaleControlsWithSelectedObject();
+                        SetWhichObjectTransformControlsToShow();
+                        SetMinimumScale();
+                    }
                 }
+                else // no object hit
+                {
+                    if (!wasLastPointerDownOverUi) // if player clicks just the background, unselect object
+                    {
+                        UnselectObject();
+                    }
+                }
+
             }
         }
 
