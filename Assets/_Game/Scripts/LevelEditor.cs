@@ -41,7 +41,7 @@ public class LevelEditor : MonoBehaviour
     Vector3 pointerWorldPositionAtLastPointerDown;
 
     // object selection
-    const float BOX_SELECT_DRAG_THRESHOLD_PIXELS = 15f;
+    const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
     Vector2 pointerScreenPositionAtLastPointerDown;
     bool hasSelectionDragExceededThreshold = false;
     int primaryFingerId = -1;
@@ -289,7 +289,7 @@ public class LevelEditor : MonoBehaviour
         if (pointerIsHeld && !hasSelectionDragExceededThreshold)
         {
             float dragDistanceInPixels = Vector2.Distance(pointerScreenPositionAtLastPointerDown, GetCurrentPointerScreenPosition());
-            if (dragDistanceInPixels >= BOX_SELECT_DRAG_THRESHOLD_PIXELS)
+            if (dragDistanceInPixels >= MINIMUM_DRAG_DISTANCE_PIXELS)
             {
                 hasSelectionDragExceededThreshold = true;
                 Debug.Log("LevelEditor: drag threshold crossed, box-select mode latched for this pointer cycle.");
@@ -371,6 +371,9 @@ public class LevelEditor : MonoBehaviour
             hasSelectionDragExceededThreshold = false;
 
             if (wasLastPointerUpOverUi) // click was on a UI element, so don't try to change selected object
+                return;
+
+            if (isTryingToMoveSelectedObject && lastHitMoveControl != null && lastHitMoveControl.name == "Duplicate")
                 return;
 
             if (shouldDoBoxSelect)
@@ -541,8 +544,9 @@ public class LevelEditor : MonoBehaviour
             {
                 Vector3 pointerWorldPosition = GetCurrentPointerWorldPosition();
 
-                // to prevent the object from moving when the player is trying to just duplicate it, don't move the object when the pointer has only moved a small distance
-                if (lastHitMoveControl.name == "Duplicate" && Vector3.Distance(pointerPositionAtStartMove, pointerWorldPosition) < 0.2f)
+                // Keep a clicked Duplicate clone in place until the pointer moves beyond the shared drag threshold.
+                float dragDistanceInPixels = Vector2.Distance(pointerScreenPositionAtLastPointerDown, GetCurrentPointerScreenPosition());
+                if (lastHitMoveControl.name == "Duplicate" && dragDistanceInPixels < MINIMUM_DRAG_DISTANCE_PIXELS)
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
                 else
                 {
