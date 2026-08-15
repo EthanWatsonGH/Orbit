@@ -44,6 +44,7 @@ public class LevelEditor : MonoBehaviour
     const float BOX_SELECT_DRAG_THRESHOLD_PIXELS = 15f;
     Vector2 pointerScreenPositionAtLastPointerDown;
     bool hasSelectionDragExceededThreshold = false;
+    int primaryFingerId = -1;
     Vector2 pointerPositionAtStartSelect;
     GameObject selectionGroup;
 
@@ -120,6 +121,7 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
+        UpdatePrimaryFingerTracking();
         CheckPointerPositionAtLastPointerDown();
         CheckIfLastPointerDownWasOverUi();
         CheckIfLastPointerUpWasOverUi();
@@ -196,15 +198,74 @@ public class LevelEditor : MonoBehaviour
 
     #endregion
 
-    Vector3 GetCurrentPointerWorldPosition()
+    // track what finger touched first to follow it as the primary one, so its movement is consistently followed,
+    // rather than potentially jumping to different fingers when multiple are on screen between start and end touch.
+    // this helps with things like 2 finger panning / zooming while moving an object.
+    void UpdatePrimaryFingerTracking()
     {
-        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-
-        if (Input.touchCount >= 1)
+        // if no touches, reset to not track any finger as primary. -1 represents no tracked finger.
+        if (Input.touchCount <= 0)
         {
-            currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
+            primaryFingerId = -1;
+            return;
+        }
+        // if no finger is currently tracked, check if any touches just began, and track id of the touch that just began as our primary finger
+        else if (primaryFingerId == -1)
+        {
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase == TouchPhase.Began)
+                {
+                    primaryFingerId = touch.fingerId;
+                    return;
+                }
+            }
+
+            // in case no touches just began but there are touches, set the primary finger as the first one found
+            primaryFingerId = Input.GetTouch(0).fingerId;
+            return;
         }
 
+        // if primary finger cannot be found on the screen, stop tracking it.
+        // the next loop through this on the next frame will make it find the next finger on the screen to be set as the primary finger.
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.fingerId == primaryFingerId)
+            {
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    primaryFingerId = -1;
+                return;
+            }
+        }
+
+        primaryFingerId = -1;
+    }
+
+    bool TryGetPrimaryFingerScreenPosition(out Vector2 touchPosition)
+    {
+        if (primaryFingerId != -1)
+        {
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.fingerId == primaryFingerId)
+                {
+                    touchPosition = touch.position;
+                    return true;
+                }
+            }
+        }
+
+        touchPosition = Vector2.zero;
+        return false;
+    }
+
+    Vector3 GetCurrentPointerWorldPosition()
+    {
+        Vector2 currentPointerScreenPosition = GetCurrentPointerScreenPosition();
+        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(currentPointerScreenPosition);
         // ensure no depth
         currentPointerWorldPosition.z = 0;
         return currentPointerWorldPosition;
@@ -222,6 +283,9 @@ public class LevelEditor : MonoBehaviour
 
     Vector2 GetCurrentPointerScreenPosition()
     {
+        if (TryGetPrimaryFingerScreenPosition(out Vector2 primaryFingerScreenPosition))
+            return primaryFingerScreenPosition;
+
         if (Input.touchCount >= 1)
             return Input.GetTouch(0).position;
 
