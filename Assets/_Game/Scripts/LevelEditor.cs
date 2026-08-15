@@ -32,7 +32,6 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
-    Vector3 pointerWorldPosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
@@ -121,7 +120,6 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
-        UpdatePointerWorldPosition();
         CheckPointerPositionAtLastPointerDown();
         CheckIfLastPointerDownWasOverUi();
         CheckIfLastPointerUpWasOverUi();
@@ -198,25 +196,25 @@ public class LevelEditor : MonoBehaviour
 
     #endregion
 
-    void UpdatePointerWorldPosition()
+    Vector3 GetCurrentPointerWorldPosition()
     {
-        pointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-        // TODO: i dont like this because when there's more than 1 finger the pointerWorldPosition will jump between the fingers. just make each funtion handle touch and mouse position independently on their own?
         if (Input.touchCount >= 1)
         {
-            pointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
+            currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
         }
 
         // ensure no depth
-        pointerWorldPosition.z = 0;
+        currentPointerWorldPosition.z = 0;
+        return currentPointerWorldPosition;
     }
 
     void CheckPointerPositionAtLastPointerDown()
     {
         if (Input.GetButtonDown("Fire1"))
         {
-            pointerWorldPositionAtLastPointerDown = pointerWorldPosition;
+            pointerWorldPositionAtLastPointerDown = GetCurrentPointerWorldPosition();
             pointerScreenPositionAtLastPointerDown = GetCurrentPointerScreenPosition();
             hasSelectionDragExceededThreshold = false;
         }
@@ -248,7 +246,7 @@ public class LevelEditor : MonoBehaviour
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
             // make the object the player is currently trying to place follow the pointer
-            objectCurrentlyTryingToPlace.transform.position = pointerWorldPosition;
+            objectCurrentlyTryingToPlace.transform.position = GetCurrentPointerWorldPosition();
 
             // dont show object that is currently trying to be placed when over object selection bar
             if (pointerIsOverObjectSelectionBar)
@@ -443,7 +441,7 @@ public class LevelEditor : MonoBehaviour
                     isTryingToMoveSelectedObject = true;
                     lastHitMoveControl = hit.transform;
                     selectedObjectPositionAtStartMove = selectedObject.transform.position;
-                    pointerPositionAtStartMove = pointerWorldPosition;
+                    pointerPositionAtStartMove = GetCurrentPointerWorldPosition();
 
                     if (isWorldTransform)
                     {
@@ -457,7 +455,7 @@ public class LevelEditor : MonoBehaviour
                     }
 
                     // get offset between selected object and pointer position to keep it while moving
-                    moveOffset = selectedObject.transform.position - pointerWorldPosition;
+                    moveOffset = selectedObject.transform.position - GetCurrentPointerWorldPosition();
                 }
             }
         }
@@ -485,6 +483,8 @@ public class LevelEditor : MonoBehaviour
         {
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
+                Vector3 pointerWorldPosition = GetCurrentPointerWorldPosition();
+
                 // to prevent the object from moving when the player is trying to just duplicate it, don't move the object when the pointer has only moved a small distance
                 if (lastHitMoveControl.name == "Duplicate" && Vector3.Distance(pointerPositionAtStartMove, pointerWorldPosition) < 0.2f)
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
@@ -603,7 +603,7 @@ public class LevelEditor : MonoBehaviour
             selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, newRotation));
 
             // update line renderer position
-            rotationLine.SetPosition(1, pointerWorldPosition);
+            rotationLine.SetPosition(1, GetCurrentPointerWorldPosition());
         }
     }
 
@@ -621,7 +621,7 @@ public class LevelEditor : MonoBehaviour
                 if (hitName == "Scale Both" || hitName == "Scale X" || hitName == "Scale Y")
                 {
                     isTryingToScaleSelectedObject = true;
-                    pointerPositionAtStartScale = pointerWorldPosition;
+                    pointerPositionAtStartScale = GetCurrentPointerWorldPosition();
                     selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
                     lastHitScaleControl = hit.transform;
                     selectedObjectXScaleAtStartScale = selectedObject.transform.localScale.x;
@@ -640,6 +640,7 @@ public class LevelEditor : MonoBehaviour
         if (isTryingToScaleSelectedObject) // do scaling
         {
             Vector3 newScale = selectedObject.transform.localScale;
+            Vector3 pointerWorldPosition = GetCurrentPointerWorldPosition();
 
             // get scaling to add/remove depending on pointer movement
             // TODO: change this to be the distance directly towards/away from the selected object instead of this absolute position method
@@ -781,7 +782,7 @@ public class LevelEditor : MonoBehaviour
     void StartTryingToPlaceObject()
     {
         isTryingToPlace = true;
-        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerWorldPosition, Quaternion.identity, levelObjectsCollection.transform);
+        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, GetCurrentPointerWorldPosition(), Quaternion.identity, levelObjectsCollection.transform);
     }
     public void PlaceBooster()
     {
