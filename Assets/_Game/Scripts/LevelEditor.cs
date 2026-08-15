@@ -704,42 +704,19 @@ public class LevelEditor : MonoBehaviour
 
             // get scaling to add/remove depending on pointer movement
             // TODO: change this to be the distance directly towards/away from the selected object instead of this absolute position method
-            float differenceX = pointerPositionAtStartScale.x - pointerWorldPosition.x;
-            float differenceY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
-
-            //float scaleToAdd = differenceX + differenceY;
-
-            //float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
-            //float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
+            float pointerScaleDeltaX = pointerPositionAtStartScale.x - pointerWorldPosition.x;
+            float pointerScaleDeltaY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
 
             // get scaling depending on which scale control was pressed
             switch (lastHitScaleControl.name)
             {
                 case "Scale Both":
-                    // get object width/magnitude at start scale, eg. 17m
-                    // get distance from pointer movement to add as width, eg. 2m
-                    // divide width to add by object width at start, eg. 2 / 17 = 0.11764...
-                    // multiply object width at start by (1 + value of previous calculation), eg. (1 + 0.11764...) * 17 = 19
+                    Vector3 scaleReferencePoint = pointerPositionAtStartScale + selectedObject.transform.right * 9999f;
+                    float distanceToReferenceAtStartScale = Vector3.Distance(pointerPositionAtStartScale, scaleReferencePoint);
+                    float scaleDelta = (Vector3.Distance(pointerWorldPosition, scaleReferencePoint) - distanceToReferenceAtStartScale) * 2f; // * 2 since it needs to add the length to both sides
 
-                    // or get aspect ratio between each axis, and scale each with percentage multiplied by aspect ratio
-
-                    // if i scale one axis of an object, lets say the bigger one is the x axis and it's 13m at start scale, and i add 2.5m distance to it in the scaling,
-                    //  then whatever percentage it just increased should be applied to the other smaller axis. say the y axis, the smaller axis, is 7m,
-                    //  the x axis increased by (2.5 / 13 = 0.1923...) so the y axis should be increasing by the same percentage.
-                    //  i dont even have to do any adding of the movement value to the smaller axis, just multiplying by the same percent
-
-                    // for getting the proper amount of length to add/subtract:
-                    // get pointer position at start scale
-                    // get selected object position
-                    // in the direction from pointer position at start scale to selected object position, create a vector 9999f away from selected object
-                    Vector3 scaleToPoint = pointerPositionAtStartScale + selectedObject.transform.right * 9999f;
-                    // get distance between pointer position at start scale and the created vector
-                    float distanceAtStartScale = Vector3.Distance(pointerPositionAtStartScale, scaleToPoint);
-                    // get difference between last calculation and (distance between current pointer position and created vector)
-                    float scaleToAdd = (Vector3.Distance(pointerWorldPosition, scaleToPoint) - distanceAtStartScale) * 2f; // * 2 since it needs to add the length to both sides
-
-                    float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
-                    float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
+                    float xScaleMultiplier = scaleDelta / selectedObjectXScaleAtStartScale;
+                    float yScaleMultiplier = scaleDelta / selectedObjectYScaleAtStartScale;
 
                     float parentXScale = selectedObject.transform.parent.localScale.x;
                     float parentYScale = selectedObject.transform.parent.localScale.y;
@@ -748,7 +725,7 @@ public class LevelEditor : MonoBehaviour
                     {
                         float xAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.x / selectedObjectXScaleAtStartScale;
 
-                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
+                        newScale = new Vector3(Mathf.Clamp((1 + xScaleMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
                         Mathf.Clamp(selectedObjectYScaleAtStartScale * xAxisScaleDifferenceSinceStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
                         1f);
                     }
@@ -757,21 +734,14 @@ public class LevelEditor : MonoBehaviour
                         float yAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.y / selectedObjectYScaleAtStartScale;
 
                         newScale = new Vector3(Mathf.Clamp(selectedObjectXScaleAtStartScale * yAxisScaleDifferenceSinceStartScale, minimumScale * parentXScale, maximumScale * parentXScale),
-                        Mathf.Clamp((1 + yMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
+                        Mathf.Clamp((1 + yScaleMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
                         1f);
                     }
                     else // x and y width equal. so square or circular objects
                     {
-                        newScale = new Vector3(Mathf.Clamp((1 + xMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
-                        Mathf.Clamp((1 + yMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
+                        newScale = new Vector3(Mathf.Clamp((1 + xScaleMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
+                        Mathf.Clamp((1 + yScaleMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
                         1f);
-
-                        // TODO: this is a cool bug that i could turn into a feature
-                        //float differenceX = pointerPositionAtStartScale.x - pointerWorldPosition.x; // these 2 lines are here just in case i change the code for them above and need this to check the bug later
-                        //float differenceY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
-                        //newScale = new Vector3(Mathf.Clamp(differenceX * 2f + selectedObjectScaleAtStartScale.x, minimumScale, maximumScale), // * 2 since it's for both sides
-                        //Mathf.Clamp(differenceY * 2f + selectedObjectScaleAtStartScale.y, minimumScale, maximumScale),
-                        //1f);
                     }
 
                     break;
@@ -781,7 +751,7 @@ public class LevelEditor : MonoBehaviour
                     horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 9999f);
                     horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 9999f);
 
-                    newScale = new Vector3(Mathf.Clamp(differenceX * 2f + selectedObjectScaleAtStartScale.x, minimumScale, maximumScale), // * 2 since it's for both sides
+                    newScale = new Vector3(Mathf.Clamp(pointerScaleDeltaX * 2f + selectedObjectScaleAtStartScale.x, minimumScale, maximumScale), // * 2 since it's for both sides
                         selectedObjectScaleAtStartScale.y,
                         1f);
 
@@ -793,7 +763,7 @@ public class LevelEditor : MonoBehaviour
                     verticalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.up * 9999f);
 
                     newScale = new Vector3(selectedObjectScaleAtStartScale.x,
-                        Mathf.Clamp(differenceY * 2f + selectedObjectScaleAtStartScale.y, minimumScale, maximumScale), // * 2 since it's for both sides
+                        Mathf.Clamp(pointerScaleDeltaY * 2f + selectedObjectScaleAtStartScale.y, minimumScale, maximumScale), // * 2 since it's for both sides
                         1f);
 
                     break;
