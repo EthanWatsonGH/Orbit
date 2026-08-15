@@ -32,14 +32,21 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
-    Vector3 pointerPosition;
+    Vector3 pointerWorldPosition;
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
     bool isWorldTransform = true;
     bool wasLastPointerDownOverUi = false;
     bool wasLastPointerUpOverUi = false;
-    Vector3 pointerPositionAtLastPointerDown;
+    Vector3 pointerWorldPositionAtLastPointerDown;
+
+    // object selection
+    const float BOX_SELECT_DRAG_THRESHOLD_PIXELS = 15f;
+    Vector2 pointerScreenPositionAtLastPointerDown;
+    bool hasSelectionDragExceededThreshold = false;
+    Vector2 pointerPositionAtStartSelect;
+    GameObject selectionGroup;
 
     // object movement
     Vector3 moveOffset;
@@ -114,10 +121,11 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
-        UpdatePointerPosition();
+        UpdatePointerWorldPosition();
         CheckPointerPositionAtLastPointerDown();
         CheckIfLastPointerDownWasOverUi();
         CheckIfLastPointerUpWasOverUi();
+        UpdateBoxSelectIntentFromPointerDrag();
         HandlePlacePrefab();
         HandleSelectObject();
         HandleScaleSelectedObject();
@@ -190,25 +198,48 @@ public class LevelEditor : MonoBehaviour
 
     #endregion
 
-    void UpdatePointerPosition()
+    void UpdatePointerWorldPosition()
     {
-        pointerPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        pointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-        // TODO: i dont like this because when there's more than 1 finger the pointerPosition will jump between the fingers. just make each funtion handle touch and mouse position independently on their own
+        // TODO: i dont like this because when there's more than 1 finger the pointerWorldPosition will jump between the fingers. just make each funtion handle touch and mouse position independently on their own?
         if (Input.touchCount >= 1)
         {
-            pointerPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
+            pointerWorldPosition = Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position);
         }
 
         // ensure no depth
-        pointerPosition.z = 0;
+        pointerWorldPosition.z = 0;
     }
 
     void CheckPointerPositionAtLastPointerDown()
     {
         if (Input.GetButtonDown("Fire1"))
         {
-            pointerPositionAtLastPointerDown = pointerPosition;
+            pointerWorldPositionAtLastPointerDown = pointerWorldPosition;
+            pointerScreenPositionAtLastPointerDown = GetCurrentPointerScreenPosition();
+            hasSelectionDragExceededThreshold = false;
+        }
+    }
+
+    Vector2 GetCurrentPointerScreenPosition()
+    {
+        if (Input.touchCount >= 1)
+            return Input.GetTouch(0).position;
+
+        return Input.mousePosition;
+    }
+
+    void UpdateBoxSelectIntentFromPointerDrag()
+    {
+        if (Input.GetButton("Fire1") && !hasSelectionDragExceededThreshold)
+        {
+            float dragDistanceInPixels = Vector2.Distance(pointerScreenPositionAtLastPointerDown, GetCurrentPointerScreenPosition());
+            if (dragDistanceInPixels >= BOX_SELECT_DRAG_THRESHOLD_PIXELS)
+            {
+                hasSelectionDragExceededThreshold = true;
+                Debug.Log("LevelEditor: drag threshold crossed, box-select mode latched for this pointer cycle.");
+            }
         }
     }
 
@@ -217,7 +248,7 @@ public class LevelEditor : MonoBehaviour
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
             // make the object the player is currently trying to place follow the pointer
-            objectCurrentlyTryingToPlace.transform.position = pointerPosition;
+            objectCurrentlyTryingToPlace.transform.position = pointerWorldPosition;
 
             // dont show object that is currently trying to be placed when over object selection bar
             if (pointerIsOverObjectSelectionBar)
@@ -282,15 +313,21 @@ public class LevelEditor : MonoBehaviour
         // set the object the player clicks as selected if it's allowed to be selected
         if (Input.GetButtonUp("Fire1") && !UIManager.Instance.IsInControlBlockingMenu)
         {
+            bool shouldDoBoxSelect = hasSelectionDragExceededThreshold;
+            hasSelectionDragExceededThreshold = false;
+
             if (wasLastPointerUpOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 
-            if (Vector3.Distance(pointerPositionAtLastPointerDown, pointerPosition) >= 1f) // box select // TODO: make this based on screen width, not world distance
-            { 
-
+            if (shouldDoBoxSelect)
+            {
+                Debug.Log("LevelEditor: pointer cycle resolved as box-select.");
+                // TODO: create/update visible box while dragging.
+                // TODO: collect objects inside selection box and apply selection grouping flow on pointer up.
             }
             else // click select
             {
+                Debug.Log("LevelEditor: pointer cycle resolved as click-select.");
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
                 RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
@@ -307,6 +344,7 @@ public class LevelEditor : MonoBehaviour
                 }
                 else // no object hit
                 {
+                    // TODO: circle-collision fallback selection flow should be initiated here.
                     if (!wasLastPointerDownOverUi) // if player clicks just the background, unselect object
                     {
                         UnselectObject();
@@ -405,7 +443,7 @@ public class LevelEditor : MonoBehaviour
                     isTryingToMoveSelectedObject = true;
                     lastHitMoveControl = hit.transform;
                     selectedObjectPositionAtStartMove = selectedObject.transform.position;
-                    pointerPositionAtStartMove = pointerPosition;
+                    pointerPositionAtStartMove = pointerWorldPosition;
 
                     if (isWorldTransform)
                     {
@@ -419,7 +457,7 @@ public class LevelEditor : MonoBehaviour
                     }
 
                     // get offset between selected object and pointer position to keep it while moving
-                    moveOffset = selectedObject.transform.position - pointerPosition;
+                    moveOffset = selectedObject.transform.position - pointerWorldPosition;
                 }
             }
         }
@@ -448,12 +486,12 @@ public class LevelEditor : MonoBehaviour
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
                 // to prevent the object from moving when the player is trying to just duplicate it, don't move the object when the pointer has only moved a small distance
-                if (lastHitMoveControl.name == "Duplicate" && Vector3.Distance(pointerPositionAtStartMove, pointerPosition) < 0.2f)
+                if (lastHitMoveControl.name == "Duplicate" && Vector3.Distance(pointerPositionAtStartMove, pointerWorldPosition) < 0.2f)
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
                 else
                 {
-                    float newX = RoundToIncrement(pointerPosition.x + moveOffset.x, moveIncrement) + moveIncrementOffset.x;
-                    float newY = RoundToIncrement(pointerPosition.y + moveOffset.y, moveIncrement) + moveIncrementOffset.y;
+                    float newX = RoundToIncrement(pointerWorldPosition.x + moveOffset.x, moveIncrement) + moveIncrementOffset.x;
+                    float newY = RoundToIncrement(pointerWorldPosition.y + moveOffset.y, moveIncrement) + moveIncrementOffset.y;
 
                     // make selectedObject move with pointer
                     selectedObject.transform.position = new Vector3(newX, newY, 0f);
@@ -565,7 +603,7 @@ public class LevelEditor : MonoBehaviour
             selectedObject.transform.localRotation = Quaternion.Euler(new Vector3(0, 0, newRotation));
 
             // update line renderer position
-            rotationLine.SetPosition(1, pointerPosition);
+            rotationLine.SetPosition(1, pointerWorldPosition);
         }
     }
 
@@ -583,7 +621,7 @@ public class LevelEditor : MonoBehaviour
                 if (hitName == "Scale Both" || hitName == "Scale X" || hitName == "Scale Y")
                 {
                     isTryingToScaleSelectedObject = true;
-                    pointerPositionAtStartScale = pointerPosition;
+                    pointerPositionAtStartScale = pointerWorldPosition;
                     selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
                     lastHitScaleControl = hit.transform;
                     selectedObjectXScaleAtStartScale = selectedObject.transform.localScale.x;
@@ -605,8 +643,8 @@ public class LevelEditor : MonoBehaviour
 
             // get scaling to add/remove depending on pointer movement
             // TODO: change this to be the distance directly towards/away from the selected object instead of this absolute position method
-            float differenceX = pointerPositionAtStartScale.x - pointerPosition.x;
-            float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+            float differenceX = pointerPositionAtStartScale.x - pointerWorldPosition.x;
+            float differenceY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
 
             //float scaleToAdd = differenceX + differenceY;
 
@@ -637,7 +675,7 @@ public class LevelEditor : MonoBehaviour
                     // get distance between pointer position at start scale and the created vector
                     float distanceAtStartScale = Vector3.Distance(pointerPositionAtStartScale, scaleToPoint);
                     // get difference between last calculation and (distance between current pointer position and created vector)
-                    float scaleToAdd = (Vector3.Distance(pointerPosition, scaleToPoint) - distanceAtStartScale) * 2f; // * 2 since it needs to add the length to both sides
+                    float scaleToAdd = (Vector3.Distance(pointerWorldPosition, scaleToPoint) - distanceAtStartScale) * 2f; // * 2 since it needs to add the length to both sides
 
                     float xMultiplier = scaleToAdd / selectedObjectXScaleAtStartScale;
                     float yMultiplier = scaleToAdd / selectedObjectYScaleAtStartScale;
@@ -668,8 +706,8 @@ public class LevelEditor : MonoBehaviour
                         1f);
 
                         // TODO: this is a cool bug that i could turn into a feature
-                        //float differenceX = pointerPositionAtStartScale.x - pointerPosition.x; // these 2 lines are here just in case i change the code for them above and need this to check the bug later
-                        //float differenceY = pointerPosition.y - pointerPositionAtStartScale.y;
+                        //float differenceX = pointerPositionAtStartScale.x - pointerWorldPosition.x; // these 2 lines are here just in case i change the code for them above and need this to check the bug later
+                        //float differenceY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
                         //newScale = new Vector3(Mathf.Clamp(differenceX * 2f + selectedObjectScaleAtStartScale.x, minimumScale, maximumScale), // * 2 since it's for both sides
                         //Mathf.Clamp(differenceY * 2f + selectedObjectScaleAtStartScale.y, minimumScale, maximumScale),
                         //1f);
@@ -743,7 +781,7 @@ public class LevelEditor : MonoBehaviour
     void StartTryingToPlaceObject()
     {
         isTryingToPlace = true;
-        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerPosition, Quaternion.identity, levelObjectsCollection.transform);
+        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerWorldPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
     public void PlaceBooster()
     {
