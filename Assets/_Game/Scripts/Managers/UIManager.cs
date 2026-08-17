@@ -92,7 +92,7 @@ public class UIManager : MonoBehaviour
     public void ShowPlayerLevelSelectionMenu()
     {
         ShowLevelPreviewPanel();
-        StartCoroutine(LevelManager.Instance.LoadLevelPreviews(LevelSource.MyLevels));
+        StartCoroutine(LevelManager.Instance.LoadLevelPreviews(LevelSource.PlayerLevels));
     }
 
     public void ShowGameLevelSelectionMenu()

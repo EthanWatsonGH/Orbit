@@ -1,5 +1,5 @@
 {
-    "content": [
+    "levels": [
         {
             "id": "1",
             "contentType": "level",
@@ -54,17 +54,6 @@
             "createdAtUtcTicks": 0,
             "updatedAtUtcTicks": 0,
             "sortOrder": 5
-        },
-        {
-            "id": "Custom Level Dec 05 2025 4-18-04PM",
-            "contentType": "level",
-            "displayName": "Custom Level Dec 05 2025 4-18-04PM",
-            "author": "TO ADD",
-            "payloadFileName": "Custom Level Dec 05 2025 4-18-04PM.json",
-            "previewFileName": "Custom Level Dec 05 2025 4-18-04PM.png",
-            "createdAtUtcTicks": 0,
-            "updatedAtUtcTicks": 0,
-            "sortOrder": 6
         }
     ]
 }

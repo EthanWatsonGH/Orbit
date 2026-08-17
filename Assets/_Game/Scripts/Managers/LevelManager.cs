@@ -250,7 +250,7 @@ public class LevelManager : MonoBehaviour
         byte[] previewImageBytes = null;
         yield return CaptureLevelPreview(capturedImageBytes => previewImageBytes = capturedImageBytes);
 
-        bool didSave = levelStorage.SaveLevel(LevelSource.MyLevels, new LevelCatalogRecord
+        bool didSave = levelStorage.SaveLevel(LevelSource.PlayerLevels, new LevelCatalogRecord
         {
             id = level.contentId,
             contentType = "level",

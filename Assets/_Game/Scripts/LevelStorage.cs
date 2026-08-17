@@ -9,7 +9,7 @@ using UnityEngine.Networking;
 public enum LevelSource
 {
     Game,
-    MyLevels,
+    PlayerLevels,
     // TODO(downloaded-levels): Add a validated downloader/importer that calls SaveLevel.
     // Files written directly into this folder bypass its catalog and will not be shown.
     DownloadedLevels
@@ -18,8 +18,7 @@ public enum LevelSource
 [Serializable]
 public class LevelCatalog
 {
-    // Keep this field name so existing content-catalog.json files remain compatible.
-    public List<LevelCatalogRecord> content = new List<LevelCatalogRecord>();
+    public List<LevelCatalogRecord> levels = new List<LevelCatalogRecord>();
 }
 
 [Serializable]
@@ -61,7 +60,7 @@ public sealed class LevelStorage
 
     public void EnsureLocalContentDirectories()
     {
-        EnsureLocalContentDirectory(LevelSource.MyLevels);
+        EnsureLocalContentDirectory(LevelSource.PlayerLevels);
         EnsureLocalContentDirectory(LevelSource.DownloadedLevels);
     }
 
@@ -194,8 +193,8 @@ public sealed class LevelStorage
                 File.WriteAllBytes(GetLocalContentPath(source, record.previewFileName), previewImageBytes);
 
             LevelCatalog catalog = LoadLocalCatalog(source);
-            catalog.content.RemoveAll(existingRecord => existingRecord.id == record.id);
-            catalog.content.Add(record);
+            catalog.levels.RemoveAll(existingRecord => existingRecord.id == record.id);
+            catalog.levels.Add(record);
             return SaveLocalCatalog(source, catalog);
         }
         catch (Exception exception)
@@ -218,8 +217,8 @@ public sealed class LevelStorage
             }
 
             LevelCatalog catalog = JsonUtility.FromJson<LevelCatalog>(request.downloadHandler.text) ?? new LevelCatalog();
-            if (catalog.content == null)
-                catalog.content = new List<LevelCatalogRecord>();
+            if (catalog.levels == null)
+                catalog.levels = new List<LevelCatalogRecord>();
 
             onLoaded?.Invoke(catalog);
         }
@@ -239,8 +238,8 @@ public sealed class LevelStorage
         try
         {
             LevelCatalog catalog = JsonUtility.FromJson<LevelCatalog>(File.ReadAllText(catalogPath)) ?? new LevelCatalog();
-            if (catalog.content == null)
-                catalog.content = new List<LevelCatalogRecord>();
+            if (catalog.levels == null)
+                catalog.levels = new List<LevelCatalogRecord>();
             return catalog;
         }
         catch (Exception exception)
@@ -267,7 +266,7 @@ public sealed class LevelStorage
                 string displayName = string.IsNullOrWhiteSpace(metadata.levelName) ? Path.GetFileNameWithoutExtension(payloadPath) : metadata.levelName;
                 DateTime createdAt = File.GetCreationTimeUtc(payloadPath);
                 DateTime updatedAt = File.GetLastWriteTimeUtc(payloadPath);
-                catalog.content.Add(new LevelCatalogRecord
+                catalog.levels.Add(new LevelCatalogRecord
                 {
                     id = Guid.NewGuid().ToString(),
                     contentType = "level",
@@ -319,7 +318,7 @@ public sealed class LevelStorage
     {
         switch (source)
         {
-            case LevelSource.MyLevels:
+            case LevelSource.PlayerLevels:
                 return myLevelsDirectory;
             case LevelSource.DownloadedLevels:
                 return downloadedLevelsDirectory;
@@ -335,13 +334,13 @@ public sealed class LevelStorage
 
     static List<LevelCatalogRecord> SortRecords(LevelCatalog catalog, LevelSource source)
     {
-        if (catalog == null || catalog.content == null)
+        if (catalog == null || catalog.levels == null)
             return new List<LevelCatalogRecord>();
 
         if (source == LevelSource.Game)
-            return catalog.content.OrderBy(record => record.sortOrder).ThenBy(record => record.displayName).ToList();
+            return catalog.levels.OrderBy(record => record.sortOrder).ThenBy(record => record.displayName).ToList();
 
-        return catalog.content.OrderByDescending(record => record.updatedAtUtcTicks).ThenBy(record => record.displayName).ToList();
+        return catalog.levels.OrderByDescending(record => record.updatedAtUtcTicks).ThenBy(record => record.displayName).ToList();
     }
 
     static string SanitizeReadableName(string displayName)

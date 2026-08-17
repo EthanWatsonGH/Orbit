@@ -6,6 +6,7 @@ using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
+[InitializeOnLoad]
 public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
 {
     const string GameLevelsDirectory = "Assets/StreamingAssets/gameLevels";
@@ -18,7 +19,19 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
         public string levelAuthor;
     }
 
+    static GameLevelCatalogBuilder()
+    {
+        EditorApplication.playModeStateChanged -= RebuildBeforeEnteringPlayMode;
+        EditorApplication.playModeStateChanged += RebuildBeforeEnteringPlayMode;
+    }
+
     public int callbackOrder => 0;
+
+    static void RebuildBeforeEnteringPlayMode(PlayModeStateChange change)
+    {
+        if (change == PlayModeStateChange.ExitingEditMode)
+            RebuildGameLevelCatalog();
+    }
 
     [MenuItem("Orbit/Levels/Rebuild Game Level Catalog")]
     public static void RebuildGameLevelCatalog()
@@ -53,7 +66,7 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
             if (!File.Exists(Path.Combine(GameLevelsDirectory, previewFileName)))
                 Debug.LogWarning("WARNING: Game level preview image could not be found: " + previewFileName);
 
-            catalog.content.Add(new LevelCatalogRecord
+            catalog.levels.Add(new LevelCatalogRecord
             {
                 id = levelId,
                 contentType = "level",
@@ -66,9 +79,13 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
         }
 
         string catalogPath = GameLevelsDirectory + "/" + CatalogFileName;
-        File.WriteAllText(catalogPath, JsonUtility.ToJson(catalog, true));
+        string catalogJson = JsonUtility.ToJson(catalog, true);
+        if (File.Exists(catalogPath) && File.ReadAllText(catalogPath) == catalogJson)
+            return;
+
+        File.WriteAllText(catalogPath, catalogJson);
         AssetDatabase.ImportAsset(catalogPath);
-        Debug.Log("Rebuilt game level catalog with " + catalog.content.Count + " level(s).");
+        Debug.Log("Rebuilt game level catalog with " + catalog.levels.Count + " level(s).");
     }
 
     public void OnPreprocessBuild(BuildReport report)
