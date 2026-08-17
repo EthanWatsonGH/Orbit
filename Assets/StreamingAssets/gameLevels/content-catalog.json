@@ -1,0 +1,70 @@
+{
+    "content": [
+        {
+            "id": "1",
+            "contentType": "level",
+            "displayName": "1",
+            "author": "TO ADD",
+            "payloadFileName": "1.json",
+            "previewFileName": "1.png",
+            "createdAtUtcTicks": 0,
+            "updatedAtUtcTicks": 0,
+            "sortOrder": 1
+        },
+        {
+            "id": "2",
+            "contentType": "level",
+            "displayName": "2",
+            "author": "TO ADD",
+            "payloadFileName": "2.json",
+            "previewFileName": "2.png",
+            "createdAtUtcTicks": 0,
+            "updatedAtUtcTicks": 0,
+            "sortOrder": 2
+        },
+        {
+            "id": "3",
+            "contentType": "level",
+            "displayName": "3",
+            "author": "TO ADD",
+            "payloadFileName": "3.json",
+            "previewFileName": "3.png",
+            "createdAtUtcTicks": 0,
+            "updatedAtUtcTicks": 0,
+            "sortOrder": 3
+        },
+        {
+            "id": "4",
+            "contentType": "level",
+            "displayName": "4",
+            "author": "TO ADD",
+            "payloadFileName": "4.json",
+            "previewFileName": "4.png",
+            "createdAtUtcTicks": 0,
+            "updatedAtUtcTicks": 0,
+            "sortOrder": 4
+        },
+        {
+            "id": "5",
+            "contentType": "level",
+            "displayName": "5",
+            "author": "TO ADD",
+            "payloadFileName": "5.json",
+            "previewFileName": "5.png",
+            "createdAtUtcTicks": 0,
+            "updatedAtUtcTicks": 0,
+            "sortOrder": 5
+        },
+        {
+            "id": "Custom Level Dec 05 2025 4-18-04PM",
+            "contentType": "level",
+            "displayName": "Custom Level Dec 05 2025 4-18-04PM",
+            "author": "TO ADD",
+            "payloadFileName": "Custom Level Dec 05 2025 4-18-04PM.json",
+            "previewFileName": "Custom Level Dec 05 2025 4-18-04PM.png",
+            "createdAtUtcTicks": 0,
+            "updatedAtUtcTicks": 0,
+            "sortOrder": 6
+        }
+    ]
+}

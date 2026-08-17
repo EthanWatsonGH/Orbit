@@ -52,6 +52,7 @@ public class LevelManager : MonoBehaviour
     [System.Serializable]
     struct Level
     {
+        public string contentId;
         public byte loaderVersion;
         public string levelName;
         //public string levelDescription;
@@ -89,9 +90,8 @@ public class LevelManager : MonoBehaviour
 
     // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
     public const byte LOADER_VERSION = 1;
-
     public string playerLevelsDirectory { get; private set; }
-    string gameLevelsDirectory;
+    LevelStorage levelStorage;
     string levelLoadJson;
     string lastSavedLevelJson = string.Empty;
 
@@ -113,20 +113,9 @@ public class LevelManager : MonoBehaviour
     {
         // get directory for player's levels
         playerLevelsDirectory = Application.persistentDataPath + "/playerLevels";
-        EnsureDirectoryExists(playerLevelsDirectory);
-
-        // get directory for game's levels
-        gameLevelsDirectory = Application.streamingAssetsPath + "/gameLevels";
-        EnsureDirectoryExists(gameLevelsDirectory);
-    }
-
-    void EnsureDirectoryExists(string directory)
-    {
-        // create directory if it doesn't already exist 
-        if (!Directory.Exists(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
+        string downloadedLevelsDirectory = Application.persistentDataPath + "/downloadedLevels";
+        levelStorage = new LevelStorage(playerLevelsDirectory, downloadedLevelsDirectory);
+        levelStorage.EnsureLocalContentDirectories();
     }
 
     public void DestroyAllExistingLevelObjects()
@@ -166,6 +155,7 @@ public class LevelManager : MonoBehaviour
 
         // TODO: make these values get properly set
         // set values to save
+        level.contentId = Guid.NewGuid().ToString();
         level.levelName = levelName;
         level.levelAuthor = "TO ADD";
         level.loaderVersion = LOADER_VERSION;
@@ -222,38 +212,59 @@ public class LevelManager : MonoBehaviour
     }
     #endregion
 
-    IEnumerator SaveScreenshot(string screenshotLocation)
+    IEnumerator CaptureLevelPreview(Action<byte[]> onComplete)
     {
-        // TODO: will probably have to change this later when i move the save level button to a different menu. at that point just handle all UI stuff in a manager with events.
         // hide level editor UI while taking screenshot
         GameObject levelEditorCanvas = GameObject.Find("LevelEditor").transform.Find("Canvas").gameObject;
+        bool wasLevelEditorCanvasActive = levelEditorCanvas.activeSelf;
+        bool wereObjectTransformControlsActive = objectTransformControls.activeSelf;
         levelEditorCanvas.SetActive(false);
         objectTransformControls.SetActive(false);
 
         // wait until the end of the frame before taking the screenshot since the UI is actually hidden at the end of the frame
         yield return new WaitForEndOfFrame();
 
-        // save screenshot for level preview image
-        ScreenCapture.CaptureScreenshot(screenshotLocation + ".png");
+        Texture2D screenshot = ScreenCapture.CaptureScreenshotAsTexture();
+        byte[] previewImageBytes = screenshot.EncodeToPNG();
+        Destroy(screenshot);
 
         // unhide level editor UI
-        levelEditorCanvas.SetActive(true);
-        objectTransformControls.SetActive(true);
+        levelEditorCanvas.SetActive(wasLevelEditorCanvasActive);
+        objectTransformControls.SetActive(wereObjectTransformControlsActive);
+
+        onComplete?.Invoke(previewImageBytes);
     }
 
     public void SaveLevel()
     {
-        Level level = GenerateLevelObject();
+        StartCoroutine(SaveLevelWithPreview());
+    }
 
+    IEnumerator SaveLevelWithPreview()
+    {
+        Level level = GenerateLevelObject();
         string json = JsonUtility.ToJson(level, true);
 
-        EnsureDirectoryExists(playerLevelsDirectory);
+        string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
+        string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
+        byte[] previewImageBytes = null;
+        yield return CaptureLevelPreview(capturedImageBytes => previewImageBytes = capturedImageBytes);
 
-        string saveLocation = Path.Combine(playerLevelsDirectory, level.levelName);
+        bool didSave = levelStorage.SaveLevel(LevelSource.MyLevels, new LevelCatalogRecord
+        {
+            id = level.contentId,
+            contentType = "level",
+            displayName = level.levelName,
+            author = level.levelAuthor,
+            payloadFileName = payloadFileName,
+            previewFileName = previewFileName,
+            createdAtUtcTicks = DateTime.UtcNow.Ticks,
+            updatedAtUtcTicks = DateTime.UtcNow.Ticks,
+            sortOrder = 0
+        }, json, previewImageBytes);
 
-        File.WriteAllText(saveLocation + ".json", json);
-
-        StartCoroutine(SaveScreenshot(saveLocation));
+        if (!didSave)
+            yield break;
 
         lastSavedLevelJson = json;
 
@@ -288,18 +299,37 @@ public class LevelManager : MonoBehaviour
     }
     #endregion
 
-    public bool GetLevelJsonFromFile(string levelPath)
+    public IEnumerator LoadLevelFromPreview(LevelSource source, string contentId, Action<bool> onComplete)
     {
-        // if level file is not found, send a message and cancel loading
-        if (!File.Exists(levelPath))
+        if (string.IsNullOrEmpty(contentId))
         {
-            Debug.Log("ERROR: Level not found.");
-            return false;
+            Debug.Log("ERROR: Level preview ID is not valid.");
+            onComplete?.Invoke(false);
+            yield break;
         }
 
-        levelLoadJson = File.ReadAllText(levelPath);
+        List<LevelCatalogRecord> records = null;
+        yield return levelStorage.LoadCatalog(source, loadedRecords => records = loadedRecords);
+        LevelCatalogRecord record = records?.FirstOrDefault(candidate => candidate.id == contentId);
+        if (record == null)
+        {
+            Debug.Log("ERROR: Content catalog entry could not be found. ID: " + contentId);
+            onComplete?.Invoke(false);
+            yield break;
+        }
 
-        return true;
+        string json = null;
+        yield return levelStorage.LoadPayload(source, record, loadedJson => json = loadedJson);
+        if (string.IsNullOrEmpty(json))
+        {
+            onComplete?.Invoke(false);
+            yield break;
+        }
+
+        levelLoadJson = json;
+
+        LoadLevel();
+        onComplete?.Invoke(true);
     }
 
     public void LoadLevel()
@@ -388,113 +418,73 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    public IEnumerator LoadLevelPreviews(string levelsDirectory)
+    void ResetLevelPreviews()
     {
-        string directory = string.Empty;
-
-        if (levelsDirectory == "player")
-        {
-            directory = playerLevelsDirectory;
-        }
-        else if (levelsDirectory == "game")
-        {
-            directory = gameLevelsDirectory;
-        }
-
-        if (!Directory.Exists(directory))
-        {
-            Debug.Log("ERROR: Folder could not be found when trying to load level previews at folder: " + directory);
-            yield break;
-        }
-
-        // reset previews panel for next load
         foreach (Transform levelPreview in levelsPreviewPanel.transform)
         {
             Destroy(levelPreview.gameObject);
         }
+
         noLevelsFoundText.text = string.Empty;
-        
+    }
 
-        // TODO: also account for other file types like .dat for when i do the built in levels with binary serialization
-        string[] levelFiles = Directory.GetFiles(directory, "*.json");
+    void ShowNoLevelsFound()
+    {
+        noLevelsFoundText.text = "No levels found";
+        noLevelsFoundText.color = Color.white;
+    }
 
-        if (levelFiles.Length <= 0) // if no levels found, show message where levels would have been displayed
+    GameObject CreateLevelPreview(LevelCatalogRecord record, LevelSource source)
+    {
+        GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel.transform);
+        Transform previewContent = levelPreview.transform.GetChild(0);
+
+        previewContent.Find("LevelName").GetComponent<TMP_Text>().text = record.displayName;
+        previewContent.Find("LevelAuthor").GetComponent<TMP_Text>().text = record.author;
+
+        ButtonEventCaller buttonEventCaller = levelPreview.GetComponentInChildren<ButtonEventCaller>(true);
+        if (buttonEventCaller == null)
+            Debug.LogError("ERROR: Level preview prefab is missing ButtonEventCaller.");
+        else
+            buttonEventCaller.ConfigureLevelPreview(source, record.id);
+
+        return levelPreview;
+    }
+
+    void ShowPreviewImageError(GameObject levelPreview, string message)
+    {
+        Transform imageTransform = levelPreview.transform.GetChild(0).Find("Image");
+        imageTransform.GetChild(0).GetComponent<TMP_Text>().text = message;
+        imageTransform.GetComponent<Image>().color = Color.grey;
+    }
+
+    void SetPreviewImage(GameObject levelPreview, Texture2D imageTexture)
+    {
+        Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
+        levelPreview.transform.GetChild(0).Find("Image").GetComponent<Image>().sprite = imageSprite;
+    }
+
+    public IEnumerator LoadLevelPreviews(LevelSource source)
+    {
+        ResetLevelPreviews();
+        int previewCount = 0;
+
+        List<LevelCatalogRecord> records = null;
+        yield return levelStorage.LoadCatalog(source, loadedRecords => records = loadedRecords);
+        foreach (LevelCatalogRecord record in records)
         {
-            noLevelsFoundText.text = "No levels found";
-            noLevelsFoundText.color = Color.white;
+            GameObject levelPreview = CreateLevelPreview(record, source);
+            Texture2D previewTexture = null;
+            yield return levelStorage.LoadPreview(source, record, loadedTexture => previewTexture = loadedTexture);
+            if (previewTexture == null)
+                ShowPreviewImageError(levelPreview, "Image not found");
+            else
+                SetPreviewImage(levelPreview, previewTexture);
+            previewCount++;
         }
-        else // display levels
-        {
-            if (levelsDirectory == "player")
-            {
-                levelFiles = levelFiles.OrderByDescending(file => new FileInfo(file).CreationTime).ToArray(); // order levels by creation time descending
-            }
-            else if (levelsDirectory == "game")
-            {
-                levelFiles = levelFiles.OrderBy(file => Path.GetFileName(file)).ToArray(); // order levels by alphabetical name
-            }
-            
 
-            string[] levelImages = Directory.GetFiles(directory, "*.png");
-
-            foreach (string level in levelFiles)
-            {
-                try
-                {
-                    string json = File.ReadAllText(level);
-
-                    Level deserializedLevel = JsonUtility.FromJson<Level>(json);
-
-                    if (!deserializedLevel.Equals(null))
-                    {
-                        GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel.transform);
-
-                        string imageFile = Array.Find(levelImages, image => image.Contains(deserializedLevel.levelName)); // since im using the plain level name, the error described below can happen
-
-                        if (string.IsNullOrEmpty(imageFile)) // if image wasn't found, show message where it would have been displayed
-                        {
-                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
-                            levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
-
-                            Debug.Log("ERROR: Could not find image. Level file name, image file name, and level name in level file must all match. And image must be in same folder as level.");
-                        }
-                        else // show display
-                        {
-                            try
-                            {
-                                byte[] imageBytes = File.ReadAllBytes(imageFile);
-
-                                Texture2D imageTexture = new Texture2D(2, 2);
-                                imageTexture.LoadImage(imageBytes);
-
-                                Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
-
-                                levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().sprite = imageSprite;
-                            }
-                            catch
-                            {
-                                levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetChild(0).GetComponent<TMP_Text>().text = "Image could not be loaded";
-                                levelPreview.transform.GetChild(0).transform.Find("Image").transform.GetComponent<Image>().color = Color.grey;
-                            }
-                        }
-
-                        levelPreview.transform.GetChild(0).transform.Find("LevelName").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelName;
-                        levelPreview.transform.GetChild(0).transform.Find("LevelAuthor").transform.GetComponent<TMP_Text>().text = deserializedLevel.levelAuthor;
-                        levelPreview.transform.GetChild(0).transform.Find("LevelPath").transform.GetComponent<TMP_Text>().text = level;
-                    }
-                    else
-                    {
-                        Debug.Log("ERROR: A level preview failed to load");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.Log("ERROR: A level preview failed to load or deserialize. Level: " + level + " . Exception message:" + ex.Message);
-                }
-
-                yield return null;
-            }
-        }
+        if (previewCount == 0)
+            ShowNoLevelsFound();
     }
     #endregion
 }

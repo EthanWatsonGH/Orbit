@@ -1,10 +1,11 @@
 using System.Collections;
-using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
 public class ButtonEventCaller : MonoBehaviour
 {
+    LevelSource previewLevelSource;
+    string previewLevelId;
+
     public void RecenterCamera()
     {
         EventManager.Instance.RecenterCamera();
@@ -27,9 +28,22 @@ public class ButtonEventCaller : MonoBehaviour
 
     public void LoadLevelFromPreviewPanel()
     {
-        LevelManager.Instance.GetLevelJsonFromFile(gameObject.transform.Find("LevelPath").transform.GetComponent<TMP_Text>().text);
-        LevelManager.Instance.LoadLevel();
-        UIManager.Instance.ShowLastActiveUiBeforeOpeningMainMenu();
+        StartCoroutine(LoadLevelFromPreview(previewLevelSource, previewLevelId));
+    }
+
+    public void ConfigureLevelPreview(LevelSource source, string contentId)
+    {
+        previewLevelSource = source;
+        previewLevelId = contentId;
+    }
+
+    IEnumerator LoadLevelFromPreview(LevelSource source, string contentId)
+    {
+        bool didLoad = false;
+        yield return LevelManager.Instance.LoadLevelFromPreview(source, contentId, loaded => didLoad = loaded);
+
+        if (didLoad)
+            UIManager.Instance.ShowLastActiveUiBeforeOpeningMainMenu();
     }
 
     public void LoadLevelFromLevelCodeInput()
