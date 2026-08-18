@@ -1,6 +1,14 @@
 using TMPro;
 using UnityEngine;
 
+public enum PlayerState
+{
+    Aiming,
+    Playing,
+    Win,
+    Lose
+}
+
 public class Player : MonoBehaviour
 {
     // self component references
@@ -25,117 +33,153 @@ public class Player : MonoBehaviour
     // variables
     [SerializeField] float pullForce;
     [SerializeField] float launchForce;
+    [Header("Quick Play Settings")]
+    [SerializeField] bool quickRetryEnabled;
+    [SerializeField] bool quickLaunchEnabled;
+    [SerializeField] ToggleButton quickRetryToggle;
+    [SerializeField] ToggleButton quickLaunchToggle;
+
     float timeAtLastLaunch;
-    bool isInAimingMode = true;
-    bool playerPressedLaunch = false; // TODO: change to events
-    bool isInvincible = false;
-    bool isInWinState = false;
-    bool isInLoseState = false;
-    bool canMoveLaunchDirectionPoint = false;
+    PlayerState state = PlayerState.Aiming;
+    bool playerPressedLaunch; // TODO: change to events
+    bool isInvincible;
+    bool canMoveLaunchDirectionPoint;
     Vector3 offsetAtStartMoveLaunchDirectionPoint = Vector3.zero;
     float timeAtLastRetry;
+    bool hasStarted;
+
+    public PlayerState State => state;
+
+    void SetState(PlayerState newState)
+    {
+        state = newState;
+    }
 
     void Start()
     {
         lr.positionCount = 2;
-        RetryLevel();
 
         // ensure player UI is enabled
         canvas.gameObject.SetActive(true);
 
         HideFinishTrailRenderer();
+
+        hasStarted = true;
+        SyncQuickPlayToggleButtons();
+        EnterAiming(false);
     }
 
     void Update()
     {
-        if (!UIManager.Instance.IsInControlBlockingMenu)
+        if (UIManager.Instance.IsInControlBlockingMenu)
+            return;
+
+        switch (state)
         {
-            TryLaunch();
-
-            if (!isInAimingMode)
-            {
-                if (!isInWinState)
-                {
-                    // update time display
-                    timeDisplay.text = (Time.time - timeAtLastLaunch).ToString("F3");
-                }
-
-                // update speed display
-                speedDisplay.text = rb.linearVelocity.magnitude.ToString("F2");
-
-                // hide launch direction UI when not in aiming mode
-                lr.enabled = false;
-                launchDirectionPoint.SetActive(false);
-            }
+            case PlayerState.Aiming:
+                UpdateAiming();
+                break;
+            case PlayerState.Playing:
+                UpdatePlaying();
+                break;
+            case PlayerState.Win:
+            case PlayerState.Lose:
+                UpdateFinishedAttempt();
+                break;
         }
     }
 
     private void OnEnable()
     {
-        isInWinState = false;
-        RetryLevel();
-
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.AddListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.AddListener(HideInWorldUiElements);
-        EventManager.Instance.OnLevelLoadEvent.AddListener(RetryLevel);
+        EventManager.Instance.OnLevelLoadEvent.AddListener(EnterAimingAfterLevelLoad);
+
+        if (hasStarted)
+        {
+            EnterAiming(false);
+            SyncQuickPlayToggleButtons();
+        }
     }
 
     private void OnDisable()
     {
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.RemoveListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
-        EventManager.Instance.OnLevelLoadEvent.RemoveListener(RetryLevel);
+        EventManager.Instance.OnLevelLoadEvent.RemoveListener(EnterAimingAfterLevelLoad);
     }
 
-    void TryLaunch()
+    void UpdateAiming()
     {
-        // TODO: improve this logic to only trigger once per retry
-        if (isInAimingMode)
-        {
-            // show launch button instead of retry button
-            launchButton.SetActive(true);
-            retryButton.SetActive(false);
+        launchButton.SetActive(true);
+        retryButton.SetActive(false);
 
-            // reset HUD displays
-            timeDisplay.text = "0";
-            speedDisplay.text = "0";
+        timeDisplay.text = "0";
+        speedDisplay.text = "0";
 
-            // show aiming guides
-            lr.enabled = true;
-            launchDirectionPoint.SetActive(true);
+        lr.enabled = true;
+        launchDirectionPoint.SetActive(true);
 
-            EnsureLaunchDirectionPointAlwaysInFront();
-            HandleMoveLaunchDirectionPoint();
-            HandleLaunchDirectionPointRotation();
-            UpdateLineRenderer();
+        EnsureLaunchDirectionPointAlwaysInFront();
+        HandleMoveLaunchDirectionPoint();
+        HandleLaunchDirectionPointRotation();
+        UpdateLineRenderer();
 
-            // ensure velocity is zero
-            rb.linearVelocity = Vector2.zero;
+        rb.linearVelocity = Vector2.zero;
 
-            // launch player in direction of launchDirectionPoint when they press launch
-            if ((Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4) || playerPressedLaunch) && Time.time > timeAtLastRetry + 0.1f) // since launch and retry are on the same key, check a delay to not let them happen on the same frame
-            {
-                Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
-                rb.linearVelocity = launchDirection.normalized * launchForce;
+        if (WasLaunchRequested() && Time.time > timeAtLastRetry + 0.1f) // launch and retry share input, so prevent both in the same frame
+            Launch();
+    }
 
-                // for timer calculation
-                timeAtLastLaunch = Time.time;
+    void UpdatePlaying()
+    {
+        timeDisplay.text = (Time.time - timeAtLastLaunch).ToString("F3");
+        speedDisplay.text = rb.linearVelocity.magnitude.ToString("F2");
 
-                isInAimingMode = false;
-                playerPressedLaunch = false;
-            }
-        }
-        else // in play mode
-        {
-            if (Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4))
-            {
-                RetryLevel();
-            }
+        retryButton.SetActive(true);
+        launchButton.SetActive(false);
+        HideAimingGuides();
 
-            // show retry button instead of launch button
-            retryButton.SetActive(true);
-            launchButton.SetActive(false);
-        }
+        if (WasRetryRequested())
+            EnterAiming(true);
+    }
+
+    void UpdateFinishedAttempt()
+    {
+        retryButton.SetActive(true);
+        launchButton.SetActive(false);
+        HideAimingGuides();
+
+        if (WasRetryRequested())
+            EnterAiming(true);
+    }
+
+    bool WasLaunchRequested()
+    {
+        return Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4) || playerPressedLaunch;
+    }
+
+    bool WasRetryRequested()
+    {
+        return Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4);
+    }
+
+    void Launch()
+    {
+        if (state != PlayerState.Aiming)
+            return;
+
+        Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
+        rb.linearVelocity = launchDirection.normalized * launchForce;
+        timeAtLastLaunch = Time.time;
+        playerPressedLaunch = false;
+        SetState(PlayerState.Playing);
+    }
+
+    void HideAimingGuides()
+    {
+        lr.enabled = false;
+        launchDirectionPoint.SetActive(false);
     }
 
     void EnsureLaunchDirectionPointAlwaysInFront()
@@ -215,13 +259,17 @@ public class Player : MonoBehaviour
         lr.SetPosition(1, launchDirectionPoint.transform.position);
     }
 
-    void RetryLevel()
+    void EnterAimingAfterLevelLoad()
+    {
+        // A level change always waits for a manual first launch, even when Quick Launch is enabled.
+        EnterAiming(false);
+    }
+
+    void EnterAiming(bool allowQuickLaunch)
     {
         timeAtLastRetry = Time.time;
 
-        isInAimingMode = true;
-        isInWinState = false;
-        isInLoseState = false;
+        SetState(PlayerState.Aiming);
         playerPressedLaunch = false;
 
         // ensure velocity is zero
@@ -242,11 +290,14 @@ public class Player : MonoBehaviour
         finishTrailRenderer.Clear();
 
         HideFinishTrailRenderer();
+
+        if (allowQuickLaunch && quickLaunchEnabled)
+            Launch();
     }
 
     public void SwitchToLevelEditor()
     {
-        RetryLevel();
+        EnterAiming(false);
         
         // show player start location icon
         startLocationIcon.SetActive(true);
@@ -275,7 +326,7 @@ public class Player : MonoBehaviour
     {
         // pull area
         // TODO: subtract 1 touch for each one over a UI element, and then check if its still == 1 touch count
-        if ((Input.GetMouseButton(0) || Input.touchCount == 1) && !isInAimingMode)
+        if ((Input.GetMouseButton(0) || Input.touchCount == 1) && state == PlayerState.Playing)
         {
             if (collision.gameObject.CompareTag("Pull"))
             {
@@ -287,24 +338,47 @@ public class Player : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D collision)
     {
-        if (!isInAimingMode) // in play mode
+        if (state == PlayerState.Playing)
         {
             // kill area
-            if (collision.gameObject.CompareTag("Kill") && !isInvincible && !isInWinState)
+            if (collision.gameObject.CompareTag("Kill") && !isInvincible)
             {
-                Time.timeScale = 0f;
-                loseDisplay.gameObject.SetActive(true);
-                isInLoseState = true;
+                Lose();
+                return;
             }
             // finish area
-            if (collision.gameObject.CompareTag("Finish") && !isInLoseState)
+            if (collision.gameObject.CompareTag("Finish"))
             {
-                Time.timeScale = 0f;
-                winDisplay.gameObject.SetActive(true);
-                isInWinState = true;
-                ShowFinishTrailRenderer();
+                Win();
             }
         }
+    }
+
+    void Win()
+    {
+        if (state != PlayerState.Playing)
+            return;
+
+        SetState(PlayerState.Win);
+        Time.timeScale = 0f;
+        winDisplay.gameObject.SetActive(true);
+        ShowFinishTrailRenderer();
+    }
+
+    void Lose()
+    {
+        if (state != PlayerState.Playing)
+            return;
+
+        if (quickRetryEnabled)
+        {
+            EnterAiming(true);
+            return;
+        }
+
+        SetState(PlayerState.Lose);
+        Time.timeScale = 0f;
+        loseDisplay.gameObject.SetActive(true);
     }
 
     void ShowInWorldUiElements()
@@ -319,13 +393,35 @@ public class Player : MonoBehaviour
         launchDirectionPoint.SetActive(false);
     }
 
-    // TODO: change these to proper events
     public void PressedLaunch()
     {
         playerPressedLaunch = true;
     }
+
     public void PressedRetry()
     {
-        RetryLevel();
-    }    
+        EnterAiming(true);
+    }
+
+    public void SetQuickRetryEnabled(bool isEnabled)
+    {
+        quickRetryEnabled = isEnabled;
+        if (quickRetryToggle != null)
+            quickRetryToggle.SetIsOn(quickRetryEnabled);
+    }
+
+    public void SetQuickLaunchEnabled(bool isEnabled)
+    {
+        quickLaunchEnabled = isEnabled;
+        if (quickLaunchToggle != null)
+            quickLaunchToggle.SetIsOn(quickLaunchEnabled);
+    }
+
+    void SyncQuickPlayToggleButtons()
+    {
+        if (quickRetryToggle != null)
+            quickRetryToggle.SetIsOn(quickRetryEnabled);
+        if (quickLaunchToggle != null)
+            quickLaunchToggle.SetIsOn(quickLaunchEnabled);
+    }
 }
