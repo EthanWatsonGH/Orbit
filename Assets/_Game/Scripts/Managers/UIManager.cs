@@ -25,6 +25,20 @@ public class UIManager : MonoBehaviour
     }
     #endregion
 
+    void Start()
+    {
+        // HUD prefabs stay disabled by default so they do not clutter the editor.
+        // Apply the active world mode once the scene has finished enabling its objects.
+        WorldMode initialMode = GetActiveWorldMode();
+        if (initialMode == WorldMode.None)
+        {
+            HideWorldHud();
+            return;
+        }
+
+        ShowWorldModeUi(initialMode);
+    }
+
     enum WorldMode
     {
         None,
@@ -54,9 +68,6 @@ public class UIManager : MonoBehaviour
     bool uiRootWasActive;
     bool levelEditorHudWasActive;
     bool playerHudWasActive;
-    bool gameLevelSelectionMenuWasActive;
-    bool playerLevelSelectionMenuWasActive;
-    bool downloadedLevelSelectionMenuWasActive;
 
     public bool IsInControlBlockingMenu => activeMenu != null;
 
@@ -112,24 +123,15 @@ public class UIManager : MonoBehaviour
         uiRootWasActive = uiRoot != null && uiRoot.activeSelf;
         levelEditorHudWasActive = levelEditorHUD != null && levelEditorHUD.activeSelf;
         playerHudWasActive = playerHUD != null && playerHUD.activeSelf;
-        gameLevelSelectionMenuWasActive = gameLevelSelectionMenu != null && gameLevelSelectionMenu.gameObject.activeSelf;
-        playerLevelSelectionMenuWasActive = playerLevelSelectionMenu != null && playerLevelSelectionMenu.gameObject.activeSelf;
-        downloadedLevelSelectionMenuWasActive = downloadedLevelSelectionMenu != null && downloadedLevelSelectionMenu.gameObject.activeSelf;
 
-        // The HUDs and menus are still legacy canvases outside UIRoot. Hide them here until
-        // their migration is complete, then this can reduce to only toggling UIRoot.
+        // The level-selection menus now live below UIRoot. The two HUDs are still embedded
+        // in world prefabs, so hide them separately until their migration is complete.
         if (uiRoot != null)
             uiRoot.SetActive(false);
         if (levelEditorHUD != null)
             levelEditorHUD.SetActive(false);
         if (playerHUD != null)
             playerHUD.SetActive(false);
-        if (gameLevelSelectionMenu != null)
-            gameLevelSelectionMenu.gameObject.SetActive(false);
-        if (playerLevelSelectionMenu != null)
-            playerLevelSelectionMenu.gameObject.SetActive(false);
-        if (downloadedLevelSelectionMenu != null)
-            downloadedLevelSelectionMenu.gameObject.SetActive(false);
     }
 
     public void RestoreUiAfterPreviewCapture()
@@ -143,12 +145,6 @@ public class UIManager : MonoBehaviour
             levelEditorHUD.SetActive(levelEditorHudWasActive);
         if (playerHUD != null)
             playerHUD.SetActive(playerHudWasActive);
-        if (gameLevelSelectionMenu != null)
-            gameLevelSelectionMenu.gameObject.SetActive(gameLevelSelectionMenuWasActive);
-        if (playerLevelSelectionMenu != null)
-            playerLevelSelectionMenu.gameObject.SetActive(playerLevelSelectionMenuWasActive);
-        if (downloadedLevelSelectionMenu != null)
-            downloadedLevelSelectionMenu.gameObject.SetActive(downloadedLevelSelectionMenuWasActive);
 
         isUiHiddenForPreviewCapture = false;
     }

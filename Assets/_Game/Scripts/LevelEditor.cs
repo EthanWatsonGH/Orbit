@@ -8,10 +8,9 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
     [SerializeField] GameObject startLocationIcon;
-    [SerializeField] GameObject canvas;
     [SerializeField] GameObject localTransformButton;
     [SerializeField] GameObject worldTransformButton;
-    [SerializeField] GameObject closeObjectTransformControlsButton;
+    [SerializeField] GameObject deselectObjectButton;
     [SerializeField] GameObject snapVerticalButton;
     [SerializeField] GameObject snapHorizontalButton;
     [SerializeField] LineRenderer verticalLine;
@@ -96,7 +95,7 @@ public class LevelEditor : MonoBehaviour
         selectionControlsUI.Initialize(this);
 
         // ensure toggleable elements are at proper default show/hide
-        closeObjectTransformControlsButton.SetActive(false);
+        deselectObjectButton.SetActive(false);
         worldTransformButton.SetActive(true);
         localTransformButton.SetActive(false);
         snapVerticalButton.SetActive(false);
@@ -107,9 +106,6 @@ public class LevelEditor : MonoBehaviour
     {
         // ensure level editor object and all of its visuals are disabled before starting game
         gameObject.SetActive(false);
-
-        // ensure level editor UI is enabled
-        canvas.gameObject.SetActive(true);
 
         // setup increment dropdown listeners
         moveIncrementDropdown.onValueChanged.AddListener(OnMoveIncrementDropdownChanged);
@@ -513,7 +509,7 @@ public class LevelEditor : MonoBehaviour
         {
             Destroy(selectedObject);
             UnselectObject();
-            closeObjectTransformControlsButton.gameObject.SetActive(false);
+            deselectObjectButton.gameObject.SetActive(false);
         }
     }
 
@@ -651,7 +647,7 @@ public class LevelEditor : MonoBehaviour
         // lets its pointer handler still receive the matching drag and release events.
         selectionControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
         selectionControlsUI.SetControlsVisible(show);
-        closeObjectTransformControlsButton.SetActive(show);
+        deselectObjectButton.SetActive(show);
         snapVerticalButton.SetActive(show);
         snapHorizontalButton.SetActive(show);
     }
@@ -759,7 +755,7 @@ public class LevelEditor : MonoBehaviour
         LevelManager.Instance.LoadLevel();
     }
 
-    public void CloseObjectTransformControls()
+    public void DeselectObject()
     {
         UnselectObject();
     }

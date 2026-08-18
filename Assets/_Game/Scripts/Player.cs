@@ -18,7 +18,6 @@ public class Player : MonoBehaviour
     [SerializeField] TrailRenderer finishTrailRenderer;
     // self object references
     [SerializeField] GameObject launchDirectionPoint;
-    [SerializeField] GameObject canvas;
     [SerializeField] GameObject launchButton;
     [SerializeField] GameObject retryButton;
     // HUD
@@ -60,9 +59,6 @@ public class Player : MonoBehaviour
     void Start()
     {
         lr.positionCount = 2;
-
-        // ensure player UI is enabled
-        canvas.gameObject.SetActive(true);
 
         HideFinishTrailRenderer();
 
