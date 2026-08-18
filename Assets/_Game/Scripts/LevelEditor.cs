@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class LevelEditor : MonoBehaviour
@@ -11,7 +10,6 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject prefabToPlace;
     [SerializeField] GameObject player;
     [SerializeField] GameObject startLocationIcon;
-    [SerializeField] EventSystem es;
     [SerializeField] GameObject canvas;
     [SerializeField] GameObject localTransformButton;
     [SerializeField] GameObject worldTransformButton;
@@ -36,20 +34,10 @@ public class LevelEditor : MonoBehaviour
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
     bool isWorldTransform = true;
-    bool wasLastPointerDownOverUi = false;
-    bool wasLastPointerUpOverUi = false;
-    Vector3 pointerWorldPositionAtLastPointerDown;
 
     // object selection
     const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
-    Vector2 pointerScreenPositionAtLastPointerDown;
     bool hasSelectionDragExceededThreshold = false;
-    int primaryFingerId = -1;
-    Vector2 currentPointerScreenPosition;
-    bool pointerWasPressedThisFrame = false;
-    bool pointerIsHeld = false;
-    bool pointerWasReleasedThisFrame = false;
-    Vector2 pointerPositionAtStartSelect;
     GameObject selectionGroup;
 
     // object movement
@@ -94,6 +82,13 @@ public class LevelEditor : MonoBehaviour
 
     void Awake()
     {
+        if (PointerInput.Instance == null)
+        {
+            Debug.LogError("LevelEditor requires one PointerInput component in the scene.", this);
+            enabled = false;
+            return;
+        }
+
         // enable this for a frame to let the scaling initialize
         // TODO: change this to false once i change them to real buttons
         objectTransformControls.SetActive(true);
@@ -125,10 +120,6 @@ public class LevelEditor : MonoBehaviour
 
     void Update()
     {
-        UpdatePointerInput();
-        CheckPointerPositionAtLastPointerDown();
-        CheckIfLastPointerDownWasOverUi();
-        CheckIfLastPointerUpWasOverUi();
         UpdateBoxSelectIntentFromPointerDrag();
         HandlePlacePrefab();
         HandleSelectObject();
@@ -154,7 +145,7 @@ public class LevelEditor : MonoBehaviour
 
     string SanitizeSelectedValue(string selected)
     {
-        selected = selected.Replace("°", "");
+        selected = selected.Replace("Â°", "");
         if (selected.Length > 0 && (char.IsDigit(selected[0]) || selected[0] == '.'))
             selected = selected.Split(' ')[0];
         else
@@ -202,93 +193,27 @@ public class LevelEditor : MonoBehaviour
 
     #endregion
 
-    // A touch that begins an editor interaction remains its primary pointer until it ends or is canceled.
-    // This prevents a second touch from taking over the editor interaction mid-gesture.
-    void UpdatePointerInput()
-    {
-        pointerWasPressedThisFrame = false;
-        pointerWasReleasedThisFrame = false;
-
-        if (primaryFingerId != -1)
-        {
-            for (int i = 0; i < Input.touchCount; i++)
-            {
-                Touch touch = Input.GetTouch(i);
-                if (touch.fingerId == primaryFingerId)
-                {
-                    currentPointerScreenPosition = touch.position;
-                    pointerIsHeld = touch.phase != TouchPhase.Ended && touch.phase != TouchPhase.Canceled;
-
-                    if (!pointerIsHeld)
-                    {
-                        pointerWasReleasedThisFrame = true;
-                        primaryFingerId = -1;
-                    }
-
-                    return;
-                }
-            }
-
-            pointerIsHeld = false;
-            pointerWasReleasedThisFrame = true;
-            primaryFingerId = -1;
-            return;
-        }
-
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            Touch touch = Input.GetTouch(i);
-            if (touch.phase == TouchPhase.Began)
-            {
-                primaryFingerId = touch.fingerId;
-                currentPointerScreenPosition = touch.position;
-                pointerWasPressedThisFrame = true;
-                pointerIsHeld = true;
-                return;
-            }
-        }
-
-        if (Input.touchCount > 0)
-        {
-            pointerIsHeld = false;
-            return;
-        }
-
-        currentPointerScreenPosition = Input.mousePosition;
-        pointerWasPressedThisFrame = Input.GetMouseButtonDown(0);
-        pointerIsHeld = Input.GetMouseButton(0);
-        pointerWasReleasedThisFrame = Input.GetMouseButtonUp(0);
-    }
-
     Vector3 GetCurrentPointerWorldPosition()
     {
-        Vector2 currentPointerScreenPosition = GetCurrentPointerScreenPosition();
-        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(currentPointerScreenPosition);
+        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(PointerInput.Instance.ScreenPosition);
         // ensure no depth
         currentPointerWorldPosition.z = 0;
         return currentPointerWorldPosition;
     }
 
-    void CheckPointerPositionAtLastPointerDown()
-    {
-        if (pointerWasPressedThisFrame)
-        {
-            pointerWorldPositionAtLastPointerDown = GetCurrentPointerWorldPosition();
-            pointerScreenPositionAtLastPointerDown = GetCurrentPointerScreenPosition();
-            hasSelectionDragExceededThreshold = false;
-        }
-    }
-
     Vector2 GetCurrentPointerScreenPosition()
     {
-        return currentPointerScreenPosition;
+        return PointerInput.Instance.ScreenPosition;
     }
 
     void UpdateBoxSelectIntentFromPointerDrag()
     {
-        if (pointerIsHeld && !hasSelectionDragExceededThreshold)
+        if (PointerInput.Instance.WasPressedThisFrame)
+            hasSelectionDragExceededThreshold = false;
+
+        if (PointerInput.Instance.IsHeld && !hasSelectionDragExceededThreshold)
         {
-            float dragDistanceInPixels = Vector2.Distance(pointerScreenPositionAtLastPointerDown, GetCurrentPointerScreenPosition());
+            float dragDistanceInPixels = PointerInput.Instance.DragDistancePixels;
             if (dragDistanceInPixels >= MINIMUM_DRAG_DISTANCE_PIXELS)
             {
                 hasSelectionDragExceededThreshold = true;
@@ -311,7 +236,7 @@ public class LevelEditor : MonoBehaviour
                 objectCurrentlyTryingToPlace.SetActive(true);
 
             // stop following pointer and finish placing object
-            if (pointerWasReleasedThisFrame && isTryingToPlace)
+            if (PointerInput.Instance.WasReleasedThisFrame && isTryingToPlace)
             {
                 isTryingToPlace = false;
 
@@ -332,45 +257,15 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    void CheckIfLastPointerDownWasOverUi()
-    {
-        if (pointerWasPressedThisFrame)
-        {
-            // check if any UI elements were hit
-            PointerEventData data = new PointerEventData(EventSystem.current);
-            data.position = GetCurrentPointerScreenPosition();
-
-            List<RaycastResult> uiHits = new List<RaycastResult>();
-            EventSystem.current.RaycastAll(data, uiHits);
-
-            wasLastPointerDownOverUi = uiHits.Count > 1;
-        }
-    }
-
-    void CheckIfLastPointerUpWasOverUi()
-    {
-        if (pointerWasReleasedThisFrame)
-        {
-            // check if any UI elements were hit
-            PointerEventData data = new PointerEventData(EventSystem.current);
-            data.position = GetCurrentPointerScreenPosition();
-
-            List<RaycastResult> uiHits = new List<RaycastResult>();
-            EventSystem.current.RaycastAll(data, uiHits);
-
-            wasLastPointerUpOverUi = uiHits.Count > 1;
-        }
-    }
-
     void HandleSelectObject()
     {
         // set the object the player clicks as selected if it's allowed to be selected
-        if (pointerWasReleasedThisFrame && !UIManager.Instance.IsInControlBlockingMenu)
+        if (PointerInput.Instance.WasReleasedThisFrame && !UIManager.Instance.IsInControlBlockingMenu)
         {
             bool shouldDoBoxSelect = hasSelectionDragExceededThreshold;
             hasSelectionDragExceededThreshold = false;
 
-            if (wasLastPointerUpOverUi) // click was on a UI element, so don't try to change selected object
+            if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null && lastHitMoveControl.name == "Duplicate")
@@ -402,7 +297,7 @@ public class LevelEditor : MonoBehaviour
                 else // no object hit
                 {
                     // TODO: circle-collision fallback selection flow should be initiated here.
-                    if (!wasLastPointerDownOverUi) // if player clicks just the background, unselect object
+                    if (!PointerInput.Instance.WasPressedOverUi) // if player clicks just the background, unselect object
                     {
                         UnselectObject();
                     }
@@ -480,7 +375,7 @@ public class LevelEditor : MonoBehaviour
     void HandleMoveSelectedObject()
     {
         // start trying to move selected object when the player presses on move control
-        if (pointerWasPressedThisFrame && !wasLastPointerDownOverUi)
+        if (PointerInput.Instance.WasPressedThisFrame && !PointerInput.Instance.WasPressedOverUi)
         {
             Ray ray = Camera.main.ScreenPointToRay(GetCurrentPointerScreenPosition());
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -521,7 +416,7 @@ public class LevelEditor : MonoBehaviour
 
         // stop trying to move selected object when player releases
         // TODO: handle if they pause or exit edit mode while moving object, if that's still an issue later
-        if (pointerWasReleasedThisFrame && isTryingToMoveSelectedObject)
+        if (PointerInput.Instance.WasReleasedThisFrame && isTryingToMoveSelectedObject)
         {
             verticalLine.gameObject.SetActive(false);
             horizontalLine.gameObject.SetActive(false);
@@ -538,14 +433,14 @@ public class LevelEditor : MonoBehaviour
             }
         }
 
-        if (pointerIsHeld && selectedObject != null)
+        if (PointerInput.Instance.IsHeld && selectedObject != null)
         {
             if (isTryingToMoveSelectedObject && lastHitMoveControl != null)
             {
                 Vector3 pointerWorldPosition = GetCurrentPointerWorldPosition();
 
                 // Keep a clicked Duplicate clone in place until the pointer moves beyond the shared drag threshold.
-                float dragDistanceInPixels = Vector2.Distance(pointerScreenPositionAtLastPointerDown, GetCurrentPointerScreenPosition());
+                float dragDistanceInPixels = PointerInput.Instance.DragDistancePixels;
                 if (lastHitMoveControl.name == "Duplicate" && dragDistanceInPixels < MINIMUM_DRAG_DISTANCE_PIXELS)
                     selectedObject.transform.position = selectedObjectPositionAtStartMove;
                 else
@@ -598,7 +493,7 @@ public class LevelEditor : MonoBehaviour
 
     void HandleRotateSelectedObject()
     {
-        if (pointerWasPressedThisFrame && !wasLastPointerDownOverUi) // start rotate
+        if (PointerInput.Instance.WasPressedThisFrame && !PointerInput.Instance.WasPressedOverUi) // start rotate
         {
             Ray ray = Camera.main.ScreenPointToRay(GetCurrentPointerScreenPosition());
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -628,7 +523,7 @@ public class LevelEditor : MonoBehaviour
             }
         }
 
-        if (pointerWasReleasedThisFrame && isTryingToRotateSelectedObject) // end rotate
+        if (PointerInput.Instance.WasReleasedThisFrame && isTryingToRotateSelectedObject) // end rotate
         {
             rotationLine.gameObject.SetActive(false);
 
@@ -669,7 +564,7 @@ public class LevelEditor : MonoBehaviour
 
     void HandleScaleSelectedObject()
     {
-        if (pointerWasPressedThisFrame && !wasLastPointerDownOverUi) // start scale
+        if (PointerInput.Instance.WasPressedThisFrame && !PointerInput.Instance.WasPressedOverUi) // start scale
         {
             Ray ray = Camera.main.ScreenPointToRay(GetCurrentPointerScreenPosition());
             RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
@@ -689,7 +584,7 @@ public class LevelEditor : MonoBehaviour
                 }
             }
         }
-        if (pointerWasReleasedThisFrame && isTryingToScaleSelectedObject) // end scale
+        if (PointerInput.Instance.WasReleasedThisFrame && isTryingToScaleSelectedObject) // end scale
         {
             isTryingToScaleSelectedObject = false;
 

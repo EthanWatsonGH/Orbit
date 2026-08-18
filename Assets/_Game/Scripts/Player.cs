@@ -38,6 +38,9 @@ public class Player : MonoBehaviour
     [SerializeField] bool quickLaunchEnabled;
     [SerializeField] ToggleButton quickRetryToggle;
     [SerializeField] ToggleButton quickLaunchToggle;
+    [Header("Quick Retry Swipe")]
+    [SerializeField, Min(0f)] float quickRetrySwipeMinimumDistancePixels = 150f;
+    [SerializeField, Min(0f)] float quickRetrySwipeMaximumDurationSeconds = 0.35f;
 
     float timeAtLastLaunch;
     PlayerState state = PlayerState.Aiming;
@@ -73,6 +76,16 @@ public class Player : MonoBehaviour
     {
         if (UIManager.Instance.IsInControlBlockingMenu)
             return;
+
+        if (WasQuickSwipeGesturePerformed())
+        {
+            if (state == PlayerState.Aiming)
+                Launch();
+            else
+                EnterAiming(true);
+
+            return;
+        }
 
         switch (state)
         {
@@ -164,6 +177,21 @@ public class Player : MonoBehaviour
         return Input.GetButtonDown("Jump") || Input.GetMouseButtonDown(3) || Input.GetMouseButtonDown(4);
     }
 
+    bool WasQuickSwipeGesturePerformed()
+    {
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput == null)
+            return false;
+
+        return pointerInput.WasReleasedThisFrame
+            && !pointerInput.WasCanceledThisFrame
+            && !pointerInput.HadMultiplePointersDuringCurrentGesture
+            && !pointerInput.WasPressedOverSelectableUi
+            && !pointerInput.WasReleasedOverSelectableUi
+            && pointerInput.PointerDurationSeconds <= quickRetrySwipeMaximumDurationSeconds
+            && pointerInput.DragDistancePixels >= quickRetrySwipeMinimumDistancePixels;
+    }
+
     void Launch()
     {
         if (state != PlayerState.Aiming)
@@ -190,53 +218,36 @@ public class Player : MonoBehaviour
 
     void HandleMoveLaunchDirectionPoint()
     {
-        bool IsTouchOverLaunchDirectionPoint(Touch touch) // touchscreen
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput == null)
+            return;
+
+        bool IsPointerOverLaunchDirectionPoint()
         {
-            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(touch.position), Vector2.zero);
+            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(pointerInput.ScreenPosition), Vector2.zero);
             if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
             {
-                offsetAtStartMoveLaunchDirectionPoint = launchDirectionPoint.transform.position - Camera.main.ScreenToWorldPoint(touch.position);
+                offsetAtStartMoveLaunchDirectionPoint = launchDirectionPoint.transform.position - Camera.main.ScreenToWorldPoint(pointerInput.ScreenPosition);
                 return true;
             }
-            else
-                return false;
+
+            return false;
         }
 
-        bool IsMouseOverLaunchDirectionPoint() // desktop
-        {
-            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
-            if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
-            {
-                offsetAtStartMoveLaunchDirectionPoint = launchDirectionPoint.transform.position - Camera.main.ScreenToWorldPoint(Input.mousePosition);
-                return true;
-            }
-            else
-                return false;
-        }
-
-        // check if a touch/click just began over launchDirectionPoint
-        if ((Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Began && IsTouchOverLaunchDirectionPoint(Input.GetTouch(0))) // touchscreen
-            || (Input.GetMouseButtonDown(0) && IsMouseOverLaunchDirectionPoint())) // desktop
+        // Check if the shared primary pointer began over launchDirectionPoint.
+        if (pointerInput.WasPressedThisFrame && IsPointerOverLaunchDirectionPoint())
             canMoveLaunchDirectionPoint = true;
 
-        // when touch ends, reset ability to move start launch point
-        if (Input.touchCount == 0 && !Input.GetMouseButton(0))
+        if (!pointerInput.IsHeld)
             canMoveLaunchDirectionPoint = false;
 
-        // set launchDirectionPoint location to pointer position
         if (canMoveLaunchDirectionPoint)
         {
-            if (Input.touchCount == 1) // touchscreen
-                launchDirectionPoint.transform.position = 
-                    new Vector3(Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position).x + offsetAtStartMoveLaunchDirectionPoint.x,
-                    Camera.main.ScreenToWorldPoint(Input.GetTouch(0).position).y + offsetAtStartMoveLaunchDirectionPoint.y, 
-                    launchDirectionPoint.transform.position.z);
-
-            if (Input.GetMouseButton(0)) // desktop
-                launchDirectionPoint.transform.position = 
-                    new Vector3(Camera.main.ScreenToWorldPoint(Input.mousePosition).x + offsetAtStartMoveLaunchDirectionPoint.x,
-                    Camera.main.ScreenToWorldPoint(Input.mousePosition).y + offsetAtStartMoveLaunchDirectionPoint.y,
-                    launchDirectionPoint.transform.position.z);
+            Vector3 pointerWorldPosition = Camera.main.ScreenToWorldPoint(pointerInput.ScreenPosition);
+            launchDirectionPoint.transform.position =
+                new Vector3(pointerWorldPosition.x + offsetAtStartMoveLaunchDirectionPoint.x,
+                pointerWorldPosition.y + offsetAtStartMoveLaunchDirectionPoint.y,
+                launchDirectionPoint.transform.position.z);
         }
     }
 
@@ -325,8 +336,8 @@ public class Player : MonoBehaviour
     void OnTriggerStay2D(Collider2D collision)
     {
         // pull area
-        // TODO: subtract 1 touch for each one over a UI element, and then check if its still == 1 touch count
-        if ((Input.GetMouseButton(0) || Input.touchCount == 1) && state == PlayerState.Playing)
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput != null && pointerInput.IsSinglePointerHeld && state == PlayerState.Playing)
         {
             if (collision.gameObject.CompareTag("Pull"))
             {
