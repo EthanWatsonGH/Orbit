@@ -90,7 +90,6 @@ public class LevelManager : MonoBehaviour
     [SerializeField] GameObject playerStartPoint;
     [SerializeField] TMP_InputField levelSaveNameInput;
     [SerializeField] TMP_InputField levelLoadNameInput;
-    [SerializeField] GameObject objectTransformControls;
     [SerializeField] TMP_InputField levelCodeToCopyInput;
     [SerializeField] TMP_InputField levelCodeInput;
 
@@ -198,12 +197,7 @@ public class LevelManager : MonoBehaviour
 
     IEnumerator CaptureLevelPreview(Action<byte[]> onComplete)
     {
-        // hide level editor UI while taking screenshot
-        GameObject levelEditorCanvas = GameObject.Find("LevelEditor").transform.Find("Canvas").gameObject;
-        bool wasLevelEditorCanvasActive = levelEditorCanvas.activeSelf;
-        bool wereObjectTransformControlsActive = objectTransformControls.activeSelf;
-        levelEditorCanvas.SetActive(false);
-        objectTransformControls.SetActive(false);
+        UIManager.Instance.HideUiForPreviewCapture();
 
         // wait until the end of the frame before taking the screenshot since the UI is actually hidden at the end of the frame
         yield return new WaitForEndOfFrame();
@@ -212,9 +206,7 @@ public class LevelManager : MonoBehaviour
         byte[] previewImageBytes = screenshot.EncodeToPNG();
         Destroy(screenshot);
 
-        // unhide level editor UI
-        levelEditorCanvas.SetActive(wasLevelEditorCanvasActive);
-        objectTransformControls.SetActive(wereObjectTransformControlsActive);
+        UIManager.Instance.RestoreUiAfterPreviewCapture();
 
         onComplete?.Invoke(previewImageBytes);
     }

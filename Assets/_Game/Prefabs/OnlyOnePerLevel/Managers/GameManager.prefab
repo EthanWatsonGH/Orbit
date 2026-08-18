@@ -45,7 +45,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   UIScale: 2.25
-  ObjectTransformControlsOffsetMultiplier: 1.25
   DefaultCameraZoom: 10
   MaxCameraZoom: 1000
   MinCameraZoom: 1

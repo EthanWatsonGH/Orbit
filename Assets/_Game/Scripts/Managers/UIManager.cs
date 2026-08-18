@@ -36,6 +36,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] GameObject playerModeRoot;
     [SerializeField] GameObject levelEditorModeRoot;
 
+    [Header("Persistent UI")]
+    [SerializeField] GameObject uiRoot;
+
     [Header("World HUD")]
     [SerializeField] GameObject levelEditorHUD;
     [SerializeField] GameObject playerHUD;
@@ -47,6 +50,13 @@ public class UIManager : MonoBehaviour
 
     LevelSelectionMenu activeMenu;
     WorldMode menuReturnMode;
+    bool isUiHiddenForPreviewCapture;
+    bool uiRootWasActive;
+    bool levelEditorHudWasActive;
+    bool playerHudWasActive;
+    bool gameLevelSelectionMenuWasActive;
+    bool playerLevelSelectionMenuWasActive;
+    bool downloadedLevelSelectionMenuWasActive;
 
     public bool IsInControlBlockingMenu => activeMenu != null;
 
@@ -91,6 +101,56 @@ public class UIManager : MonoBehaviour
         HideWorldHud();
         EventManager.Instance.UnselectObject();
         EventManager.Instance.HidePlayerInWorldUiElements();
+    }
+
+    public void HideUiForPreviewCapture()
+    {
+        if (isUiHiddenForPreviewCapture)
+            return;
+
+        isUiHiddenForPreviewCapture = true;
+        uiRootWasActive = uiRoot != null && uiRoot.activeSelf;
+        levelEditorHudWasActive = levelEditorHUD != null && levelEditorHUD.activeSelf;
+        playerHudWasActive = playerHUD != null && playerHUD.activeSelf;
+        gameLevelSelectionMenuWasActive = gameLevelSelectionMenu != null && gameLevelSelectionMenu.gameObject.activeSelf;
+        playerLevelSelectionMenuWasActive = playerLevelSelectionMenu != null && playerLevelSelectionMenu.gameObject.activeSelf;
+        downloadedLevelSelectionMenuWasActive = downloadedLevelSelectionMenu != null && downloadedLevelSelectionMenu.gameObject.activeSelf;
+
+        // The HUDs and menus are still legacy canvases outside UIRoot. Hide them here until
+        // their migration is complete, then this can reduce to only toggling UIRoot.
+        if (uiRoot != null)
+            uiRoot.SetActive(false);
+        if (levelEditorHUD != null)
+            levelEditorHUD.SetActive(false);
+        if (playerHUD != null)
+            playerHUD.SetActive(false);
+        if (gameLevelSelectionMenu != null)
+            gameLevelSelectionMenu.gameObject.SetActive(false);
+        if (playerLevelSelectionMenu != null)
+            playerLevelSelectionMenu.gameObject.SetActive(false);
+        if (downloadedLevelSelectionMenu != null)
+            downloadedLevelSelectionMenu.gameObject.SetActive(false);
+    }
+
+    public void RestoreUiAfterPreviewCapture()
+    {
+        if (!isUiHiddenForPreviewCapture)
+            return;
+
+        if (uiRoot != null)
+            uiRoot.SetActive(uiRootWasActive);
+        if (levelEditorHUD != null)
+            levelEditorHUD.SetActive(levelEditorHudWasActive);
+        if (playerHUD != null)
+            playerHUD.SetActive(playerHudWasActive);
+        if (gameLevelSelectionMenu != null)
+            gameLevelSelectionMenu.gameObject.SetActive(gameLevelSelectionMenuWasActive);
+        if (playerLevelSelectionMenu != null)
+            playerLevelSelectionMenu.gameObject.SetActive(playerLevelSelectionMenuWasActive);
+        if (downloadedLevelSelectionMenu != null)
+            downloadedLevelSelectionMenu.gameObject.SetActive(downloadedLevelSelectionMenuWasActive);
+
+        isUiHiddenForPreviewCapture = false;
     }
 
     void ShowLevelSelectionMenu(LevelSource source)

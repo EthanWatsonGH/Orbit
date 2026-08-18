@@ -2212,7 +2212,6 @@ MonoBehaviour:
   rotateIncrementDropdown: {fileID: 1237844570846840629}
   moveIncrementDropdown: {fileID: 8220399901892147502}
   levelObjectsCollection: {fileID: 0}
-  objectTransformControls: {fileID: 0}
 --- !u!1 &1816768705775173672
 GameObject:
   m_ObjectHideFlags: 0
