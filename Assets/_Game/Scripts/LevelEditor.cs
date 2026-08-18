@@ -27,6 +27,9 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject levelObjectsCollection;
     [SerializeField] GameObject objectTransformControls;
 
+    [Header("Screen Space UI")]
+    [SerializeField] SelectionControlsUI selectionControlsUI;
+
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
     bool pointerIsOverObjectSelectionBar = false;
@@ -66,6 +69,9 @@ public class LevelEditor : MonoBehaviour
     float selectedObjectYScaleAtStartScale;
     float scaleIncrement = 0f;
 
+    ObjectTransformControl activeMoveControl;
+    ObjectTransformControl activeScaleControl;
+
     // TODO: if i turn the in world buttons into UI buttons i won't need this
     readonly List<string> UNSELECTABLE_OBJECTS = new List<string> 
     {
@@ -88,9 +94,29 @@ public class LevelEditor : MonoBehaviour
             return;
         }
 
-        // enable this for a frame to let the scaling initialize
-        // TODO: change this to false once i change them to real buttons
-        objectTransformControls.SetActive(true);
+        if (selectionControlsUI == null)
+        {
+            SelectionControlsUI[] availableControls = FindObjectsByType<SelectionControlsUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (availableControls.Length == 1)
+                selectionControlsUI = availableControls[0];
+            else if (availableControls.Length > 1)
+                Debug.LogError("LevelEditor found more than one SelectionControlsUI. Assign the intended controls in the inspector.", this);
+        }
+
+        if (selectionControlsUI != null)
+        {
+            selectionControlsUI.Initialize(this);
+
+            // The old physics-based controls remain as a project fallback, but the UI version
+            // owns input whenever it has been assigned in the scene.
+            if (objectTransformControls != null)
+                objectTransformControls.SetActive(false);
+        }
+        else if (objectTransformControls != null)
+        {
+            // Legacy fallback: enable for one frame so its world-space scaling can initialize.
+            objectTransformControls.SetActive(true);
+        }
 
         // ensure toggleable elements are at proper default show/hide
         closeObjectTransformControlsButton.SetActive(false);
@@ -109,7 +135,8 @@ public class LevelEditor : MonoBehaviour
         // ensure level editor UI is enabled
         canvas.gameObject.SetActive(true);
 
-        objectTransformControls.SetActive(false);
+        if (objectTransformControls != null)
+            objectTransformControls.SetActive(false);
 
         // setup increment dropdown listeners
         moveIncrementDropdown.onValueChanged.AddListener(OnMoveIncrementDropdownChanged);
@@ -125,6 +152,7 @@ public class LevelEditor : MonoBehaviour
         HandleScaleSelectedObject();
         HandleRotateSelectedObject();
         HandleMoveSelectedObject();
+        UpdateActiveScreenSpaceTransformControl();
         HandleShowObjectTransformControls();
     }
 
@@ -192,12 +220,19 @@ public class LevelEditor : MonoBehaviour
 
     #endregion
 
-    Vector3 GetCurrentPointerWorldPosition()
+    bool UsesScreenSpaceControls => selectionControlsUI != null;
+
+    Vector3 GetPointerWorldPosition(Vector2 screenPosition)
     {
-        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(PointerInput.Instance.ScreenPosition);
+        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(screenPosition);
         // ensure no depth
         currentPointerWorldPosition.z = 0;
         return currentPointerWorldPosition;
+    }
+
+    Vector3 GetCurrentPointerWorldPosition()
+    {
+        return GetPointerWorldPosition(PointerInput.Instance.ScreenPosition);
     }
 
     Vector2 GetCurrentPointerScreenPosition()
@@ -305,7 +340,7 @@ public class LevelEditor : MonoBehaviour
             }
         }
 
-        if (selectedObject != null)
+        if (!UsesScreenSpaceControls && selectedObject != null)
         {
             objectTransformControls.transform.position = new Vector3(selectedObject.transform.position.x, selectedObject.transform.position.y, objectTransformControls.transform.position.z);
         }
@@ -316,6 +351,9 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject != null)
             lastSelectedObject = selectedObject;
         selectedObject = objectToSelect;
+
+        if (selectionControlsUI != null)
+            selectionControlsUI.SetSelectedTransform(selectedObject.transform);
     }
 
     void UnselectObject()
@@ -323,10 +361,19 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject != null)
             lastSelectedObject = selectedObject;
         selectedObject = null;
+
+        if (selectionControlsUI != null)
+        {
+            selectionControlsUI.SetSelectedTransform(null);
+            selectionControlsUI.SetVisible(false);
+        }
     }
 
     void AlignScaleControlsWithSelectedObject()
     {
+        if (UsesScreenSpaceControls)
+            return;
+
         if (selectedObject != null)
         {
             objectTransformControls.transform.Find("Scale Both").transform.localRotation = selectedObject.transform.localRotation;
@@ -343,6 +390,17 @@ public class LevelEditor : MonoBehaviour
             bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
             bool isPuller = selectedObject.name.Contains("Puller");
             bool isKillCircle = selectedObject.name.Contains("KillCircle");
+
+            if (selectionControlsUI != null)
+            {
+                selectionControlsUI.SetControlAvailability(
+                    !isPlayerStartPoint,
+                    !isPlayerStartPoint,
+                    !isPlayerStartPoint && !isPuller && !isKillCircle,
+                    !isPlayerStartPoint && !isPuller && !isKillCircle,
+                    !isPlayerStartPoint && !isPuller && !isKillCircle);
+                return;
+            }
 
             objectTransformControls.transform.Find("Duplicate").gameObject.SetActive(!isPlayerStartPoint);
             objectTransformControls.transform.Find("Scale Both").gameObject.SetActive(!isPlayerStartPoint);
@@ -371,8 +429,294 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    // These are called by the screen-space selection controls. Keeping the transform work here
+    // means both the controls and the editor continue to have one owner for object edits.
+    public void BeginObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition)
+    {
+        if (selectedObject == null || isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject)
+            return;
+
+        switch (control)
+        {
+            case ObjectTransformControl.MoveBoth:
+            case ObjectTransformControl.MoveX:
+            case ObjectTransformControl.MoveY:
+            case ObjectTransformControl.Duplicate:
+                BeginMoveSelectedObject(control, screenPosition);
+                break;
+            case ObjectTransformControl.Rotate:
+                BeginRotateSelectedObject(screenPosition);
+                break;
+            case ObjectTransformControl.ScaleBoth:
+            case ObjectTransformControl.ScaleX:
+            case ObjectTransformControl.ScaleY:
+                BeginScaleSelectedObject(control, screenPosition);
+                break;
+        }
+    }
+
+    public void UpdateObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition, float dragDistancePixels)
+    {
+        if (control == activeMoveControl && isTryingToMoveSelectedObject)
+            UpdateMoveSelectedObject(screenPosition, dragDistancePixels);
+        else if (control == ObjectTransformControl.Rotate && isTryingToRotateSelectedObject)
+            UpdateRotateSelectedObject(screenPosition);
+        else if (control == activeScaleControl && isTryingToScaleSelectedObject)
+            UpdateScaleSelectedObject(screenPosition);
+    }
+
+    public void EndObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition, float dragDistancePixels)
+    {
+        if (control == activeMoveControl && isTryingToMoveSelectedObject)
+            EndMoveSelectedObject();
+        else if (control == ObjectTransformControl.Rotate && isTryingToRotateSelectedObject)
+            EndRotateSelectedObject();
+        else if (control == activeScaleControl && isTryingToScaleSelectedObject)
+            EndScaleSelectedObject();
+    }
+
+    void UpdateActiveScreenSpaceTransformControl()
+    {
+        if (!UsesScreenSpaceControls || !PointerInput.Instance.IsHeld)
+            return;
+
+        // UI drag events only fire when the pointer itself moves. Re-evaluate from the shared
+        // screen position every frame so camera zoom/pan also updates the object's world position.
+        Vector2 screenPosition = PointerInput.Instance.ScreenPosition;
+
+        if (isTryingToMoveSelectedObject)
+            UpdateMoveSelectedObject(screenPosition, PointerInput.Instance.DragDistancePixels);
+        else if (isTryingToRotateSelectedObject)
+            UpdateRotateSelectedObject(screenPosition);
+        else if (isTryingToScaleSelectedObject)
+            UpdateScaleSelectedObject(screenPosition);
+    }
+
+    void BeginMoveSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
+    {
+        if (control == ObjectTransformControl.Duplicate)
+        {
+            SelectObject(Instantiate(selectedObject, levelObjectsCollection.transform));
+            selectedObject.transform.name = selectedObject.transform.name.Replace("(Clone)", "");
+            SetWhichObjectTransformControlsToShow();
+            SetMinimumScale();
+        }
+
+        isTryingToMoveSelectedObject = true;
+        activeMoveControl = control;
+        selectedObjectPositionAtStartMove = selectedObject.transform.position;
+        pointerPositionAtStartMove = GetPointerWorldPosition(screenPosition);
+
+        if (isWorldTransform)
+        {
+            moveIncrementOffset = Vector3.zero;
+        }
+        else
+        {
+            moveIncrementOffset = new Vector3(
+                selectedObjectPositionAtStartMove.x - RoundToIncrement(selectedObjectPositionAtStartMove.x, moveIncrement),
+                selectedObjectPositionAtStartMove.y - RoundToIncrement(selectedObjectPositionAtStartMove.y, moveIncrement),
+                0f);
+        }
+
+        moveOffset = selectedObject.transform.position - pointerPositionAtStartMove;
+    }
+
+    void UpdateMoveSelectedObject(Vector2 screenPosition, float dragDistancePixels)
+    {
+        if (selectedObject == null)
+            return;
+
+        Vector3 pointerWorldPosition = GetPointerWorldPosition(screenPosition);
+
+        // A quick click duplicates in place. It starts moving only after the same threshold the
+        // legacy world-space control used, so the two control systems feel the same.
+        if (activeMoveControl == ObjectTransformControl.Duplicate && dragDistancePixels < MINIMUM_DRAG_DISTANCE_PIXELS)
+        {
+            selectedObject.transform.position = selectedObjectPositionAtStartMove;
+        }
+        else
+        {
+            float newX = RoundToIncrement(pointerWorldPosition.x + moveOffset.x, moveIncrement) + moveIncrementOffset.x;
+            float newY = RoundToIncrement(pointerWorldPosition.y + moveOffset.y, moveIncrement) + moveIncrementOffset.y;
+            selectedObject.transform.position = new Vector3(newX, newY, 0f);
+        }
+
+        if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+            selectedObject.SetActive(false);
+        else
+            selectedObject.SetActive(true);
+
+        if (activeMoveControl == ObjectTransformControl.MoveX)
+        {
+            float newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement) + moveIncrementOffset.x;
+            selectedObject.transform.position = new Vector3(newX, selectedObjectPositionAtStartMove.y, 0f);
+
+            horizontalLine.gameObject.SetActive(true);
+            horizontalLine.transform.position = selectedObject.transform.position;
+            horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 9999f, horizontalLine.transform.position.y, 0f));
+            horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 9999f, horizontalLine.transform.position.y, 0f));
+        }
+
+        if (activeMoveControl == ObjectTransformControl.MoveY)
+        {
+            float newY = RoundToIncrement(selectedObject.transform.position.y, moveIncrement) + moveIncrementOffset.y;
+            selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, newY, 0f);
+
+            verticalLine.gameObject.SetActive(true);
+            verticalLine.transform.position = selectedObject.transform.position;
+            verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 9999f, 0f));
+            verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 9999f, 0f));
+        }
+    }
+
+    void EndMoveSelectedObject()
+    {
+        verticalLine.gameObject.SetActive(false);
+        horizontalLine.gameObject.SetActive(false);
+
+        isTryingToMoveSelectedObject = false;
+
+        if (selectedObject != null && pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+        {
+            Destroy(selectedObject);
+            UnselectObject();
+            closeObjectTransformControlsButton.gameObject.SetActive(false);
+        }
+    }
+
+    void BeginRotateSelectedObject(Vector2 screenPosition)
+    {
+        rotationLine.gameObject.SetActive(true);
+        rotationLine.SetPosition(0, selectedObject.transform.position);
+
+        isTryingToRotateSelectedObject = true;
+        selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
+        Vector3 direction = GetPointerWorldPosition(screenPosition) - selectedObject.transform.position;
+        angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+
+        rotationIncrementOffset = isWorldTransform
+            ? 0f
+            : selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
+    }
+
+    void UpdateRotateSelectedObject(Vector2 screenPosition)
+    {
+        if (selectedObject == null)
+            return;
+
+        Vector3 pointerWorldPosition = GetPointerWorldPosition(screenPosition);
+        Vector3 direction = pointerWorldPosition - selectedObject.transform.position;
+        float currentAngleToPointer = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        float deltaAngle = currentAngleToPointer - angleToPointerAtStartRotate;
+        float newRotation = RoundToIncrement(selectedObjectRotationAtStartRotate + deltaAngle, rotateIncrement);
+
+        if (!isWorldTransform)
+            newRotation += rotationIncrementOffset;
+
+        selectedObject.transform.localRotation = Quaternion.Euler(0f, 0f, newRotation);
+        rotationLine.SetPosition(1, pointerWorldPosition);
+    }
+
+    void EndRotateSelectedObject()
+    {
+        rotationLine.gameObject.SetActive(false);
+        isTryingToRotateSelectedObject = false;
+        AlignScaleControlsWithSelectedObject();
+    }
+
+    void BeginScaleSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
+    {
+        isTryingToScaleSelectedObject = true;
+        activeScaleControl = control;
+        pointerPositionAtStartScale = GetPointerWorldPosition(screenPosition);
+        selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
+        selectedObjectXScaleAtStartScale = selectedObject.transform.localScale.x;
+        selectedObjectYScaleAtStartScale = selectedObject.transform.localScale.y;
+    }
+
+    void UpdateScaleSelectedObject(Vector2 screenPosition)
+    {
+        if (selectedObject == null)
+            return;
+
+        Vector3 newScale = selectedObject.transform.localScale;
+        Vector3 pointerWorldPosition = GetPointerWorldPosition(screenPosition);
+        float pointerScaleDeltaX = pointerPositionAtStartScale.x - pointerWorldPosition.x;
+        float pointerScaleDeltaY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
+
+        switch (activeScaleControl)
+        {
+            case ObjectTransformControl.ScaleBoth:
+                Vector3 scaleReferencePoint = pointerPositionAtStartScale + selectedObject.transform.right * 9999f;
+                float distanceToReferenceAtStartScale = Vector3.Distance(pointerPositionAtStartScale, scaleReferencePoint);
+                float scaleDelta = (Vector3.Distance(pointerWorldPosition, scaleReferencePoint) - distanceToReferenceAtStartScale) * 2f;
+                float xScaleMultiplier = scaleDelta / selectedObjectXScaleAtStartScale;
+                float yScaleMultiplier = scaleDelta / selectedObjectYScaleAtStartScale;
+                float parentXScale = selectedObject.transform.parent.localScale.x;
+                float parentYScale = selectedObject.transform.parent.localScale.y;
+
+                if (selectedObjectXScaleAtStartScale > selectedObjectYScaleAtStartScale)
+                {
+                    float xAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.x / selectedObjectXScaleAtStartScale;
+                    newScale = new Vector3(
+                        Mathf.Clamp((1 + xScaleMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
+                        Mathf.Clamp(selectedObjectYScaleAtStartScale * xAxisScaleDifferenceSinceStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
+                        1f);
+                }
+                else if (selectedObjectYScaleAtStartScale > selectedObjectXScaleAtStartScale)
+                {
+                    float yAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.y / selectedObjectYScaleAtStartScale;
+                    newScale = new Vector3(
+                        Mathf.Clamp(selectedObjectXScaleAtStartScale * yAxisScaleDifferenceSinceStartScale, minimumScale * parentXScale, maximumScale * parentXScale),
+                        Mathf.Clamp((1 + yScaleMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
+                        1f);
+                }
+                else
+                {
+                    newScale = new Vector3(
+                        Mathf.Clamp((1 + xScaleMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
+                        Mathf.Clamp((1 + yScaleMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
+                        1f);
+                }
+                break;
+
+            case ObjectTransformControl.ScaleX:
+                horizontalLine.gameObject.SetActive(true);
+                horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 9999f);
+                horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 9999f);
+                newScale = new Vector3(
+                    Mathf.Clamp(pointerScaleDeltaX * 2f + selectedObjectScaleAtStartScale.x, minimumScale, maximumScale),
+                    selectedObjectScaleAtStartScale.y,
+                    1f);
+                break;
+
+            case ObjectTransformControl.ScaleY:
+                verticalLine.gameObject.SetActive(true);
+                verticalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.up * 9999f);
+                verticalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.up * 9999f);
+                newScale = new Vector3(
+                    selectedObjectScaleAtStartScale.x,
+                    Mathf.Clamp(pointerScaleDeltaY * 2f + selectedObjectScaleAtStartScale.y, minimumScale, maximumScale),
+                    1f);
+                break;
+        }
+
+        selectedObject.transform.localScale = newScale;
+    }
+
+    void EndScaleSelectedObject()
+    {
+        isTryingToScaleSelectedObject = false;
+        horizontalLine.gameObject.SetActive(false);
+        verticalLine.gameObject.SetActive(false);
+    }
+
     void HandleMoveSelectedObject()
     {
+        if (UsesScreenSpaceControls)
+            return;
+
         // start trying to move selected object when the player presses on move control
         if (PointerInput.Instance.WasPressedThisFrame && !PointerInput.Instance.WasPressedOverUi)
         {
@@ -492,6 +836,9 @@ public class LevelEditor : MonoBehaviour
 
     void HandleRotateSelectedObject()
     {
+        if (UsesScreenSpaceControls)
+            return;
+
         if (PointerInput.Instance.WasPressedThisFrame && !PointerInput.Instance.WasPressedOverUi) // start rotate
         {
             Ray ray = Camera.main.ScreenPointToRay(GetCurrentPointerScreenPosition());
@@ -563,6 +910,9 @@ public class LevelEditor : MonoBehaviour
 
     void HandleScaleSelectedObject()
     {
+        if (UsesScreenSpaceControls)
+            return;
+
         if (PointerInput.Instance.WasPressedThisFrame && !PointerInput.Instance.WasPressedOverUi) // start scale
         {
             Ray ray = Camera.main.ScreenPointToRay(GetCurrentPointerScreenPosition());
@@ -682,7 +1032,18 @@ public class LevelEditor : MonoBehaviour
     void HandleShowObjectTransformControls()
     {
         bool show = selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject || isTryingToPlace);
-        objectTransformControls.SetActive(show);
+        if (selectionControlsUI != null)
+        {
+            selectionControlsUI.SetSelectedTransform(selectedObject != null ? selectedObject.transform : null);
+            // Keep the object active while a UI drag is running, but hide its CanvasGroup. That
+            // lets its pointer handler still receive the matching drag and release events.
+            selectionControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
+            selectionControlsUI.SetControlsVisible(show);
+        }
+        else if (objectTransformControls != null)
+        {
+            objectTransformControls.SetActive(show);
+        }
         closeObjectTransformControlsButton.SetActive(show);
         snapVerticalButton.SetActive(show);
         snapHorizontalButton.SetActive(show);

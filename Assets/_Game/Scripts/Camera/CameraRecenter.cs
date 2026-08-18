@@ -1,28 +1,62 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class CameraRecenter : MonoBehaviour
 {
+    Transform playerStartPoint;
+    bool isLevelEditorCamera;
+
+    void Awake()
+    {
+        isLevelEditorCamera = GetComponentInParent<LevelEditor>() != null;
+    }
+
     void OnEnable()
     {
-        EventManager.Instance.RecenterCameraEvent.AddListener(RecenterCamera);
+        if (EventManager.Instance != null)
+            EventManager.Instance.RecenterCameraEvent.AddListener(RecenterCamera);
     }
 
     void OnDisable()
     {
-        EventManager.Instance.RecenterCameraEvent.RemoveListener(RecenterCamera);
+        if (EventManager.Instance != null)
+            EventManager.Instance.RecenterCameraEvent.RemoveListener(RecenterCamera);
     }
 
     void RecenterCamera()
     {
-        if (transform.parent.name == "LevelEditor")
-        {
-            Transform recenterLocation = GameObject.Find("PlayerStartPoint").transform;
+        if (!TryGetRecenterPosition(out Vector3 recenterPosition))
+            return;
 
-            transform.position = new Vector3(recenterLocation.position.x, recenterLocation.position.y, transform.position.z);
+        transform.position = new Vector3(recenterPosition.x, recenterPosition.y, transform.position.z);
+    }
+
+    public bool TryGetRecenterPosition(out Vector3 recenterPosition)
+    {
+        if (!isLevelEditorCamera)
+        {
+            if (transform.parent == null)
+            {
+                recenterPosition = default;
+                return false;
+            }
+
+            recenterPosition = transform.parent.position;
+            return true;
         }
-        else
-            transform.position = new Vector3(transform.parent.position.x, transform.parent.position.y, transform.position.z);
+
+        if (playerStartPoint == null)
+        {
+            GameObject playerStartPointObject = GameObject.Find("PlayerStartPoint");
+            playerStartPoint = playerStartPointObject != null ? playerStartPointObject.transform : null;
+        }
+
+        if (playerStartPoint == null)
+        {
+            recenterPosition = default;
+            return false;
+        }
+
+        recenterPosition = playerStartPoint.position;
+        return true;
     }
 }
