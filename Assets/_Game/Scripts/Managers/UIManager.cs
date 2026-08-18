@@ -1,6 +1,3 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [DefaultExecutionOrder(-100)]
@@ -28,75 +25,238 @@ public class UIManager : MonoBehaviour
     }
     #endregion
 
-    [Header("World Object References")]
+    enum WorldMode
+    {
+        None,
+        Player,
+        LevelEditor
+    }
+
+    [Header("World Mode Roots")]
+    [SerializeField] GameObject playerModeRoot;
+    [SerializeField] GameObject levelEditorModeRoot;
+
+    [Header("World HUD")]
     [SerializeField] GameObject levelEditorHUD;
     [SerializeField] GameObject playerHUD;
 
-    GameObject lastActiveUiBeforeOpeningMenu;
+    [Header("Modal Menus")]
+    [SerializeField] LevelSelectionMenu gameLevelSelectionMenu;
+    [SerializeField] LevelSelectionMenu playerLevelSelectionMenu;
+    [SerializeField] LevelSelectionMenu downloadedLevelSelectionMenu;
 
-    public bool IsInControlBlockingMenu = false;
+    LevelSelectionMenu activeMenu;
+    WorldMode menuReturnMode;
 
-    void FindLastActiveUiBeforeOpeningMainMenu()
-    {
-        if (levelEditorHUD.activeSelf)
-            lastActiveUiBeforeOpeningMenu = levelEditorHUD;
-        if (playerHUD.activeSelf)
-            lastActiveUiBeforeOpeningMenu = playerHUD;
-    }
+    public bool IsInControlBlockingMenu => activeMenu != null;
 
     public void ShowLastActiveUiBeforeOpeningMainMenu()
     {
-        HideAllUI();
-        lastActiveUiBeforeOpeningMenu.SetActive(true);
+        CloseActiveMenu();
     }
 
-    private IEnumerator HideInWorldUI()
+    public void SwitchToPlayerMode()
     {
+        SwitchWorldMode(WorldMode.Player);
+    }
+
+    public void SwitchToLevelEditorMode()
+    {
+        SwitchWorldMode(WorldMode.LevelEditor);
+    }
+
+    void SwitchWorldMode(WorldMode targetMode)
+    {
+        HideActiveMenuWithoutRestoringWorldMode();
+
+        WorldMode currentMode = GetActiveWorldMode();
+        if (currentMode == targetMode)
+        {
+            ShowWorldModeUi(targetMode);
+            return;
+        }
+
         EventManager.Instance.UnselectObject();
-        yield return null;
         EventManager.Instance.HidePlayerInWorldUiElements();
+        HideWorldHud();
+
+        SetWorldModeActive(currentMode, false);
+        SetWorldModeActive(targetMode, true);
+        ShowWorldModeUi(targetMode);
     }
 
     public void HideAllUI()
     {
-        StartCoroutine(HideInWorldUI());
-
-        LevelManager.Instance.HideAllLevelSelectionMenus();
-        levelEditorHUD.SetActive(false);
-        playerHUD.SetActive(false);
+        HideAllLevelSelectionMenus();
+        HideWorldHud();
+        EventManager.Instance.UnselectObject();
+        EventManager.Instance.HidePlayerInWorldUiElements();
     }
 
-    void ShowLevelPreviewPanel(LevelSource source)
+    void ShowLevelSelectionMenu(LevelSource source)
     {
-        FindLastActiveUiBeforeOpeningMainMenu();
-        HideAllUI();
-        LevelManager.Instance.ShowLevelSelectionMenu(source);
+        LevelSelectionMenu menu = GetLevelSelectionMenu(source);
+        if (menu == null)
+        {
+            Debug.LogError("UIManager is missing the " + source + " level selection menu reference.", this);
+            return;
+        }
+
+        if (activeMenu != null)
+        {
+            if (activeMenu != menu)
+            {
+                activeMenu.Hide();
+                activeMenu = menu;
+                activeMenu.Show();
+            }
+
+            return;
+        }
+
+        WorldMode currentMode = GetActiveWorldMode();
+        if (currentMode == WorldMode.None)
+        {
+            Debug.LogError("UIManager cannot open a menu because neither world mode is active.", this);
+            return;
+        }
+
+        if (CameraViewManager.Instance == null || !CameraViewManager.Instance.ActivateMenuCameraFromCurrentView())
+            return;
+
+        menuReturnMode = currentMode;
+        EventManager.Instance.UnselectObject();
+        EventManager.Instance.HidePlayerInWorldUiElements();
+        HideWorldHud();
+        SetWorldModeActive(currentMode, false);
+
+        activeMenu = menu;
+        activeMenu.Show();
     }
 
     public void ShowPlayerLevelSelectionMenu()
     {
-        ShowLevelPreviewPanel(LevelSource.PlayerLevels);
+        ShowLevelSelectionMenu(LevelSource.PlayerLevels);
     }
 
     public void ShowGameLevelSelectionMenu()
     {
-        ShowLevelPreviewPanel(LevelSource.Game);
+        ShowLevelSelectionMenu(LevelSource.Game);
     }
 
     public void ShowDownloadedLevelSelectionMenu()
     {
-        ShowLevelPreviewPanel(LevelSource.DownloadedLevels);
+        ShowLevelSelectionMenu(LevelSource.DownloadedLevels);
     }
 
     public void ShowPlayerHUD()
     {
-        HideAllUI();
-        playerHUD.gameObject.SetActive(true);
-        EventManager.Instance.ShowPlayerInWorldUiElements();
+        ShowWorldModeUi(WorldMode.Player);
     }
 
-    void Update()
+    public void MarkLevelSourceDirty(LevelSource source)
     {
-        IsInControlBlockingMenu = LevelManager.Instance.IsAnyLevelSelectionMenuOpen;
+        LevelSelectionMenu menu = GetLevelSelectionMenu(source);
+        if (menu != null)
+            menu.MarkDirty();
+    }
+
+    void CloseActiveMenu()
+    {
+        if (activeMenu == null)
+            return;
+
+        activeMenu.Hide();
+        activeMenu = null;
+        CameraViewManager.Instance.DeactivateMenuCamera();
+        SetWorldModeActive(menuReturnMode, true);
+        ShowWorldModeUi(menuReturnMode);
+        menuReturnMode = WorldMode.None;
+    }
+
+    void HideActiveMenuWithoutRestoringWorldMode()
+    {
+        if (activeMenu != null)
+            activeMenu.Hide();
+
+        activeMenu = null;
+        menuReturnMode = WorldMode.None;
+
+        if (CameraViewManager.Instance != null)
+            CameraViewManager.Instance.DeactivateMenuCamera();
+    }
+
+    void HideAllLevelSelectionMenus()
+    {
+        if (gameLevelSelectionMenu != null)
+            gameLevelSelectionMenu.Hide();
+        if (playerLevelSelectionMenu != null)
+            playerLevelSelectionMenu.Hide();
+        if (downloadedLevelSelectionMenu != null)
+            downloadedLevelSelectionMenu.Hide();
+    }
+
+    LevelSelectionMenu GetLevelSelectionMenu(LevelSource source)
+    {
+        switch (source)
+        {
+            case LevelSource.Game:
+                return gameLevelSelectionMenu;
+            case LevelSource.PlayerLevels:
+                return playerLevelSelectionMenu;
+            case LevelSource.DownloadedLevels:
+                return downloadedLevelSelectionMenu;
+            default:
+                return null;
+        }
+    }
+
+    WorldMode GetActiveWorldMode()
+    {
+        if (playerModeRoot != null && playerModeRoot.activeInHierarchy)
+            return WorldMode.Player;
+        if (levelEditorModeRoot != null && levelEditorModeRoot.activeInHierarchy)
+            return WorldMode.LevelEditor;
+
+        return WorldMode.None;
+    }
+
+    void SetWorldModeActive(WorldMode mode, bool isActive)
+    {
+        switch (mode)
+        {
+            case WorldMode.Player:
+                if (playerModeRoot != null)
+                    playerModeRoot.SetActive(isActive);
+                break;
+            case WorldMode.LevelEditor:
+                if (levelEditorModeRoot != null)
+                    levelEditorModeRoot.SetActive(isActive);
+                break;
+        }
+    }
+
+    void HideWorldHud()
+    {
+        if (levelEditorHUD != null)
+            levelEditorHUD.SetActive(false);
+        if (playerHUD != null)
+            playerHUD.SetActive(false);
+    }
+
+    void ShowWorldModeUi(WorldMode mode)
+    {
+        HideWorldHud();
+
+        if (mode == WorldMode.Player)
+        {
+            if (playerHUD != null)
+                playerHUD.SetActive(true);
+            EventManager.Instance.ShowPlayerInWorldUiElements();
+        }
+        else if (mode == WorldMode.LevelEditor && levelEditorHUD != null)
+        {
+            levelEditorHUD.SetActive(true);
+        }
     }
 }

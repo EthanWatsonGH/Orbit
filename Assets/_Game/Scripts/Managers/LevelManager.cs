@@ -94,11 +94,6 @@ public class LevelManager : MonoBehaviour
     [SerializeField] TMP_InputField levelCodeToCopyInput;
     [SerializeField] TMP_InputField levelCodeInput;
 
-    [Header("Level Selection Menus")]
-    [SerializeField] LevelSelectionMenu gameLevelSelectionMenu;
-    [SerializeField] LevelSelectionMenu playerLevelSelectionMenu;
-    [SerializeField] LevelSelectionMenu downloadedLevelSelectionMenu;
-
     void InitializeLevelStorage()
     {
         playerLevelsDirectory = Application.persistentDataPath + "/playerLevels";
@@ -418,54 +413,9 @@ public class LevelManager : MonoBehaviour
         yield return levelStorage.LoadPreview(source, record, onLoaded);
     }
 
-    public void ShowLevelSelectionMenu(LevelSource source)
-    {
-        LevelSelectionMenu menu = GetLevelSelectionMenu(source);
-        if (menu == null)
-        {
-            Debug.LogError("ERROR: LevelManager is missing the " + source + " level selection menu reference.");
-            return;
-        }
-
-        HideAllLevelSelectionMenus();
-        menu.Show();
-    }
-
-    public void HideAllLevelSelectionMenus()
-    {
-        if (gameLevelSelectionMenu != null)
-            gameLevelSelectionMenu.Hide();
-        if (playerLevelSelectionMenu != null)
-            playerLevelSelectionMenu.Hide();
-        if (downloadedLevelSelectionMenu != null)
-            downloadedLevelSelectionMenu.Hide();
-    }
-
     public void MarkLevelSourceDirty(LevelSource source)
     {
-        LevelSelectionMenu menu = GetLevelSelectionMenu(source);
-        if (menu != null)
-            menu.MarkDirty();
-    }
-
-    public bool IsAnyLevelSelectionMenuOpen =>
-        (gameLevelSelectionMenu != null && gameLevelSelectionMenu.IsOpen) ||
-        (playerLevelSelectionMenu != null && playerLevelSelectionMenu.IsOpen) ||
-        (downloadedLevelSelectionMenu != null && downloadedLevelSelectionMenu.IsOpen);
-
-    LevelSelectionMenu GetLevelSelectionMenu(LevelSource source)
-    {
-        switch (source)
-        {
-            case LevelSource.Game:
-                return gameLevelSelectionMenu;
-            case LevelSource.PlayerLevels:
-                return playerLevelSelectionMenu;
-            case LevelSource.DownloadedLevels:
-                return downloadedLevelSelectionMenu;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(source), source, null);
-        }
+        UIManager.Instance.MarkLevelSourceDirty(source);
     }
     #endregion
 }

@@ -27,7 +27,6 @@ public class Player : MonoBehaviour
     [SerializeField] TMP_Text winDisplay;
     [SerializeField] TMP_Text loseDisplay;
     // level object references
-    [SerializeField] GameObject levelEditor;
     [SerializeField] GameObject startLocation;
     [SerializeField] GameObject startLocationIcon;
     // variables
@@ -313,10 +312,7 @@ public class Player : MonoBehaviour
         // show player start location icon
         startLocationIcon.SetActive(true);
 
-        UIManager.Instance.HideAllUI();
-        levelEditor.SetActive(true);
-        levelEditor.transform.Find("Canvas").gameObject.SetActive(true);
-        this.gameObject.SetActive(false);
+        UIManager.Instance.SwitchToLevelEditorMode();
     }
 
     void HideFinishTrailRenderer()

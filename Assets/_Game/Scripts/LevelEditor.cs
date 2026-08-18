@@ -8,7 +8,6 @@ public class LevelEditor : MonoBehaviour
     // self object references
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
-    [SerializeField] GameObject player;
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] GameObject canvas;
     [SerializeField] GameObject localTransformButton;
@@ -696,11 +695,7 @@ public class LevelEditor : MonoBehaviour
         HandleShowObjectTransformControls();
 
         startLocationIcon.SetActive(false);
-        UIManager.Instance.HideAllUI();
-        
-        player.SetActive(true);
-        player.transform.Find("Canvas").gameObject.SetActive(true);
-        this.gameObject.SetActive(false);
+        UIManager.Instance.SwitchToPlayerMode();
     }
 
     #region Object Place Functions
