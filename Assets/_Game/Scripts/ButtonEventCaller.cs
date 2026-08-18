@@ -21,6 +21,11 @@ public class ButtonEventCaller : MonoBehaviour
         UIManager.Instance.ShowGameLevelSelectionMenu();
     }
 
+    public void ShowDownloadedLevelSelectionMenu()
+    {
+        UIManager.Instance.ShowDownloadedLevelSelectionMenu();
+    }
+
     public void ShowLastActiveUiBeforeOpeningMainMenu()
     {
         UIManager.Instance.ShowLastActiveUiBeforeOpeningMainMenu();

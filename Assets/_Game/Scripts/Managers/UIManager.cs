@@ -40,11 +40,7 @@ public class UIManager : MonoBehaviour
     }
     #endregion
 
-    [Header("Prefab References")]
-    [SerializeField] GameObject levelPreviewPrefab;
-
     [Header("World Object References")]
-    [SerializeField] GameObject levelSelectionMenu;
     [SerializeField] GameObject levelEditorHUD;
     [SerializeField] GameObject playerHUD;
 
@@ -77,28 +73,31 @@ public class UIManager : MonoBehaviour
     {
         StartCoroutine(HideInWorldUI());
 
-        levelSelectionMenu.SetActive(false);
+        LevelManager.Instance.HideAllLevelSelectionMenus();
         levelEditorHUD.SetActive(false);
         playerHUD.SetActive(false);
     }
 
-    void ShowLevelPreviewPanel()
+    void ShowLevelPreviewPanel(LevelSource source)
     {
         FindLastActiveUiBeforeOpeningMainMenu();
         HideAllUI();
-        levelSelectionMenu.SetActive(true);
+        LevelManager.Instance.ShowLevelSelectionMenu(source);
     }
 
     public void ShowPlayerLevelSelectionMenu()
     {
-        ShowLevelPreviewPanel();
-        StartCoroutine(LevelManager.Instance.LoadLevelPreviews(LevelSource.PlayerLevels));
+        ShowLevelPreviewPanel(LevelSource.PlayerLevels);
     }
 
     public void ShowGameLevelSelectionMenu()
     {
-        ShowLevelPreviewPanel();
-        StartCoroutine(LevelManager.Instance.LoadLevelPreviews(LevelSource.Game));
+        ShowLevelPreviewPanel(LevelSource.Game);
+    }
+
+    public void ShowDownloadedLevelSelectionMenu()
+    {
+        ShowLevelPreviewPanel(LevelSource.DownloadedLevels);
     }
 
     public void ShowPlayerHUD()
@@ -110,6 +109,6 @@ public class UIManager : MonoBehaviour
 
     void Update()
     {
-        IsInControlBlockingMenu = levelSelectionMenu.activeSelf;
+        IsInControlBlockingMenu = LevelManager.Instance.IsAnyLevelSelectionMenuOpen;
     }
 }

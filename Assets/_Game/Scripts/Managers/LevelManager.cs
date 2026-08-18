@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
 using System.Runtime.InteropServices;
@@ -38,6 +37,7 @@ public class LevelManager : MonoBehaviour
         if (instance == null)
         {
             instance = this;
+            InitializeLevelStorage();
         }
         else
         {
@@ -104,14 +104,13 @@ public class LevelManager : MonoBehaviour
     [SerializeField] TMP_InputField levelCodeToCopyInput;
     [SerializeField] TMP_InputField levelCodeInput;
 
-    [Header("Level Preview References")]
-    [SerializeField] GameObject levelPreviewPrefab;
-    [SerializeField] GameObject levelsPreviewPanel;
-    [SerializeField] TMP_Text noLevelsFoundText;
+    [Header("Level Selection Menus")]
+    [SerializeField] LevelSelectionMenu gameLevelSelectionMenu;
+    [SerializeField] LevelSelectionMenu playerLevelSelectionMenu;
+    [SerializeField] LevelSelectionMenu downloadedLevelSelectionMenu;
 
-    void Start()
+    void InitializeLevelStorage()
     {
-        // get directory for player's levels
         playerLevelsDirectory = Application.persistentDataPath + "/playerLevels";
         string downloadedLevelsDirectory = Application.persistentDataPath + "/downloadedLevels";
         levelStorage = new LevelStorage(playerLevelsDirectory, downloadedLevelsDirectory);
@@ -266,6 +265,7 @@ public class LevelManager : MonoBehaviour
         if (!didSave)
             yield break;
 
+        MarkLevelSourceDirty(LevelSource.PlayerLevels);
         lastSavedLevelJson = json;
 
         SetLevelCodeToCopyInputToLastSavedLevelJson();
@@ -418,73 +418,64 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    void ResetLevelPreviews()
+    public IEnumerator LoadLevelCatalog(LevelSource source, Action<List<LevelCatalogRecord>> onLoaded)
     {
-        foreach (Transform levelPreview in levelsPreviewPanel.transform)
+        yield return levelStorage.LoadCatalog(source, onLoaded);
+    }
+
+    public IEnumerator LoadLevelPreview(LevelSource source, LevelCatalogRecord record, Action<Texture2D> onLoaded)
+    {
+        yield return levelStorage.LoadPreview(source, record, onLoaded);
+    }
+
+    public void ShowLevelSelectionMenu(LevelSource source)
+    {
+        LevelSelectionMenu menu = GetLevelSelectionMenu(source);
+        if (menu == null)
         {
-            Destroy(levelPreview.gameObject);
+            Debug.LogError("ERROR: LevelManager is missing the " + source + " level selection menu reference.");
+            return;
         }
 
-        noLevelsFoundText.text = string.Empty;
+        HideAllLevelSelectionMenus();
+        menu.Show();
     }
 
-    void ShowNoLevelsFound()
+    public void HideAllLevelSelectionMenus()
     {
-        noLevelsFoundText.text = "No levels found";
-        noLevelsFoundText.color = Color.white;
+        if (gameLevelSelectionMenu != null)
+            gameLevelSelectionMenu.Hide();
+        if (playerLevelSelectionMenu != null)
+            playerLevelSelectionMenu.Hide();
+        if (downloadedLevelSelectionMenu != null)
+            downloadedLevelSelectionMenu.Hide();
     }
 
-    GameObject CreateLevelPreview(LevelCatalogRecord record, LevelSource source)
+    public void MarkLevelSourceDirty(LevelSource source)
     {
-        GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel.transform);
-        Transform previewContent = levelPreview.transform.GetChild(0);
-
-        previewContent.Find("LevelName").GetComponent<TMP_Text>().text = record.displayName;
-        previewContent.Find("LevelAuthor").GetComponent<TMP_Text>().text = record.author;
-
-        ButtonEventCaller buttonEventCaller = levelPreview.GetComponentInChildren<ButtonEventCaller>(true);
-        if (buttonEventCaller == null)
-            Debug.LogError("ERROR: Level preview prefab is missing ButtonEventCaller.");
-        else
-            buttonEventCaller.ConfigureLevelPreview(source, record.id);
-
-        return levelPreview;
+        LevelSelectionMenu menu = GetLevelSelectionMenu(source);
+        if (menu != null)
+            menu.MarkDirty();
     }
 
-    void ShowPreviewImageError(GameObject levelPreview, string message)
-    {
-        Transform imageTransform = levelPreview.transform.GetChild(0).Find("Image");
-        imageTransform.GetChild(0).GetComponent<TMP_Text>().text = message;
-        imageTransform.GetComponent<Image>().color = Color.grey;
-    }
+    public bool IsAnyLevelSelectionMenuOpen =>
+        (gameLevelSelectionMenu != null && gameLevelSelectionMenu.IsOpen) ||
+        (playerLevelSelectionMenu != null && playerLevelSelectionMenu.IsOpen) ||
+        (downloadedLevelSelectionMenu != null && downloadedLevelSelectionMenu.IsOpen);
 
-    void SetPreviewImage(GameObject levelPreview, Texture2D imageTexture)
+    LevelSelectionMenu GetLevelSelectionMenu(LevelSource source)
     {
-        Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
-        levelPreview.transform.GetChild(0).Find("Image").GetComponent<Image>().sprite = imageSprite;
-    }
-
-    public IEnumerator LoadLevelPreviews(LevelSource source)
-    {
-        ResetLevelPreviews();
-        int previewCount = 0;
-
-        List<LevelCatalogRecord> records = null;
-        yield return levelStorage.LoadCatalog(source, loadedRecords => records = loadedRecords);
-        foreach (LevelCatalogRecord record in records)
+        switch (source)
         {
-            GameObject levelPreview = CreateLevelPreview(record, source);
-            Texture2D previewTexture = null;
-            yield return levelStorage.LoadPreview(source, record, loadedTexture => previewTexture = loadedTexture);
-            if (previewTexture == null)
-                ShowPreviewImageError(levelPreview, "Image not found");
-            else
-                SetPreviewImage(levelPreview, previewTexture);
-            previewCount++;
+            case LevelSource.Game:
+                return gameLevelSelectionMenu;
+            case LevelSource.PlayerLevels:
+                return playerLevelSelectionMenu;
+            case LevelSource.DownloadedLevels:
+                return downloadedLevelSelectionMenu;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(source), source, null);
         }
-
-        if (previewCount == 0)
-            ShowNoLevelsFound();
     }
     #endregion
 }
