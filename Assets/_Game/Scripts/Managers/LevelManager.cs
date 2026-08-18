@@ -10,39 +10,29 @@ using UnityEngine;
 using System.Runtime.InteropServices;
 #endif
 
+[DefaultExecutionOrder(-100)]
 public class LevelManager : MonoBehaviour
 {
     #region Singleton Setup
-    private static LevelManager instance;
-    public static LevelManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<LevelManager>();
-                if (instance == null )
-                {
-                    GameObject levelManager = new GameObject("LevelManager");
-                    instance = levelManager.AddComponent<LevelManager>();
-                }
-            }
-            return instance;
-        }
-    }
+    public static LevelManager Instance { get; private set; }
 
     private void Awake()
     {
-        // singleton setup
-        if (instance == null)
+        if (Instance != null && Instance != this)
         {
-            instance = this;
-            InitializeLevelStorage();
+            Debug.LogError("Duplicate LevelManager in the scene.", this);
+            Destroy(gameObject);
+            return;
         }
-        else
-        {
-            //Destroy(gameObject);
-        }
+
+        Instance = this;
+        InitializeLevelStorage();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
     #endregion
 

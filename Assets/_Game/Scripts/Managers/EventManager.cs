@@ -3,39 +3,28 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+[DefaultExecutionOrder(-100)]
 public class EventManager : MonoBehaviour
 {
     #region Singleton Setup
-    private static EventManager instance;
-    public static EventManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<EventManager>();
-                if (instance == null)
-                {
-                    GameObject eventManager = new GameObject("EventManager");
-                    instance = eventManager.AddComponent<EventManager>();
-                }
-            }
-            return instance;
-        }
-    }
+    public static EventManager Instance { get; private set; }
 
     private void Awake()
     {
-        // singleton setup
-        if (instance == null)
+        if (Instance != null && Instance != this)
         {
-            instance = this;
+            Debug.LogError("Duplicate EventManager in the scene.", this);
+            Destroy(gameObject);
+            return;
         }
-        else
-        {
-            // TODO: this is always being destroyed for some reason. if i delete the object and place a new one in the scene it fixes it, until i restart the editor and it starts doing it again
-            //Destroy(gameObject);
-        }
+
+        Instance = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
     #endregion
 

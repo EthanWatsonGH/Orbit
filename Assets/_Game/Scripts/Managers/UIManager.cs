@@ -3,40 +3,28 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[DefaultExecutionOrder(-100)]
 public class UIManager : MonoBehaviour
 {
     #region Singleton Setup
-    private static UIManager instance;
-
-    public static UIManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<UIManager>();
-
-                if (instance == null)
-                {
-                    GameObject newUIManager = new GameObject("UIManager");
-                    instance = newUIManager.AddComponent<UIManager>();
-                }
-            }
-            return instance;
-        }
-    }
+    public static UIManager Instance { get; private set; }
 
     private void Awake()
     {
-        if (instance == null)
+        if (Instance != null && Instance != this)
         {
-            instance = this;
-            //DontDestroyOnLoad(gameObject);
+            Debug.LogError("Duplicate UIManager in the scene.", this);
+            Destroy(gameObject);
+            return;
         }
-        else
-        {
-            //Destroy(gameObject);
-        }
+
+        Instance = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
     #endregion
 
