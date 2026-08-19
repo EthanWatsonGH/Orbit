@@ -6,11 +6,6 @@ public class ButtonEventCaller : MonoBehaviour
     LevelSource previewLevelSource;
     string previewLevelId;
 
-    public void RecenterCamera()
-    {
-        EventManager.Instance.RecenterCamera();
-    }
-
     public void ShowPlayerLevelSelectionMenu()
     {
         UIManager.Instance.ShowPlayerLevelSelectionMenu();

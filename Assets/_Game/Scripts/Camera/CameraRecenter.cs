@@ -24,23 +24,23 @@ public class CameraRecenter : MonoBehaviour
 
     void RecenterCamera()
     {
-        if (!TryGetRecenterPosition(out Vector3 recenterPosition))
+        if (!TryGetTargetPosition(out Vector3 targetPosition))
             return;
 
-        transform.position = new Vector3(recenterPosition.x, recenterPosition.y, transform.position.z);
+        transform.position = new Vector3(targetPosition.x, targetPosition.y, transform.position.z);
     }
 
-    public bool TryGetRecenterPosition(out Vector3 recenterPosition)
+    public bool TryGetTargetPosition(out Vector3 targetPosition)
     {
         if (!isLevelEditorCamera)
         {
             if (transform.parent == null)
             {
-                recenterPosition = default;
+                targetPosition = default;
                 return false;
             }
 
-            recenterPosition = transform.parent.position;
+            targetPosition = transform.parent.position;
             return true;
         }
 
@@ -52,11 +52,11 @@ public class CameraRecenter : MonoBehaviour
 
         if (playerStartPoint == null)
         {
-            recenterPosition = default;
+            targetPosition = default;
             return false;
         }
 
-        recenterPosition = playerStartPoint.position;
+        targetPosition = playerStartPoint.position;
         return true;
     }
 }

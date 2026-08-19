@@ -52,6 +52,12 @@ public class CameraViewManager : MonoBehaviour
         menuCamera.gameObject.tag = "Untagged";
     }
 
+    public bool TryGetActiveWorldCamera(out Camera activeCamera)
+    {
+        activeCamera = Camera.main;
+        return activeCamera != null && activeCamera != menuCamera && activeCamera.enabled;
+    }
+
     static void CopyView(Camera source, Camera destination)
     {
         destination.transform.SetPositionAndRotation(source.transform.position, source.transform.rotation);
