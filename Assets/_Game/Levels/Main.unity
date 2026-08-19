@@ -1048,10 +1048,6 @@ PrefabInstance:
       propertyPath: m_AnchorMin.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8212459075170661228, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 8234236127215419273, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 

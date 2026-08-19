@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum PlayerState
 {
@@ -17,7 +18,7 @@ public class Player : MonoBehaviour
     [SerializeField] LineRenderer lr;
     [SerializeField] TrailRenderer finishTrailRenderer;
     // self object references
-    [SerializeField] GameObject launchDirectionPoint;
+    [SerializeField, FormerlySerializedAs("launchDirectionPoint")] Transform launchDirectionTarget;
     [SerializeField] GameObject launchButton;
     [SerializeField] GameObject retryButton;
     // HUD
@@ -44,8 +45,8 @@ public class Player : MonoBehaviour
     PlayerState state = PlayerState.Aiming;
     bool playerPressedLaunch; // TODO: change to events
     bool isInvincible;
-    bool canMoveLaunchDirectionPoint;
-    Vector3 offsetAtStartMoveLaunchDirectionPoint = Vector3.zero;
+    bool isDraggingLaunchDirectionTarget;
+    Vector3 launchTargetDragOffset = Vector3.zero;
     float timeAtLastRetry;
     bool hasStarted;
 
@@ -126,11 +127,6 @@ public class Player : MonoBehaviour
         speedDisplay.text = "0";
 
         lr.enabled = true;
-        launchDirectionPoint.SetActive(true);
-
-        EnsureLaunchDirectionPointAlwaysInFront();
-        HandleMoveLaunchDirectionPoint();
-        HandleLaunchDirectionPointRotation();
         UpdateLineRenderer();
 
         rb.linearVelocity = Vector2.zero;
@@ -192,7 +188,7 @@ public class Player : MonoBehaviour
         if (state != PlayerState.Aiming)
             return;
 
-        Vector2 launchDirection = launchDirectionPoint.transform.position - rb.transform.position;
+        Vector2 launchDirection = launchDirectionTarget.position - rb.transform.position;
         rb.linearVelocity = launchDirection.normalized * launchForce;
         timeAtLastLaunch = Time.time;
         playerPressedLaunch = false;
@@ -202,67 +198,51 @@ public class Player : MonoBehaviour
     void HideAimingGuides()
     {
         lr.enabled = false;
-        launchDirectionPoint.SetActive(false);
     }
 
-    void EnsureLaunchDirectionPointAlwaysInFront()
+    public bool BeginLaunchDirectionTargetDrag(Vector2 screenPosition)
     {
-        Vector3 launchDirectionPointPosition = new Vector3(launchDirectionPoint.transform.position.x, launchDirectionPoint.transform.position.y, -1f);
-        launchDirectionPoint.transform.position = launchDirectionPointPosition;
+        if (state != PlayerState.Aiming || launchDirectionTarget == null ||
+            !TryGetWorldPositionFromScreenPosition(screenPosition, out Vector3 pointerWorldPosition))
+            return false;
+
+        launchTargetDragOffset = launchDirectionTarget.position - pointerWorldPosition;
+        isDraggingLaunchDirectionTarget = true;
+        return true;
     }
 
-    void HandleMoveLaunchDirectionPoint()
+    public void UpdateLaunchDirectionTargetDrag(Vector2 screenPosition)
     {
-        PointerInput pointerInput = PointerInput.Instance;
-        if (pointerInput == null)
+        if (!isDraggingLaunchDirectionTarget || launchDirectionTarget == null ||
+            !TryGetWorldPositionFromScreenPosition(screenPosition, out Vector3 pointerWorldPosition))
             return;
 
-        bool IsPointerOverLaunchDirectionPoint()
-        {
-            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(pointerInput.ScreenPosition), Vector2.zero);
-            if (hit.collider != null && hit.collider.gameObject == launchDirectionPoint)
-            {
-                offsetAtStartMoveLaunchDirectionPoint = launchDirectionPoint.transform.position - Camera.main.ScreenToWorldPoint(pointerInput.ScreenPosition);
-                return true;
-            }
-
-            return false;
-        }
-
-        // Check if the shared primary pointer began over launchDirectionPoint.
-        if (pointerInput.WasPressedThisFrame && IsPointerOverLaunchDirectionPoint())
-            canMoveLaunchDirectionPoint = true;
-
-        if (!pointerInput.IsHeld)
-            canMoveLaunchDirectionPoint = false;
-
-        if (canMoveLaunchDirectionPoint)
-        {
-            Vector3 pointerWorldPosition = Camera.main.ScreenToWorldPoint(pointerInput.ScreenPosition);
-            launchDirectionPoint.transform.position =
-                new Vector3(pointerWorldPosition.x + offsetAtStartMoveLaunchDirectionPoint.x,
-                pointerWorldPosition.y + offsetAtStartMoveLaunchDirectionPoint.y,
-                launchDirectionPoint.transform.position.z);
-        }
+        launchDirectionTarget.position = pointerWorldPosition + launchTargetDragOffset;
     }
 
-    void HandleLaunchDirectionPointRotation()
+    public void EndLaunchDirectionTargetDrag()
     {
-        // make launchDirectionPoint icon point away from the player
-        if (canMoveLaunchDirectionPoint)
-        {
-            Vector3 direction = launchDirectionPoint.transform.position - transform.position;
+        isDraggingLaunchDirectionTarget = false;
+    }
 
-            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+    bool TryGetWorldPositionFromScreenPosition(Vector2 screenPosition, out Vector3 worldPosition)
+    {
+        worldPosition = default;
 
-            launchDirectionPoint.transform.rotation = Quaternion.Euler(new Vector3(0, 0, angle));
-        }
+        if (CameraViewManager.Instance == null ||
+            !CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
+            return false;
+
+        float targetDepth = Mathf.Abs(launchDirectionTarget.position.z - activeCamera.transform.position.z);
+        Vector3 convertedPosition = activeCamera.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, targetDepth));
+        worldPosition = new Vector3(convertedPosition.x, convertedPosition.y, launchDirectionTarget.position.z);
+        return true;
     }
 
     void UpdateLineRenderer()
     {
         lr.SetPosition(0, transform.position);
-        lr.SetPosition(1, launchDirectionPoint.transform.position);
+        lr.SetPosition(1, launchDirectionTarget.position);
     }
 
     void EnterAimingAfterLevelLoad()
@@ -387,14 +367,15 @@ public class Player : MonoBehaviour
     void ShowInWorldUiElements()
     {
         lr.enabled = true;
-        launchDirectionPoint.SetActive(true);
     }
 
     void HideInWorldUiElements()
     {
         lr.enabled = false;
-        launchDirectionPoint.SetActive(false);
     }
+
+    public bool IsAiming => state == PlayerState.Aiming;
+    public Vector3 LaunchDirectionTargetPosition => launchDirectionTarget != null ? launchDirectionTarget.position : transform.position;
 
     public void PressedLaunch()
     {

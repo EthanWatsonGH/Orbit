@@ -118,19 +118,24 @@ public class LevelEditor : MonoBehaviour
         UpdateBoxSelectIntentFromPointerDrag();
         HandlePlacePrefab();
         HandleSelectObject();
-        UpdateActiveScreenSpaceTransformControl();
         RefreshSelectionControls();
     }
 
     private void OnEnable()
     {
         EventManager.Instance.UnselectObjectEvent.AddListener(UnselectObject);
+
+        if (PointerInput.Instance != null)
+            PointerInput.Instance.HeldPointerUpdated += UpdateActiveScreenSpaceTransformControl;
     }
 
     private void OnDisable()
     {
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
+
+        if (PointerInput.Instance != null)
+            PointerInput.Instance.HeldPointerUpdated -= UpdateActiveScreenSpaceTransformControl;
     }
 
     
@@ -383,16 +388,6 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    public void UpdateObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition, float dragDistancePixels)
-    {
-        if (control == activeMoveControl && isTryingToMoveSelectedObject)
-            UpdateMoveSelectedObject(screenPosition, dragDistancePixels);
-        else if (control == ObjectTransformControl.Rotate && isTryingToRotateSelectedObject)
-            UpdateRotateSelectedObject(screenPosition);
-        else if (control == activeScaleControl && isTryingToScaleSelectedObject)
-            UpdateScaleSelectedObject(screenPosition);
-    }
-
     public void EndObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition, float dragDistancePixels)
     {
         if (control == activeMoveControl && isTryingToMoveSelectedObject)
@@ -403,15 +398,8 @@ public class LevelEditor : MonoBehaviour
             EndScaleSelectedObject();
     }
 
-    void UpdateActiveScreenSpaceTransformControl()
+    void UpdateActiveScreenSpaceTransformControl(Vector2 screenPosition)
     {
-        if (!PointerInput.Instance.IsHeld)
-            return;
-
-        // UI drag events only fire when the pointer itself moves. Re-evaluate from the shared
-        // screen position every frame so camera zoom/pan also updates the object's world position.
-        Vector2 screenPosition = PointerInput.Instance.ScreenPosition;
-
         if (isTryingToMoveSelectedObject)
             UpdateMoveSelectedObject(screenPosition, PointerInput.Instance.DragDistancePixels);
         else if (isTryingToRotateSelectedObject)

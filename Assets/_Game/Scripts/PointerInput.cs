@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -7,6 +8,10 @@ using UnityEngine.UI;
 public class PointerInput : MonoBehaviour
 {
     public static PointerInput Instance { get; private set; }
+
+    // Raised after all Update calls while the primary pointer is held. This lets drag consumers
+    // recalculate their world position after camera pan or zoom, even if the pointer did not move.
+    public event Action<Vector2> HeldPointerUpdated;
 
     public bool WasPressedThisFrame { get; private set; }
     public bool WasReleasedThisFrame { get; private set; }
@@ -79,6 +84,12 @@ public class PointerInput : MonoBehaviour
         }
 
         UpdateMouse();
+    }
+
+    void LateUpdate()
+    {
+        if (IsHeld)
+            HeldPointerUpdated?.Invoke(ScreenPosition);
     }
 
     void UpdateTrackedTouch()

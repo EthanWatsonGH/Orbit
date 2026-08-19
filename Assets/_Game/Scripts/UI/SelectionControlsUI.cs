@@ -73,12 +73,6 @@ public class SelectionControlsUI : MonoBehaviour
             levelEditor.BeginObjectTransformControl(control, screenPosition);
     }
 
-    public void UpdateControl(ObjectTransformControl control, Vector2 screenPosition, Vector2 pressScreenPosition)
-    {
-        if (levelEditor != null)
-            levelEditor.UpdateObjectTransformControl(control, screenPosition, Vector2.Distance(pressScreenPosition, screenPosition));
-    }
-
     public void EndControl(ObjectTransformControl control, Vector2 screenPosition, Vector2 pressScreenPosition)
     {
         if (levelEditor != null)

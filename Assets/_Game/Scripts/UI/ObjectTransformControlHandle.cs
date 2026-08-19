@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class ObjectTransformControlHandle : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
+public class ObjectTransformControlHandle : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     [SerializeField] ObjectTransformControl control;
 
@@ -20,12 +20,6 @@ public class ObjectTransformControlHandle : MonoBehaviour, IPointerDownHandler, 
 
         activePointerId = eventData.pointerId;
         selectionControls.BeginControl(control, eventData.position);
-    }
-
-    public void OnDrag(PointerEventData eventData)
-    {
-        if (selectionControls != null && eventData.pointerId == activePointerId)
-            selectionControls.UpdateControl(control, eventData.position, eventData.pressPosition);
     }
 
     public void OnPointerUp(PointerEventData eventData)

@@ -4,6 +4,8 @@ public class PlayerHUD : MonoBehaviour
 {
     [SerializeField] Player player;
 
+    public Player Player => player;
+
     public void Bind(Player targetPlayer)
     {
         player = targetPlayer;
