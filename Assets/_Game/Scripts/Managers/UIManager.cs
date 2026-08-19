@@ -66,8 +66,6 @@ public class UIManager : MonoBehaviour
     WorldMode menuReturnMode;
     bool isUiHiddenForPreviewCapture;
     bool uiRootWasActive;
-    bool levelEditorHudWasActive;
-    bool playerHudWasActive;
 
     public bool IsInControlBlockingMenu => activeMenu != null;
 
@@ -121,17 +119,10 @@ public class UIManager : MonoBehaviour
 
         isUiHiddenForPreviewCapture = true;
         uiRootWasActive = uiRoot != null && uiRoot.activeSelf;
-        levelEditorHudWasActive = levelEditorHUD != null && levelEditorHUD.activeSelf;
-        playerHudWasActive = playerHUD != null && playerHUD.activeSelf;
 
-        // The level-selection menus now live below UIRoot. The two HUDs are still embedded
-        // in world prefabs, so hide them separately until their migration is complete.
+        // All screen UI, including both HUDs and modal menus, now lives below UIRoot.
         if (uiRoot != null)
             uiRoot.SetActive(false);
-        if (levelEditorHUD != null)
-            levelEditorHUD.SetActive(false);
-        if (playerHUD != null)
-            playerHUD.SetActive(false);
     }
 
     public void RestoreUiAfterPreviewCapture()
@@ -141,10 +132,6 @@ public class UIManager : MonoBehaviour
 
         if (uiRoot != null)
             uiRoot.SetActive(uiRootWasActive);
-        if (levelEditorHUD != null)
-            levelEditorHUD.SetActive(levelEditorHudWasActive);
-        if (playerHUD != null)
-            playerHUD.SetActive(playerHudWasActive);
 
         isUiHiddenForPreviewCapture = false;
     }

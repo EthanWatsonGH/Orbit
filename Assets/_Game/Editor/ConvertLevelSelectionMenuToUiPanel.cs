@@ -9,6 +9,9 @@ using UnityEngine.UI;
 public static class ConvertLevelSelectionMenuToUiPanel
 {
     const string PanelPrefabPath = "Assets/_Game/Prefabs/UI/LevelSelectionMenuPanel.prefab";
+    const string PlayerHudPrefabPath = "Assets/_Game/Prefabs/UI/PlayerHUD.prefab";
+    const string EditorHudPrefabPath = "Assets/_Game/Prefabs/UI/EditorHUD.prefab";
+    const string LevelPreviewPrefabPath = "Assets/_Game/Prefabs/LevelPreview.prefab";
 
     sealed class MenuEntry
     {
@@ -142,8 +145,7 @@ public static class ConvertLevelSelectionMenuToUiPanel
             GameObject panel = PrefabUtility.LoadPrefabContents(PanelPrefabPath);
             try
             {
-                RemoveLegacyCanvasComponents(panel);
-                ConfigurePanelTransform(panel.GetComponent<RectTransform>());
+                NormalizeLevelSelectionMenuPanel(panel);
                 PrefabUtility.SaveAsPrefabAsset(panel, PanelPrefabPath);
             }
             finally
@@ -158,6 +160,35 @@ public static class ConvertLevelSelectionMenuToUiPanel
         {
             Debug.LogException(exception);
             EditorUtility.DisplayDialog("Menu repair stopped", "Check the Console and use version control to restore any partial asset changes before trying again.", "OK");
+        }
+    }
+
+    [MenuItem("Orbit/UI/Normalize Screen UI Panels")]
+    static void NormalizeScreenUiPanels()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            EditorUtility.DisplayDialog("UI normalization unavailable", "Exit Play Mode before normalizing screen UI panels.", "OK");
+            return;
+        }
+
+        try
+        {
+            NormalizePrefab(PanelPrefabPath, NormalizeLevelSelectionMenuPanel);
+            NormalizePrefab(PlayerHudPrefabPath, NormalizeHudPanel);
+            NormalizePrefab(EditorHudPrefabPath, NormalizeHudPanel);
+            NormalizePrefab(LevelPreviewPrefabPath, NormalizeLevelPreview);
+
+            AssetDatabase.SaveAssets();
+            EditorUtility.DisplayDialog(
+                "Screen UI panels normalized",
+                "Level selection, Player HUD, and Editor HUD now use the UIRoot Canvas only. The level preview grid was resized for UIRoot's 1000 x 800 design space. Test all three level menus and both HUDs.",
+                "OK");
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+            EditorUtility.DisplayDialog("UI normalization stopped", "Check the Console and use version control to restore any partial asset changes before trying again.", "OK");
         }
     }
 
@@ -196,7 +227,7 @@ public static class ConvertLevelSelectionMenuToUiPanel
         LevelSelectionMenu panelMenu = panel.AddComponent<LevelSelectionMenu>();
         EditorUtility.CopySerialized(gameMenu, panelMenu);
 
-        RemoveLegacyCanvasComponents(panel);
+        NormalizeLevelSelectionMenuPanel(panel);
 
         panel.name = "LevelSelectionMenuPanel";
         panel.transform.SetParent(modalMenus, false);
@@ -219,19 +250,89 @@ public static class ConvertLevelSelectionMenuToUiPanel
         panel.localScale = Vector3.one;
     }
 
-    static void RemoveLegacyCanvasComponents(GameObject panel)
+    static void NormalizePrefab(string prefabPath, Action<GameObject> normalize)
     {
-        // Canvas must be removed last because these two UI components depend on it.
-        GraphicRaycaster raycaster = panel.GetComponent<GraphicRaycaster>();
-        if (raycaster != null)
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
+            throw new InvalidOperationException("Required UI prefab is missing: " + prefabPath);
+
+        GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
+        {
+            normalize(prefabRoot);
+            PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(prefabRoot);
+        }
+    }
+
+    static void NormalizeLevelSelectionMenuPanel(GameObject panel)
+    {
+        RemoveCanvasComponents(panel);
+        ConfigurePanelTransform(panel.GetComponent<RectTransform>());
+
+        RectTransform scrollView = panel.transform.Find("Scroll View") as RectTransform;
+        if (scrollView == null)
+            throw new InvalidOperationException("LevelSelectionMenuPanel needs a Scroll View child.");
+
+        // The original menu was authored against a 1920 x 1080 Canvas. These bounds
+        // instead scale with UIRoot, whose Canvas Scaler owns the screen-space size.
+        scrollView.anchorMin = new Vector2(0.05f, 0.10f);
+        scrollView.anchorMax = new Vector2(0.95f, 0.86f);
+        scrollView.offsetMin = Vector2.zero;
+        scrollView.offsetMax = Vector2.zero;
+
+        GridLayoutGroup grid = scrollView.Find("Viewport/Content")?.GetComponent<GridLayoutGroup>();
+        if (grid == null)
+            throw new InvalidOperationException("LevelSelectionMenuPanel needs a GridLayoutGroup at Scroll View/Viewport/Content.");
+
+        // Keep the authored card dimensions. Flexible columns show as many cards as
+        // fit, including a single column on narrower portrait screens.
+        grid.cellSize = new Vector2(350f, 250f);
+        grid.spacing = new Vector2(40f, 40f);
+
+        RectTransform noLevelsFoundText = panel.transform.Find("NoLevelsFoundText") as RectTransform;
+        if (noLevelsFoundText != null)
+        {
+            noLevelsFoundText.anchorMin = new Vector2(0.05f, 0.20f);
+            noLevelsFoundText.anchorMax = new Vector2(0.95f, 0.80f);
+            noLevelsFoundText.offsetMin = Vector2.zero;
+            noLevelsFoundText.offsetMax = Vector2.zero;
+        }
+    }
+
+    static void NormalizeHudPanel(GameObject panel)
+    {
+        RemoveCanvasComponents(panel);
+        ConfigurePanelTransform(panel.GetComponent<RectTransform>());
+    }
+
+    static void NormalizeLevelPreview(GameObject preview)
+    {
+        RectTransform card = preview.transform.Find("Panel") as RectTransform;
+        if (card == null)
+            throw new InvalidOperationException("LevelPreview needs a Panel child.");
+
+        // The GridLayoutGroup sizes the LevelPreview root. The visible card must
+        // stretch to that root instead of retaining an independent fixed size.
+        card.anchorMin = Vector2.zero;
+        card.anchorMax = Vector2.one;
+        card.offsetMin = Vector2.zero;
+        card.offsetMax = Vector2.zero;
+        card.localScale = Vector3.one;
+    }
+
+    static void RemoveCanvasComponents(GameObject panel)
+    {
+        // Canvas must be removed last because CanvasScaler and GraphicRaycaster depend on it.
+        foreach (GraphicRaycaster raycaster in panel.GetComponentsInChildren<GraphicRaycaster>(true))
             UnityEngine.Object.DestroyImmediate(raycaster);
 
-        CanvasScaler scaler = panel.GetComponent<CanvasScaler>();
-        if (scaler != null)
+        foreach (CanvasScaler scaler in panel.GetComponentsInChildren<CanvasScaler>(true))
             UnityEngine.Object.DestroyImmediate(scaler);
 
-        Canvas canvas = panel.GetComponent<Canvas>();
-        if (canvas != null)
+        foreach (Canvas canvas in panel.GetComponentsInChildren<Canvas>(true))
             UnityEngine.Object.DestroyImmediate(canvas);
     }
 
