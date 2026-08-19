@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[DefaultExecutionOrder(100)]
 public class SelectionControlsUI : MonoBehaviour
 {
     [SerializeField] RectTransform controlsRoot;

@@ -121,21 +121,20 @@ public class LevelEditor : MonoBehaviour
         RefreshSelectionControls();
     }
 
+    void LateUpdate()
+    {
+        UpdateActiveScreenSpaceTransformControl();
+    }
+
     private void OnEnable()
     {
         EventManager.Instance.UnselectObjectEvent.AddListener(UnselectObject);
-
-        if (PointerInput.Instance != null)
-            PointerInput.Instance.HeldPointerUpdated += UpdateActiveScreenSpaceTransformControl;
     }
 
     private void OnDisable()
     {
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
-
-        if (PointerInput.Instance != null)
-            PointerInput.Instance.HeldPointerUpdated -= UpdateActiveScreenSpaceTransformControl;
     }
 
     
@@ -191,24 +190,6 @@ public class LevelEditor : MonoBehaviour
 
     #endregion
 
-    Vector3 GetPointerWorldPosition(Vector2 screenPosition)
-    {
-        Vector3 currentPointerWorldPosition = Camera.main.ScreenToWorldPoint(screenPosition);
-        // ensure no depth
-        currentPointerWorldPosition.z = 0;
-        return currentPointerWorldPosition;
-    }
-
-    Vector3 GetCurrentPointerWorldPosition()
-    {
-        return GetPointerWorldPosition(PointerInput.Instance.ScreenPosition);
-    }
-
-    Vector2 GetCurrentPointerScreenPosition()
-    {
-        return PointerInput.Instance.ScreenPosition;
-    }
-
     void UpdateBoxSelectIntentFromPointerDrag()
     {
         if (PointerInput.Instance.WasPressedThisFrame)
@@ -230,7 +211,8 @@ public class LevelEditor : MonoBehaviour
         if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
         {
             // make the object the player is currently trying to place follow the pointer
-            objectCurrentlyTryingToPlace.transform.position = GetCurrentPointerWorldPosition();
+            if (PointerInput.Instance.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
+                objectCurrentlyTryingToPlace.transform.position = pointerWorldPosition;
 
             // dont show object that is currently trying to be placed when over object selection bar
             if (pointerIsOverObjectSelectionBar)
@@ -279,7 +261,7 @@ public class LevelEditor : MonoBehaviour
             else // click select
             {
                 Debug.Log("LevelEditor: pointer cycle resolved as click-select.");
-                Ray ray = Camera.main.ScreenPointToRay(GetCurrentPointerScreenPosition());
+                Ray ray = Camera.main.ScreenPointToRay(PointerInput.Instance.ScreenPosition);
                 RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
                 if (hit.collider != null) // object hit
@@ -398,18 +380,29 @@ public class LevelEditor : MonoBehaviour
             EndScaleSelectedObject();
     }
 
-    void UpdateActiveScreenSpaceTransformControl(Vector2 screenPosition)
+    void UpdateActiveScreenSpaceTransformControl()
     {
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput == null || !pointerInput.IsHeld ||
+            !pointerInput.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
+            return;
+
         if (isTryingToMoveSelectedObject)
-            UpdateMoveSelectedObject(screenPosition, PointerInput.Instance.DragDistancePixels);
+            UpdateMoveSelectedObject(pointerWorldPosition, pointerInput.DragDistancePixels);
         else if (isTryingToRotateSelectedObject)
-            UpdateRotateSelectedObject(screenPosition);
+            UpdateRotateSelectedObject(pointerWorldPosition);
         else if (isTryingToScaleSelectedObject)
-            UpdateScaleSelectedObject(screenPosition);
+            UpdateScaleSelectedObject(pointerWorldPosition);
     }
 
     void BeginMoveSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
     {
+        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out pointerPositionAtStartMove))
+        {
+            Debug.LogError("LevelEditor could not begin moving an object because a valid pointer world position is unavailable.", this);
+            return;
+        }
+
         if (control == ObjectTransformControl.Duplicate)
         {
             SelectObject(Instantiate(selectedObject, levelObjectsCollection.transform));
@@ -421,7 +414,6 @@ public class LevelEditor : MonoBehaviour
         isTryingToMoveSelectedObject = true;
         activeMoveControl = control;
         selectedObjectPositionAtStartMove = selectedObject.transform.position;
-        pointerPositionAtStartMove = GetPointerWorldPosition(screenPosition);
 
         if (isWorldTransform)
         {
@@ -438,12 +430,10 @@ public class LevelEditor : MonoBehaviour
         moveOffset = selectedObject.transform.position - pointerPositionAtStartMove;
     }
 
-    void UpdateMoveSelectedObject(Vector2 screenPosition, float dragDistancePixels)
+    void UpdateMoveSelectedObject(Vector3 pointerWorldPosition, float dragDistancePixels)
     {
         if (selectedObject == null)
             return;
-
-        Vector3 pointerWorldPosition = GetPointerWorldPosition(screenPosition);
 
         // A quick click duplicates in place. It starts moving only after the same threshold the
         // legacy world-space control used, so the two control systems feel the same.
@@ -503,12 +493,18 @@ public class LevelEditor : MonoBehaviour
 
     void BeginRotateSelectedObject(Vector2 screenPosition)
     {
+        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPosition))
+        {
+            Debug.LogError("LevelEditor could not begin rotating an object because a valid pointer world position is unavailable.", this);
+            return;
+        }
+
         rotationLine.gameObject.SetActive(true);
         rotationLine.SetPosition(0, selectedObject.transform.position);
 
         isTryingToRotateSelectedObject = true;
         selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
-        Vector3 direction = GetPointerWorldPosition(screenPosition) - selectedObject.transform.position;
+        Vector3 direction = pointerWorldPosition - selectedObject.transform.position;
         angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
         rotationIncrementOffset = isWorldTransform
@@ -516,12 +512,11 @@ public class LevelEditor : MonoBehaviour
             : selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
     }
 
-    void UpdateRotateSelectedObject(Vector2 screenPosition)
+    void UpdateRotateSelectedObject(Vector3 pointerWorldPosition)
     {
         if (selectedObject == null)
             return;
 
-        Vector3 pointerWorldPosition = GetPointerWorldPosition(screenPosition);
         Vector3 direction = pointerWorldPosition - selectedObject.transform.position;
         float currentAngleToPointer = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         float deltaAngle = currentAngleToPointer - angleToPointerAtStartRotate;
@@ -542,21 +537,25 @@ public class LevelEditor : MonoBehaviour
 
     void BeginScaleSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
     {
+        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out pointerPositionAtStartScale))
+        {
+            Debug.LogError("LevelEditor could not begin scaling an object because a valid pointer world position is unavailable.", this);
+            return;
+        }
+
         isTryingToScaleSelectedObject = true;
         activeScaleControl = control;
-        pointerPositionAtStartScale = GetPointerWorldPosition(screenPosition);
         selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
         selectedObjectXScaleAtStartScale = selectedObject.transform.localScale.x;
         selectedObjectYScaleAtStartScale = selectedObject.transform.localScale.y;
     }
 
-    void UpdateScaleSelectedObject(Vector2 screenPosition)
+    void UpdateScaleSelectedObject(Vector3 pointerWorldPosition)
     {
         if (selectedObject == null)
             return;
 
         Vector3 newScale = selectedObject.transform.localScale;
-        Vector3 pointerWorldPosition = GetPointerWorldPosition(screenPosition);
         float pointerScaleDeltaX = pointerPositionAtStartScale.x - pointerWorldPosition.x;
         float pointerScaleDeltaY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
 
@@ -653,8 +652,14 @@ public class LevelEditor : MonoBehaviour
     #region Object Place Functions
     void StartTryingToPlaceObject()
     {
+        if (!PointerInput.Instance.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
+        {
+            Debug.LogError("LevelEditor could not begin placing an object because a valid pointer world position is unavailable.", this);
+            return;
+        }
+
         isTryingToPlace = true;
-        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, GetCurrentPointerWorldPosition(), Quaternion.identity, levelObjectsCollection.transform);
+        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerWorldPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
     public void PlaceBooster()
     {

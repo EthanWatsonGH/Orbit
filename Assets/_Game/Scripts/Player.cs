@@ -98,6 +98,17 @@ public class Player : MonoBehaviour
         }
     }
 
+    void LateUpdate()
+    {
+        if (!isDraggingLaunchDirectionTarget)
+            return;
+
+        UpdateLaunchDirectionTargetDrag();
+
+        if (state == PlayerState.Aiming)
+            UpdateLineRenderer();
+    }
+
     private void OnEnable()
     {
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.AddListener(ShowInWorldUiElements);
@@ -202,19 +213,27 @@ public class Player : MonoBehaviour
 
     public bool BeginLaunchDirectionTargetDrag(Vector2 screenPosition)
     {
-        if (state != PlayerState.Aiming || launchDirectionTarget == null ||
-            !TryGetWorldPositionFromScreenPosition(screenPosition, out Vector3 pointerWorldPosition))
+        PointerInput pointerInput = PointerInput.Instance;
+        if (state != PlayerState.Aiming)
             return false;
+
+        if (launchDirectionTarget == null || pointerInput == null ||
+            !pointerInput.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPosition))
+        {
+            Debug.LogError("Player could not begin dragging the launch direction because a required reference or valid pointer world position is unavailable.", this);
+            return false;
+        }
 
         launchTargetDragOffset = launchDirectionTarget.position - pointerWorldPosition;
         isDraggingLaunchDirectionTarget = true;
         return true;
     }
 
-    public void UpdateLaunchDirectionTargetDrag(Vector2 screenPosition)
+    void UpdateLaunchDirectionTargetDrag()
     {
-        if (!isDraggingLaunchDirectionTarget || launchDirectionTarget == null ||
-            !TryGetWorldPositionFromScreenPosition(screenPosition, out Vector3 pointerWorldPosition))
+        PointerInput pointerInput = PointerInput.Instance;
+        if (!isDraggingLaunchDirectionTarget || launchDirectionTarget == null || pointerInput == null ||
+            !pointerInput.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
             return;
 
         launchDirectionTarget.position = pointerWorldPosition + launchTargetDragOffset;
@@ -223,20 +242,6 @@ public class Player : MonoBehaviour
     public void EndLaunchDirectionTargetDrag()
     {
         isDraggingLaunchDirectionTarget = false;
-    }
-
-    bool TryGetWorldPositionFromScreenPosition(Vector2 screenPosition, out Vector3 worldPosition)
-    {
-        worldPosition = default;
-
-        if (CameraViewManager.Instance == null ||
-            !CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
-            return false;
-
-        float targetDepth = Mathf.Abs(launchDirectionTarget.position.z - activeCamera.transform.position.z);
-        Vector3 convertedPosition = activeCamera.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, targetDepth));
-        worldPosition = new Vector3(convertedPosition.x, convertedPosition.y, launchDirectionTarget.position.z);
-        return true;
     }
 
     void UpdateLineRenderer()

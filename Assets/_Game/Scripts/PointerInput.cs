@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -8,10 +7,6 @@ using UnityEngine.UI;
 public class PointerInput : MonoBehaviour
 {
     public static PointerInput Instance { get; private set; }
-
-    // Raised after all Update calls while the primary pointer is held. This lets drag consumers
-    // recalculate their world position after camera pan or zoom, even if the pointer did not move.
-    public event Action<Vector2> HeldPointerUpdated;
 
     public bool WasPressedThisFrame { get; private set; }
     public bool WasReleasedThisFrame { get; private set; }
@@ -25,7 +20,6 @@ public class PointerInput : MonoBehaviour
     public bool WasPressedOverSelectableUi { get; private set; }
     public bool WasReleasedOverSelectableUi { get; private set; }
     public bool HadMultiplePointersDuringCurrentGesture { get; private set; }
-
     public bool IsSinglePointerHeld => IsHeld && Input.touchCount <= 1;
     public float PointerDurationSeconds => (IsHeld ? Time.unscaledTime : pointerReleaseUnscaledTime) - PressStartUnscaledTime;
     public float DragDistancePixels => Vector2.Distance(PressStartScreenPosition, ScreenPosition);
@@ -33,6 +27,8 @@ public class PointerInput : MonoBehaviour
     bool isTrackingTouch;
     int primaryFingerId = -1;
     float pointerReleaseUnscaledTime;
+    Vector3 currentWorldPosition;
+    bool hasCurrentWorldPosition;
     readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>();
 
     void Awake()
@@ -88,8 +84,35 @@ public class PointerInput : MonoBehaviour
 
     void LateUpdate()
     {
-        if (IsHeld)
-            HeldPointerUpdated?.Invoke(ScreenPosition);
+        hasCurrentWorldPosition = TryGetWorldPositionNoDepth(ScreenPosition, out currentWorldPosition);
+    }
+
+    public bool TryGetWorldPosition(Vector2 screenPosition, float worldPlaneZ, out Vector3 worldPosition)
+    {
+        worldPosition = default;
+
+        if (CameraViewManager.Instance == null ||
+            !CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
+            return false;
+
+        float distanceFromCamera = Mathf.Abs(worldPlaneZ - activeCamera.transform.position.z);
+        Vector3 convertedPosition = activeCamera.ScreenToWorldPoint(
+            new Vector3(screenPosition.x, screenPosition.y, distanceFromCamera));
+        worldPosition = new Vector3(convertedPosition.x, convertedPosition.y, worldPlaneZ);
+        return true;
+    }
+
+    public bool TryGetWorldPositionNoDepth(Vector2 screenPosition, out Vector3 worldPosition)
+    {
+        return TryGetWorldPosition(screenPosition, 0f, out worldPosition);
+    }
+
+    // The cached position is refreshed after cameras move, so it remains correct when the
+    // pointer is stationary while the camera zooms or pans.
+    public bool TryGetCurrentWorldPosition(out Vector3 worldPosition)
+    {
+        worldPosition = currentWorldPosition;
+        return hasCurrentWorldPosition;
     }
 
     void UpdateTrackedTouch()

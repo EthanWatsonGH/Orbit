@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
+[DefaultExecutionOrder(100)]
 public class LaunchDirectionControlUI : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     [SerializeField] RectTransform controlRoot;
@@ -26,17 +27,8 @@ public class LaunchDirectionControlUI : MonoBehaviour, IPointerDownHandler, IPoi
         SetVisible(false);
     }
 
-    void OnEnable()
-    {
-        if (PointerInput.Instance != null)
-            PointerInput.Instance.HeldPointerUpdated += UpdateActiveDrag;
-    }
-
     void OnDisable()
     {
-        if (PointerInput.Instance != null)
-            PointerInput.Instance.HeldPointerUpdated -= UpdateActiveDrag;
-
         EndActiveDrag();
     }
 
@@ -47,15 +39,6 @@ public class LaunchDirectionControlUI : MonoBehaviour, IPointerDownHandler, IPoi
             return;
 
         activePointerId = eventData.pointerId;
-    }
-
-    void UpdateActiveDrag(Vector2 screenPosition)
-    {
-        if (activePointerId == int.MinValue)
-            return;
-
-        Player player = playerHud != null ? playerHud.Player : null;
-        player?.UpdateLaunchDirectionTargetDrag(screenPosition);
     }
 
     public void OnPointerUp(PointerEventData eventData)
