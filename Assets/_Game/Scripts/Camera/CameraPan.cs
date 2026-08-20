@@ -9,20 +9,10 @@ public class CameraPan : MonoBehaviour
     Vector3 followOffset;
     bool followTargetEnabled = true;
 
-    Vector3 touchStartPosition;
-    bool isMousePanning;
-    Vector3 mouseWorldPositionAtStartMousePan;
-
     void Awake()
     {
         cam = GetComponent<Camera>();
         CaptureFollowOffset();
-    }
-
-    void Start()
-    {
-        // Failsafe for initial touch.
-        touchStartPosition = Vector3.zero;
     }
 
     void Update()
@@ -34,47 +24,22 @@ public class CameraPan : MonoBehaviour
 
         Vector3 newPosition = transform.position;
 
-        #region Touchscreen
-        // Two-finger drag panning.
-        if (Input.touchCount == 2)
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput != null &&
+            pointerInput.TryGetPanGestureScreenDelta(out Vector2 panScreenPosition, out Vector2 panScreenDelta) &&
+            pointerInput.TryGetWorldPositionNoDepth(panScreenPosition, out Vector3 currentPanWorldPosition) &&
+            pointerInput.TryGetWorldPositionNoDepth(panScreenPosition - panScreenDelta, out Vector3 previousPanWorldPosition))
         {
-            Touch touch0 = Input.GetTouch(0);
-            Touch touch1 = Input.GetTouch(1);
-            Vector2 touchMidpoint = (touch0.position + touch1.position) / 2f;
-
-            if (touch1.phase == TouchPhase.Began)
-            {
-                touchStartPosition = cam.ScreenToWorldPoint(touchMidpoint);
-            }
-            else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
-            {
-                Vector3 touchPositionDelta = cam.ScreenToWorldPoint(touchMidpoint) - touchStartPosition;
-                newPosition -= touchPositionDelta;
-            }
-        }
-        #endregion
-
-        #region Desktop
-        // Mouse panning.
-        if (Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
-        {
-            isMousePanning = true;
-            mouseWorldPositionAtStartMousePan = cam.ScreenToWorldPoint(Input.mousePosition);
-        }
-        if (Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2))
-            isMousePanning = false;
-
-        if (isMousePanning)
-        {
-            Vector3 mousePositionDelta = cam.ScreenToWorldPoint(Input.mousePosition) - mouseWorldPositionAtStartMousePan;
-            newPosition -= mousePositionDelta;
+            newPosition -= currentPanWorldPosition - previousPanWorldPosition;
         }
 
         // Keyboard panning. Pan speed scales with zoom.
         float zoomRatio = (cam.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1f;
-        newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
-        newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
-        #endregion
+        Vector3 keyboardPanDelta = new Vector3(
+            Input.GetAxisRaw("Horizontal"),
+            Input.GetAxisRaw("Vertical"),
+            0f) * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
+        newPosition += keyboardPanDelta;
 
         newPosition.z = transform.position.z;
         SetCameraPosition(newPosition);

@@ -24,11 +24,21 @@ public class PointerInput : MonoBehaviour
     public float PointerDurationSeconds => (IsHeld ? Time.unscaledTime : pointerReleaseUnscaledTime) - PressStartUnscaledTime;
     public float DragDistancePixels => Vector2.Distance(PressStartScreenPosition, ScreenPosition);
 
+    // This is intentionally separate from the primary gameplay pointer above. A transform gesture keeps
+    // using the first finger even when a second finger starts a two-finger camera pan.
+    public Vector2 PanGestureScreenPosition { get; private set; }
+    public Vector2 PanGestureScreenDelta { get; private set; }
+    public bool HasPanGesture { get; private set; }
+
     bool isTrackingTouch;
     int primaryFingerId = -1;
     float pointerReleaseUnscaledTime;
     Vector3 currentWorldPosition;
     bool hasCurrentWorldPosition;
+    bool isTouchPanGestureActive;
+    Vector2 previousTouchPanGesturePosition;
+    bool isMousePanGestureActive;
+    Vector2 previousMousePanGesturePosition;
     readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>();
 
     void Awake()
@@ -54,6 +64,7 @@ public class PointerInput : MonoBehaviour
         WasPressedThisFrame = false;
         WasReleasedThisFrame = false;
         WasCanceledThisFrame = false;
+        UpdatePanGesture();
 
         if (isTrackingTouch)
         {
@@ -113,6 +124,87 @@ public class PointerInput : MonoBehaviour
     {
         worldPosition = currentWorldPosition;
         return hasCurrentWorldPosition;
+    }
+
+    public bool TryGetPanGestureScreenDelta(out Vector2 screenPosition, out Vector2 screenDelta)
+    {
+        screenPosition = PanGestureScreenPosition;
+        screenDelta = PanGestureScreenDelta;
+        return HasPanGesture;
+    }
+
+    void UpdatePanGesture()
+    {
+        HasPanGesture = false;
+        PanGestureScreenDelta = Vector2.zero;
+
+        if (Input.touchCount > 0)
+        {
+            isMousePanGestureActive = false;
+            UpdateTouchPanGesture();
+            return;
+        }
+
+        isTouchPanGestureActive = false;
+        UpdateMousePanGesture();
+    }
+
+    void UpdateTouchPanGesture()
+    {
+        // Camera panning requires exactly two live touches. The first touch remains the gameplay pointer;
+        // this midpoint is used only by the camera and never replaces ScreenPosition or primaryFingerId.
+        if (Input.touchCount != 2)
+        {
+            isTouchPanGestureActive = false;
+            return;
+        }
+
+        Touch firstTouch = Input.GetTouch(0);
+        Touch secondTouch = Input.GetTouch(1);
+        if (firstTouch.phase == TouchPhase.Ended || firstTouch.phase == TouchPhase.Canceled ||
+            secondTouch.phase == TouchPhase.Ended || secondTouch.phase == TouchPhase.Canceled)
+        {
+            isTouchPanGestureActive = false;
+            return;
+        }
+
+        Vector2 midpoint = (firstTouch.position + secondTouch.position) * 0.5f;
+        PanGestureScreenPosition = midpoint;
+
+        if (!isTouchPanGestureActive || firstTouch.phase == TouchPhase.Began || secondTouch.phase == TouchPhase.Began)
+        {
+            isTouchPanGestureActive = true;
+            previousTouchPanGesturePosition = midpoint;
+            return;
+        }
+
+        PanGestureScreenDelta = midpoint - previousTouchPanGesturePosition;
+        previousTouchPanGesturePosition = midpoint;
+        HasPanGesture = true;
+    }
+
+    void UpdateMousePanGesture()
+    {
+        bool isPanButtonHeld = Input.GetMouseButton(1) || Input.GetMouseButton(2);
+        if (!isPanButtonHeld)
+        {
+            isMousePanGestureActive = false;
+            return;
+        }
+
+        Vector2 mousePosition = Input.mousePosition;
+        PanGestureScreenPosition = mousePosition;
+
+        if (!isMousePanGestureActive)
+        {
+            isMousePanGestureActive = true;
+            previousMousePanGesturePosition = mousePosition;
+            return;
+        }
+
+        PanGestureScreenDelta = mousePosition - previousMousePanGesturePosition;
+        previousMousePanGesturePosition = mousePosition;
+        HasPanGesture = true;
     }
 
     void UpdateTrackedTouch()
