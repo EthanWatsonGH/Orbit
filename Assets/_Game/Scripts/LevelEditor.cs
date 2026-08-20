@@ -192,12 +192,13 @@ public class LevelEditor : MonoBehaviour
 
     void UpdateBoxSelectIntentFromPointerDrag()
     {
-        if (PointerInput.Instance.WasPressedThisFrame)
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput.WasPressedThisFrame)
             hasSelectionDragExceededThreshold = false;
 
-        if (PointerInput.Instance.IsHeld && !hasSelectionDragExceededThreshold)
+        if (!pointerInput.CurrentGestureStartedOverUi && pointerInput.IsHeld && !hasSelectionDragExceededThreshold)
         {
-            float dragDistanceInPixels = PointerInput.Instance.DragDistancePixels;
+            float dragDistanceInPixels = pointerInput.DragDistancePixels;
             if (dragDistanceInPixels >= MINIMUM_DRAG_DISTANCE_PIXELS)
             {
                 hasSelectionDragExceededThreshold = true;
@@ -244,10 +245,16 @@ public class LevelEditor : MonoBehaviour
     void HandleSelectObject()
     {
         // set the object the player clicks as selected if it's allowed to be selected
-        if (PointerInput.Instance.WasReleasedThisFrame && !UIManager.Instance.IsInControlBlockingMenu)
+        if (PointerInput.Instance.WasReleasedThisFrame)
         {
             bool shouldDoBoxSelect = hasSelectionDragExceededThreshold;
             hasSelectionDragExceededThreshold = false;
+
+            if (PointerInput.Instance.CurrentGestureStartedOverUi)
+                return;
+
+            if (UIManager.Instance.IsInControlBlockingMenu)
+                return;
 
             if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
                 return;
@@ -273,10 +280,7 @@ public class LevelEditor : MonoBehaviour
                 else // no object hit
                 {
                     // TODO: circle-collision fallback selection flow should be initiated here.
-                    if (!PointerInput.Instance.WasPressedOverUi) // if player clicks just the background, unselect object
-                    {
-                        UnselectObject();
-                    }
+                    UnselectObject();
                 }
 
             }

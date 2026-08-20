@@ -15,9 +15,9 @@ public class PointerInput : MonoBehaviour
     public Vector2 ScreenPosition { get; private set; }
     public Vector2 PressStartScreenPosition { get; private set; }
     public float PressStartUnscaledTime { get; private set; }
-    public bool WasPressedOverUi { get; private set; }
+    public bool CurrentGestureStartedOverUi { get; private set; }
     public bool WasReleasedOverUi { get; private set; }
-    public bool WasPressedOverSelectableUi { get; private set; }
+    public bool CurrentGestureStartedOverSelectableUi { get; private set; }
     public bool WasReleasedOverSelectableUi { get; private set; }
     public bool HadMultiplePointersDuringCurrentGesture { get; private set; }
     public bool IsSinglePointerHeld => IsHeld && Input.touchCount <= 1;
@@ -163,8 +163,8 @@ public class PointerInput : MonoBehaviour
         HadMultiplePointersDuringCurrentGesture = Input.touchCount > 1;
 
         GetUiStateAtScreenPosition(screenPosition, out bool isOverUi, out bool isOverSelectableUi);
-        WasPressedOverUi = isOverUi;
-        WasPressedOverSelectableUi = isOverSelectableUi;
+        CurrentGestureStartedOverUi = isOverUi;
+        CurrentGestureStartedOverSelectableUi = isOverSelectableUi;
     }
 
     void EndPointer(Vector2 screenPosition, bool wasCanceled = false)
@@ -204,8 +204,6 @@ public class PointerInput : MonoBehaviour
                 isOverSelectableUi = true;
         }
 
-        // The editor canvas always produces one baseline raycast hit. Preserve the existing
-        // editor behavior: an additional hit means the pointer is over an actual UI element.
-        isOverUi = uiRaycastResults.Count > 1;
+        isOverUi = uiRaycastResults.Count > 0;
     }
 }

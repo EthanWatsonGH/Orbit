@@ -188,7 +188,7 @@ public class Player : MonoBehaviour
         return pointerInput.WasReleasedThisFrame
             && !pointerInput.WasCanceledThisFrame
             && !pointerInput.HadMultiplePointersDuringCurrentGesture
-            && !pointerInput.WasPressedOverSelectableUi
+            && !pointerInput.CurrentGestureStartedOverSelectableUi
             && !pointerInput.WasReleasedOverSelectableUi
             && pointerInput.PointerDurationSeconds <= quickRetrySwipeMaximumDurationSeconds
             && pointerInput.DragDistancePixels >= quickRetrySwipeMinimumDistancePixels;
