@@ -253,9 +253,6 @@ public class LevelEditor : MonoBehaviour
             if (PointerInput.Instance.CurrentGestureStartedOverUi)
                 return;
 
-            if (UIManager.Instance.IsInControlBlockingMenu)
-                return;
-
             if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 

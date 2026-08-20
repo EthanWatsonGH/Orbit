@@ -70,9 +70,6 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        if (UIManager.Instance.IsInControlBlockingMenu)
-            return;
-
         if (WasQuickSwipeGesturePerformed())
         {
             if (state == PlayerState.Aiming)

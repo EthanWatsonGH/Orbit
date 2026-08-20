@@ -67,8 +67,6 @@ public class UIManager : MonoBehaviour
     bool isUiHiddenForPreviewCapture;
     bool uiRootWasActive;
 
-    public bool IsInControlBlockingMenu => activeMenu != null;
-
     public void ShowLastActiveUiBeforeOpeningMainMenu()
     {
         CloseActiveMenu();
