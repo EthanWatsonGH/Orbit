@@ -15,6 +15,9 @@ public class SelectionControlsUI : MonoBehaviour
     Transform selectedTransform;
     RectTransform overlayRect;
     Canvas parentCanvas;
+    Quaternion scaleBothControlBaseRotation;
+    Quaternion scaleXControlBaseRotation;
+    Quaternion scaleYControlBaseRotation;
 
     void Awake()
     {
@@ -22,6 +25,13 @@ public class SelectionControlsUI : MonoBehaviour
             controlsRoot = transform as RectTransform;
         if (controlsCanvasGroup == null)
             controlsCanvasGroup = GetComponent<CanvasGroup>();
+
+        if (scaleBothControl != null)
+            scaleBothControlBaseRotation = scaleBothControl.transform.localRotation;
+        if (scaleXControl != null)
+            scaleXControlBaseRotation = scaleXControl.transform.localRotation;
+        if (scaleYControl != null)
+            scaleYControlBaseRotation = scaleYControl.transform.localRotation;
 
         overlayRect = transform.parent as RectTransform;
         parentCanvas = GetComponentInParent<Canvas>();
@@ -102,8 +112,22 @@ public class SelectionControlsUI : MonoBehaviour
             return;
         }
 
+        UpdateScaleHandleRotations();
+
         Camera eventCamera = parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : parentCanvas.worldCamera;
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(overlayRect, screenPosition, eventCamera, out Vector2 localPosition))
             controlsRoot.anchoredPosition = localPosition;
+    }
+
+    void UpdateScaleHandleRotations()
+    {
+        Quaternion selectedRotation = Quaternion.Euler(0f, 0f, selectedTransform.eulerAngles.z);
+
+        if (scaleBothControl != null)
+            scaleBothControl.transform.localRotation = selectedRotation * scaleBothControlBaseRotation;
+        if (scaleXControl != null)
+            scaleXControl.transform.localRotation = selectedRotation * scaleXControlBaseRotation;
+        if (scaleYControl != null)
+            scaleYControl.transform.localRotation = selectedRotation * scaleYControlBaseRotation;
     }
 }
