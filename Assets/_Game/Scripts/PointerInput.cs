@@ -29,6 +29,9 @@ public class PointerInput : MonoBehaviour
     public Vector2 PanGestureScreenPosition { get; private set; }
     public Vector2 PanGestureScreenDelta { get; private set; }
     public bool HasPanGesture { get; private set; }
+    public Vector2 PinchGestureScreenPosition { get; private set; }
+    public float PinchGestureZoomScale { get; private set; } = 1f;
+    public bool HasPinchGesture { get; private set; }
 
     bool isTrackingTouch;
     int primaryFingerId = -1;
@@ -39,6 +42,8 @@ public class PointerInput : MonoBehaviour
     Vector2 previousTouchPanGesturePosition;
     bool isMousePanGestureActive;
     Vector2 previousMousePanGesturePosition;
+    bool isTouchPinchGestureActive;
+    float previousTouchPinchDistance;
     readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>();
 
     void Awake()
@@ -64,7 +69,7 @@ public class PointerInput : MonoBehaviour
         WasPressedThisFrame = false;
         WasReleasedThisFrame = false;
         WasCanceledThisFrame = false;
-        UpdatePanGesture();
+        UpdateInputGestures();
 
         if (isTrackingTouch)
         {
@@ -133,19 +138,30 @@ public class PointerInput : MonoBehaviour
         return HasPanGesture;
     }
 
-    void UpdatePanGesture()
+    public bool TryGetPinchGesture(out Vector2 screenPosition, out float zoomScale)
+    {
+        screenPosition = PinchGestureScreenPosition;
+        zoomScale = PinchGestureZoomScale;
+        return HasPinchGesture;
+    }
+
+    void UpdateInputGestures()
     {
         HasPanGesture = false;
         PanGestureScreenDelta = Vector2.zero;
+        HasPinchGesture = false;
+        PinchGestureZoomScale = 1f;
 
         if (Input.touchCount > 0)
         {
             isMousePanGestureActive = false;
             UpdateTouchPanGesture();
+            UpdateTouchPinchGesture();
             return;
         }
 
         isTouchPanGestureActive = false;
+        isTouchPinchGestureActive = false;
         UpdateMousePanGesture();
     }
 
@@ -205,6 +221,45 @@ public class PointerInput : MonoBehaviour
         PanGestureScreenDelta = mousePosition - previousMousePanGesturePosition;
         previousMousePanGesturePosition = mousePosition;
         HasPanGesture = true;
+    }
+
+    void UpdateTouchPinchGesture()
+    {
+        if (Input.touchCount != 2)
+        {
+            isTouchPinchGestureActive = false;
+            return;
+        }
+
+        Touch firstTouch = Input.GetTouch(0);
+        Touch secondTouch = Input.GetTouch(1);
+        if (firstTouch.phase == TouchPhase.Ended || firstTouch.phase == TouchPhase.Canceled ||
+            secondTouch.phase == TouchPhase.Ended || secondTouch.phase == TouchPhase.Canceled)
+        {
+            isTouchPinchGestureActive = false;
+            return;
+        }
+
+        float currentDistance = Vector2.Distance(firstTouch.position, secondTouch.position);
+        if (currentDistance <= Mathf.Epsilon)
+        {
+            isTouchPinchGestureActive = false;
+            return;
+        }
+
+        Vector2 midpoint = (firstTouch.position + secondTouch.position) * 0.5f;
+        PinchGestureScreenPosition = midpoint;
+
+        if (!isTouchPinchGestureActive || firstTouch.phase == TouchPhase.Began || secondTouch.phase == TouchPhase.Began)
+        {
+            isTouchPinchGestureActive = true;
+            previousTouchPinchDistance = currentDistance;
+            return;
+        }
+
+        PinchGestureZoomScale = previousTouchPinchDistance / currentDistance;
+        previousTouchPinchDistance = currentDistance;
+        HasPinchGesture = true;
     }
 
     void UpdateTrackedTouch()

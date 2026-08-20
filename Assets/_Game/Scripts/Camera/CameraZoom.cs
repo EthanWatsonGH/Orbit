@@ -1,24 +1,20 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(Camera))]
 public class CameraZoom : MonoBehaviour
 {
     Camera cam;
+    CameraPan cameraPan;
 
-    float newCameraZoom;
-    float distanceBetweenTouchesAtTouchBegan;
-    float cameraZoomAtTouchBegan;
+    void Awake()
+    {
+        cam = GetComponent<Camera>();
+        cameraPan = GetComponent<CameraPan>();
+    }
 
     void Start()
     {
-        cam = gameObject.transform.GetComponent<Camera>();
-
-        // set the default zoom of the camera
         cam.orthographicSize = GameManager.Instance.DefaultCameraZoom;
-
-        // initialize value
-        newCameraZoom = GameManager.Instance.DefaultCameraZoom;
     }
 
     void Update()
@@ -26,31 +22,42 @@ public class CameraZoom : MonoBehaviour
         if (cam == null || !cam.enabled)
             return;
 
-        // touchscreen
-        if (Input.touchCount == 2)
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput != null &&
+            pointerInput.TryGetPinchGesture(out Vector2 pinchScreenPosition, out float pinchZoomScale))
         {
-            Touch touch0 = Input.GetTouch(0);
-            Touch touch1 = Input.GetTouch(1);
-
-            if (touch1.phase == TouchPhase.Began)
-            {
-                distanceBetweenTouchesAtTouchBegan = Vector3.Distance(touch1.position, touch0.position);
-                cameraZoomAtTouchBegan = cam.orthographicSize;
-            }
-            else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
-            {
-                float currentDistanceBetweenTouches = Vector3.Distance(touch1.position, touch0.position);
-                float touchZoomRatio = distanceBetweenTouchesAtTouchBegan / currentDistanceBetweenTouches;
-                newCameraZoom = cameraZoomAtTouchBegan * touchZoomRatio;
-            }
+            ApplyPinchZoom(pinchScreenPosition, pinchZoomScale, pointerInput);
+            return;
         }
 
-        // desktop
-        float desktopZoomRatio = cam.orthographicSize / GameManager.Instance.DefaultCameraZoom; // makes zoom increment per scroll exponential with zoom level
-        if (Input.GetAxisRaw("Mouse ScrollWheel") != 0)
-            newCameraZoom = cam.orthographicSize + Input.GetAxisRaw("Mouse ScrollWheel") * GameManager.Instance.ScrollZoomIncrement * desktopZoomRatio * -1f;
+        float scrollInput = Input.GetAxisRaw("Mouse ScrollWheel");
+        if (Mathf.Approximately(scrollInput, 0f))
+            return;
 
-        // apply new zoom
-        cam.orthographicSize = Mathf.Clamp(newCameraZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+        float zoomRatio = cam.orthographicSize / GameManager.Instance.DefaultCameraZoom;
+        float requestedZoom = cam.orthographicSize + scrollInput * GameManager.Instance.ScrollZoomIncrement * zoomRatio * -1f;
+        cam.orthographicSize = Mathf.Clamp(requestedZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+    }
+
+    void ApplyPinchZoom(Vector2 pinchScreenPosition, float pinchZoomScale, PointerInput pointerInput)
+    {
+        float requestedZoom = cam.orthographicSize * pinchZoomScale;
+        float clampedZoom = Mathf.Clamp(requestedZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+        if (Mathf.Approximately(cam.orthographicSize, clampedZoom))
+            return;
+
+        // Keep the world point below the pinch midpoint fixed on screen as the orthographic size changes.
+        bool hasWorldPositionBeforeZoom = pointerInput.TryGetWorldPositionNoDepth(pinchScreenPosition, out Vector3 worldPositionBeforeZoom);
+        cam.orthographicSize = clampedZoom;
+
+        if (!hasWorldPositionBeforeZoom ||
+            !pointerInput.TryGetWorldPositionNoDepth(pinchScreenPosition, out Vector3 worldPositionAfterZoom))
+            return;
+
+        Vector3 cameraPositionAdjustment = worldPositionBeforeZoom - worldPositionAfterZoom;
+        if (cameraPan != null)
+            cameraPan.PanByWorldDelta(cameraPositionAdjustment);
+        else
+            transform.position += cameraPositionAdjustment;
     }
 }

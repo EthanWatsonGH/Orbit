@@ -68,6 +68,12 @@ public class CameraPan : MonoBehaviour
         SetCameraPosition(new Vector3(targetPosition.x, targetPosition.y, transform.position.z));
     }
 
+    public void PanByWorldDelta(Vector3 worldDelta)
+    {
+        worldDelta.z = 0f;
+        SetCameraPosition(transform.position + worldDelta);
+    }
+
     void ApplyFollowTargetPosition()
     {
         if (!followTargetEnabled || followTarget == null)
