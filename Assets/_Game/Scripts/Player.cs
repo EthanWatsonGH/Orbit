@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 public enum PlayerState
 {
@@ -18,7 +17,7 @@ public class Player : MonoBehaviour
     [SerializeField] LineRenderer lr;
     [SerializeField] TrailRenderer finishTrailRenderer;
     // self object references
-    [SerializeField, FormerlySerializedAs("launchDirectionPoint")] Transform launchDirectionTarget;
+    [SerializeField] Transform launchDirectionTarget;
     [SerializeField] GameObject launchButton;
     [SerializeField] GameObject retryButton;
     // HUD
