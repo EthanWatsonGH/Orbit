@@ -56,7 +56,8 @@ public class RecenterCameraButton : MonoBehaviour
         Camera uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
             ? canvas.worldCamera
             : null;
-        Vector2 buttonScreenPosition = RectTransformUtility.WorldToScreenPoint(uiCamera, buttonRect.position);
+        Vector3 buttonCenterWorldPosition = buttonRect.TransformPoint(buttonRect.rect.center);
+        Vector2 buttonScreenPosition = RectTransformUtility.WorldToScreenPoint(uiCamera, buttonCenterWorldPosition);
         Vector2 directionToTarget = (Vector2)targetScreenPosition - buttonScreenPosition;
 
         if (directionToTarget.sqrMagnitude < 0.01f)
