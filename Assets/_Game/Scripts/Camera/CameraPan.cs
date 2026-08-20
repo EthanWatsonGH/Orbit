@@ -9,6 +9,9 @@ public class CameraPan : MonoBehaviour
     Vector3 mouseWorldPositionAtStartMousePan;
     Vector3 parentObjectPositionAtStartPan;
     Vector3 newPosition;
+    bool followParent = true;
+    Vector3 parentObjectPositionAtEndOfLastFrame;
+    Vector3 parentObjectPositionAfterUpdate;
 
     void Start()
     {
@@ -16,10 +19,17 @@ public class CameraPan : MonoBehaviour
 
         // failsafe for initial touch
         touchStartPosition = Vector3.zero;
+        parentObjectPositionAtEndOfLastFrame = GetParentObjectPosition();
+        parentObjectPositionAfterUpdate = parentObjectPositionAtEndOfLastFrame;
     }
 
     void Update()
     {
+        Vector3 currentParentObjectPosition = GetParentObjectPosition();
+        if (!followParent)
+            transform.position -= currentParentObjectPosition - parentObjectPositionAtEndOfLastFrame;
+
+        parentObjectPositionAfterUpdate = currentParentObjectPosition;
         newPosition = transform.position;
 
         #region Touchscreen
@@ -34,13 +44,15 @@ public class CameraPan : MonoBehaviour
             if (touch1.phase == TouchPhase.Began)
             {
                 touchStartPosition = cam.ScreenToWorldPoint(touchMidpoint);
-                parentObjectPositionAtStartPan = gameObject.transform.parent.position;
+                parentObjectPositionAtStartPan = GetParentObjectPosition();
             }
             else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
             {
                 Vector3 touchPositionDelta = cam.ScreenToWorldPoint(touchMidpoint) - touchStartPosition;
                 // make camera move relative its parent object as player pans
-                Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
+                Vector3 parentObjectOffsetFromStartPan = followParent
+                    ? parentObjectPositionAtStartPan - GetParentObjectPosition()
+                    : Vector3.zero;
 
                 newPosition -= touchPositionDelta + parentObjectOffsetFromStartPan;
 
@@ -60,7 +72,7 @@ public class CameraPan : MonoBehaviour
         {
             isMousePanning = true;
             mouseWorldPositionAtStartMousePan = cam.ScreenToWorldPoint(Input.mousePosition);
-            parentObjectPositionAtStartPan = gameObject.transform.parent.position;
+            parentObjectPositionAtStartPan = GetParentObjectPosition();
         }
         if (Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2))
         {
@@ -71,7 +83,9 @@ public class CameraPan : MonoBehaviour
         {
             Vector3 mousePositionDelta = cam.ScreenToWorldPoint(Input.mousePosition) - mouseWorldPositionAtStartMousePan;
             // make camera move relative its parent object as player pans
-            Vector3 parentObjectOffsetFromStartPan = parentObjectPositionAtStartPan - gameObject.transform.parent.position;
+            Vector3 parentObjectOffsetFromStartPan = followParent
+                ? parentObjectPositionAtStartPan - GetParentObjectPosition()
+                : Vector3.zero;
 
             newPosition -= mousePositionDelta + parentObjectOffsetFromStartPan;
         }
@@ -88,5 +102,32 @@ public class CameraPan : MonoBehaviour
         newPosition.z = transform.position.z;
         // apply movement to camera
         transform.position = newPosition;
+    }
+
+    void LateUpdate()
+    {
+        Vector3 currentParentObjectPosition = GetParentObjectPosition();
+        if (!followParent)
+        {
+            Vector3 inheritedParentMovement = currentParentObjectPosition - parentObjectPositionAfterUpdate;
+            transform.position -= inheritedParentMovement;
+        }
+
+        parentObjectPositionAtEndOfLastFrame = currentParentObjectPosition;
+    }
+
+    public void SetFollowParentEnabled(bool isEnabled)
+    {
+        if (followParent == isEnabled)
+            return;
+
+        followParent = isEnabled;
+        parentObjectPositionAtEndOfLastFrame = GetParentObjectPosition();
+        parentObjectPositionAfterUpdate = parentObjectPositionAtEndOfLastFrame;
+    }
+
+    Vector3 GetParentObjectPosition()
+    {
+        return transform.parent != null ? transform.parent.position : Vector3.zero;
     }
 }

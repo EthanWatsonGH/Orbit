@@ -31,6 +31,11 @@ public class PlayerHUD : MonoBehaviour
         player?.SetQuickLaunchEnabled(isEnabled);
     }
 
+    public void SetFollowPlayerEnabled(bool isEnabled)
+    {
+        player?.SetFollowPlayerEnabled(isEnabled);
+    }
+
     public void SwitchToLevelEditor()
     {
         player?.SwitchToLevelEditor();

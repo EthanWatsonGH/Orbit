@@ -36,6 +36,9 @@ public class Player : MonoBehaviour
     [SerializeField] bool quickLaunchEnabled;
     [SerializeField] ToggleButton quickRetryToggle;
     [SerializeField] ToggleButton quickLaunchToggle;
+    [Header("Camera Settings")]
+    [SerializeField] bool followPlayerEnabled = true;
+    [SerializeField] ToggleButton followPlayerToggle;
     [Header("Quick Retry Swipe")]
     [SerializeField, Min(0f)] float quickRetrySwipeMinimumDistancePixels = 150f;
     [SerializeField, Min(0f)] float quickRetrySwipeMaximumDurationSeconds = 0.35f;
@@ -48,6 +51,7 @@ public class Player : MonoBehaviour
     Vector3 launchTargetDragOffset = Vector3.zero;
     float timeAtLastRetry;
     bool hasStarted;
+    CameraPan playerCameraPan;
 
     public PlayerState State => state;
 
@@ -63,7 +67,8 @@ public class Player : MonoBehaviour
         HideFinishTrailRenderer();
 
         hasStarted = true;
-        SyncQuickPlayToggleButtons();
+        SyncToggleButtons();
+        ApplyFollowPlayerSetting();
         EnterAiming(false);
     }
 
@@ -114,7 +119,8 @@ public class Player : MonoBehaviour
         if (hasStarted)
         {
             EnterAiming(false);
-            SyncQuickPlayToggleButtons();
+            SyncToggleButtons();
+            ApplyFollowPlayerSetting();
         }
     }
 
@@ -402,11 +408,31 @@ public class Player : MonoBehaviour
             quickLaunchToggle.SetIsOn(quickLaunchEnabled);
     }
 
-    void SyncQuickPlayToggleButtons()
+    public void SetFollowPlayerEnabled(bool isEnabled)
+    {
+        followPlayerEnabled = isEnabled;
+        ApplyFollowPlayerSetting();
+
+        if (followPlayerToggle != null)
+            followPlayerToggle.SetIsOn(followPlayerEnabled);
+    }
+
+    void ApplyFollowPlayerSetting()
+    {
+        if (playerCameraPan == null)
+            playerCameraPan = GetComponentInChildren<CameraPan>(true);
+
+        if (playerCameraPan != null)
+            playerCameraPan.SetFollowParentEnabled(followPlayerEnabled);
+    }
+
+    void SyncToggleButtons()
     {
         if (quickRetryToggle != null)
             quickRetryToggle.SetIsOn(quickRetryEnabled);
         if (quickLaunchToggle != null)
             quickLaunchToggle.SetIsOn(quickLaunchEnabled);
+        if (followPlayerToggle != null)
+            followPlayerToggle.SetIsOn(followPlayerEnabled);
     }
 }
