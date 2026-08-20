@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: -7317905138134010213}
   m_Layer: 0
   m_Name: Camera
-  m_TagString: MainCamera
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -119,6 +119,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6262198ed727334ca42a26acc850d12, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  followTarget: {fileID: 0}
 --- !u!114 &-7317905138134010213
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,3 +132,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98c25cd29b94e59428abc14803286653, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  recenterTarget: {fileID: 0}

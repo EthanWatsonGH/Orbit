@@ -1,13 +1,17 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Camera))]
 public class CameraRecenter : MonoBehaviour
 {
-    Transform playerStartPoint;
-    bool isLevelEditorCamera;
+    [SerializeField] Transform recenterTarget;
+
+    Camera cam;
+    CameraPan cameraPan;
 
     void Awake()
     {
-        isLevelEditorCamera = GetComponentInParent<LevelEditor>() != null;
+        cam = GetComponent<Camera>();
+        cameraPan = GetComponent<CameraPan>();
     }
 
     void OnEnable()
@@ -24,39 +28,24 @@ public class CameraRecenter : MonoBehaviour
 
     void RecenterCamera()
     {
-        if (!TryGetTargetPosition(out Vector3 targetPosition))
+        if (cam == null || !cam.enabled || !TryGetTargetPosition(out Vector3 targetPosition))
             return;
 
-        transform.position = new Vector3(targetPosition.x, targetPosition.y, transform.position.z);
+        if (cameraPan != null)
+            cameraPan.RecenterOn(targetPosition);
+        else
+            transform.position = new Vector3(targetPosition.x, targetPosition.y, transform.position.z);
     }
 
     public bool TryGetTargetPosition(out Vector3 targetPosition)
     {
-        if (!isLevelEditorCamera)
-        {
-            if (transform.parent == null)
-            {
-                targetPosition = default;
-                return false;
-            }
-
-            targetPosition = transform.parent.position;
-            return true;
-        }
-
-        if (playerStartPoint == null)
-        {
-            GameObject playerStartPointObject = GameObject.Find("PlayerStartPoint");
-            playerStartPoint = playerStartPointObject != null ? playerStartPointObject.transform : null;
-        }
-
-        if (playerStartPoint == null)
+        if (recenterTarget == null)
         {
             targetPosition = default;
             return false;
         }
 
-        targetPosition = playerStartPoint.position;
+        targetPosition = recenterTarget.position;
         return true;
     }
 }

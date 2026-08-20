@@ -1,133 +1,125 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Camera))]
 public class CameraPan : MonoBehaviour
 {
+    [SerializeField] Transform followTarget;
+
     Camera cam;
+    Vector3 followOffset;
+    bool followTargetEnabled = true;
 
     Vector3 touchStartPosition;
-    bool isMousePanning = false;
+    bool isMousePanning;
     Vector3 mouseWorldPositionAtStartMousePan;
-    Vector3 parentObjectPositionAtStartPan;
-    Vector3 newPosition;
-    bool followParent = true;
-    Vector3 parentObjectPositionAtEndOfLastFrame;
-    Vector3 parentObjectPositionAfterUpdate;
+
+    void Awake()
+    {
+        cam = GetComponent<Camera>();
+        CaptureFollowOffset();
+    }
 
     void Start()
     {
-        cam = gameObject.transform.GetComponent<Camera>();
-
-        // failsafe for initial touch
+        // Failsafe for initial touch.
         touchStartPosition = Vector3.zero;
-        parentObjectPositionAtEndOfLastFrame = GetParentObjectPosition();
-        parentObjectPositionAfterUpdate = parentObjectPositionAtEndOfLastFrame;
     }
 
     void Update()
     {
-        Vector3 currentParentObjectPosition = GetParentObjectPosition();
-        if (!followParent)
-            transform.position -= currentParentObjectPosition - parentObjectPositionAtEndOfLastFrame;
+        if (cam == null || !cam.enabled)
+            return;
 
-        parentObjectPositionAfterUpdate = currentParentObjectPosition;
-        newPosition = transform.position;
+        ApplyFollowTargetPosition();
+
+        Vector3 newPosition = transform.position;
 
         #region Touchscreen
-        // 2 finger drag panning
+        // Two-finger drag panning.
         if (Input.touchCount == 2)
         {
             Touch touch0 = Input.GetTouch(0);
             Touch touch1 = Input.GetTouch(1);
-
             Vector2 touchMidpoint = (touch0.position + touch1.position) / 2f;
 
             if (touch1.phase == TouchPhase.Began)
             {
                 touchStartPosition = cam.ScreenToWorldPoint(touchMidpoint);
-                parentObjectPositionAtStartPan = GetParentObjectPosition();
             }
             else if (touch0.phase == TouchPhase.Moved || touch1.phase == TouchPhase.Moved)
             {
                 Vector3 touchPositionDelta = cam.ScreenToWorldPoint(touchMidpoint) - touchStartPosition;
-                // make camera move relative its parent object as player pans
-                Vector3 parentObjectOffsetFromStartPan = followParent
-                    ? parentObjectPositionAtStartPan - GetParentObjectPosition()
-                    : Vector3.zero;
-
-                newPosition -= touchPositionDelta + parentObjectOffsetFromStartPan;
-
-                // TODO: i should only have this at the end of Update, but if i dont have this here then the camera jitters as i touch pan and im not sure why. could it be because this is an else if?
-                // don't move z
-                newPosition.z = transform.position.z;
-                // apply movement to camera
-                transform.position = newPosition;
+                newPosition -= touchPositionDelta;
             }
         }
         #endregion
 
         #region Desktop
-        // mouse panning
-        // TODO: mouse panning and zooming are fighting each other. when i scoll in a step, it has to move the camera to where the mouse is on the new zoom level, causing a jittering effect. im not sure if this is some execution ordering issue where for some reason they aren't being done on the same frame, or if there's somthing about my code that makes the panning have to wait to be executed after the zooming.
+        // Mouse panning.
         if (Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
         {
             isMousePanning = true;
             mouseWorldPositionAtStartMousePan = cam.ScreenToWorldPoint(Input.mousePosition);
-            parentObjectPositionAtStartPan = GetParentObjectPosition();
         }
         if (Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2))
-        {
             isMousePanning = false;
-        }
 
         if (isMousePanning)
         {
             Vector3 mousePositionDelta = cam.ScreenToWorldPoint(Input.mousePosition) - mouseWorldPositionAtStartMousePan;
-            // make camera move relative its parent object as player pans
-            Vector3 parentObjectOffsetFromStartPan = followParent
-                ? parentObjectPositionAtStartPan - GetParentObjectPosition()
-                : Vector3.zero;
-
-            newPosition -= mousePositionDelta + parentObjectOffsetFromStartPan;
+            newPosition -= mousePositionDelta;
         }
 
-        // keyboard panning
-        // make pan speed at different zoom levels exponentially more
-        float zoomRatio = (cam.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1;
-
+        // Keyboard panning. Pan speed scales with zoom.
+        float zoomRatio = (cam.orthographicSize / GameManager.Instance.DefaultCameraZoom) + 1f;
         newPosition.x += Input.GetAxisRaw("Horizontal") * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
         newPosition.y += Input.GetAxisRaw("Vertical") * GameManager.Instance.KeyboardPanSpeed * Time.unscaledDeltaTime * zoomRatio;
         #endregion
 
-        // don't move z
         newPosition.z = transform.position.z;
-        // apply movement to camera
-        transform.position = newPosition;
+        SetCameraPosition(newPosition);
     }
 
     void LateUpdate()
     {
-        Vector3 currentParentObjectPosition = GetParentObjectPosition();
-        if (!followParent)
-        {
-            Vector3 inheritedParentMovement = currentParentObjectPosition - parentObjectPositionAfterUpdate;
-            transform.position -= inheritedParentMovement;
-        }
-
-        parentObjectPositionAtEndOfLastFrame = currentParentObjectPosition;
+        if (cam != null && cam.enabled)
+            ApplyFollowTargetPosition();
     }
 
-    public void SetFollowParentEnabled(bool isEnabled)
+    public void SetFollowTargetEnabled(bool isEnabled)
     {
-        if (followParent == isEnabled)
+        if (followTargetEnabled == isEnabled)
             return;
 
-        followParent = isEnabled;
-        parentObjectPositionAtEndOfLastFrame = GetParentObjectPosition();
-        parentObjectPositionAfterUpdate = parentObjectPositionAtEndOfLastFrame;
+        followTargetEnabled = isEnabled;
+
+        // Resuming follow preserves the framing the player currently chose instead of snapping the camera.
+        if (followTargetEnabled)
+            CaptureFollowOffset();
     }
 
-    Vector3 GetParentObjectPosition()
+    public void RecenterOn(Vector3 targetPosition)
     {
-        return transform.parent != null ? transform.parent.position : Vector3.zero;
+        SetCameraPosition(new Vector3(targetPosition.x, targetPosition.y, transform.position.z));
+    }
+
+    void ApplyFollowTargetPosition()
+    {
+        if (!followTargetEnabled || followTarget == null)
+            return;
+
+        transform.position = followTarget.position + followOffset;
+    }
+
+    void SetCameraPosition(Vector3 newPosition)
+    {
+        transform.position = newPosition;
+        CaptureFollowOffset();
+    }
+
+    void CaptureFollowOffset()
+    {
+        if (followTarget != null)
+            followOffset = transform.position - followTarget.position;
     }
 }

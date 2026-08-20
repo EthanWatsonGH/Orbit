@@ -33,6 +33,7 @@ public class UIManager : MonoBehaviour
         if (initialMode == WorldMode.None)
         {
             HideWorldHud();
+            CameraViewManager.Instance?.DeactivateWorldCameras();
             return;
         }
 
@@ -291,13 +292,18 @@ public class UIManager : MonoBehaviour
 
         if (mode == WorldMode.Player)
         {
+            if (CameraViewManager.Instance != null)
+                CameraViewManager.Instance.ActivatePlayerCamera();
             if (playerHUD != null)
                 playerHUD.SetActive(true);
             EventManager.Instance.ShowPlayerInWorldUiElements();
         }
-        else if (mode == WorldMode.LevelEditor && levelEditorHUD != null)
+        else if (mode == WorldMode.LevelEditor)
         {
-            levelEditorHUD.SetActive(true);
+            if (CameraViewManager.Instance != null)
+                CameraViewManager.Instance.ActivateLevelEditorCamera();
+            if (levelEditorHUD != null)
+                levelEditorHUD.SetActive(true);
         }
     }
 }

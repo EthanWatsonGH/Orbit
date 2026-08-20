@@ -39,6 +39,7 @@ public class Player : MonoBehaviour
     [Header("Camera Settings")]
     [SerializeField] bool followPlayerEnabled = true;
     [SerializeField] ToggleButton followPlayerToggle;
+    [SerializeField] CameraPan playerCameraPan;
     [Header("Quick Retry Swipe")]
     [SerializeField, Min(0f)] float quickRetrySwipeMinimumDistancePixels = 150f;
     [SerializeField, Min(0f)] float quickRetrySwipeMaximumDurationSeconds = 0.35f;
@@ -51,7 +52,6 @@ public class Player : MonoBehaviour
     Vector3 launchTargetDragOffset = Vector3.zero;
     float timeAtLastRetry;
     bool hasStarted;
-    CameraPan playerCameraPan;
 
     public PlayerState State => state;
 
@@ -420,10 +420,12 @@ public class Player : MonoBehaviour
     void ApplyFollowPlayerSetting()
     {
         if (playerCameraPan == null)
-            playerCameraPan = GetComponentInChildren<CameraPan>(true);
+        {
+            Debug.LogError("Player is missing its Player Camera Pan reference.", this);
+            return;
+        }
 
-        if (playerCameraPan != null)
-            playerCameraPan.SetFollowParentEnabled(followPlayerEnabled);
+        playerCameraPan.SetFollowTargetEnabled(followPlayerEnabled);
     }
 
     void SyncToggleButtons()

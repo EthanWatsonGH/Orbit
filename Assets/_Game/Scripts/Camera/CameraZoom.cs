@@ -23,6 +23,9 @@ public class CameraZoom : MonoBehaviour
 
     void Update()
     {
+        if (cam == null || !cam.enabled)
+            return;
+
         // touchscreen
         if (Input.touchCount == 2)
         {
