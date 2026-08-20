@@ -26,7 +26,7 @@ public class CameraZoom : MonoBehaviour
         if (pointerInput != null &&
             pointerInput.TryGetPinchGesture(out Vector2 pinchScreenPosition, out float pinchZoomScale))
         {
-            ApplyPinchZoom(pinchScreenPosition, pinchZoomScale, pointerInput);
+            ApplyZoomAtScreenPosition(cam.orthographicSize * pinchZoomScale, pinchScreenPosition, pointerInput);
             return;
         }
 
@@ -36,22 +36,24 @@ public class CameraZoom : MonoBehaviour
 
         float zoomRatio = cam.orthographicSize / GameManager.Instance.DefaultCameraZoom;
         float requestedZoom = cam.orthographicSize + scrollInput * GameManager.Instance.ScrollZoomIncrement * zoomRatio * -1f;
-        cam.orthographicSize = Mathf.Clamp(requestedZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
+        Vector2 scrollZoomScreenPosition = pointerInput != null ? pointerInput.ScreenPosition : (Vector2)Input.mousePosition;
+        ApplyZoomAtScreenPosition(requestedZoom, scrollZoomScreenPosition, pointerInput);
     }
 
-    void ApplyPinchZoom(Vector2 pinchScreenPosition, float pinchZoomScale, PointerInput pointerInput)
+    void ApplyZoomAtScreenPosition(float requestedZoom, Vector2 zoomScreenPosition, PointerInput pointerInput)
     {
-        float requestedZoom = cam.orthographicSize * pinchZoomScale;
         float clampedZoom = Mathf.Clamp(requestedZoom, GameManager.Instance.MinCameraZoom, GameManager.Instance.MaxCameraZoom);
         if (Mathf.Approximately(cam.orthographicSize, clampedZoom))
             return;
 
-        // Keep the world point below the pinch midpoint fixed on screen as the orthographic size changes.
-        bool hasWorldPositionBeforeZoom = pointerInput.TryGetWorldPositionNoDepth(pinchScreenPosition, out Vector3 worldPositionBeforeZoom);
+        // Keep the world point below the zoom gesture fixed on screen as the orthographic size changes.
+        Vector3 worldPositionBeforeZoom = default;
+        bool hasWorldPositionBeforeZoom = pointerInput != null &&
+            pointerInput.TryGetWorldPositionNoDepth(zoomScreenPosition, out worldPositionBeforeZoom);
         cam.orthographicSize = clampedZoom;
 
         if (!hasWorldPositionBeforeZoom ||
-            !pointerInput.TryGetWorldPositionNoDepth(pinchScreenPosition, out Vector3 worldPositionAfterZoom))
+            !pointerInput.TryGetWorldPositionNoDepth(zoomScreenPosition, out Vector3 worldPositionAfterZoom))
             return;
 
         Vector3 cameraPositionAdjustment = worldPositionBeforeZoom - worldPositionAfterZoom;
