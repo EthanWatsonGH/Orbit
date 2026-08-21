@@ -66,6 +66,7 @@ public class UIManager : MonoBehaviour
     LevelSelectionMenu activeMenu;
     LevelEditor levelEditor;
     WorldMode menuReturnMode;
+    int levelRevisionWhenMenuOpened = -1;
     bool isUiHiddenForPreviewCapture;
     bool uiRootWasActive;
 
@@ -179,6 +180,9 @@ public class UIManager : MonoBehaviour
             return;
 
         menuReturnMode = currentMode;
+        levelRevisionWhenMenuOpened = LevelManager.Instance != null
+            ? LevelManager.Instance.CurrentLevelRevision
+            : -1;
         EventManager.Instance.UnselectObject();
         EventManager.Instance.HidePlayerInWorldUiElements();
         HideWorldHud();
@@ -220,12 +224,23 @@ public class UIManager : MonoBehaviour
         if (activeMenu == null)
             return;
 
+        bool levelChangedWhileMenuWasOpen = LevelManager.Instance != null &&
+                                            LevelManager.Instance.CurrentLevelRevision != levelRevisionWhenMenuOpened;
         activeMenu.Hide();
         activeMenu = null;
         CameraViewManager.Instance.DeactivateMenuCamera();
         SetWorldModeActive(menuReturnMode, true);
         ShowWorldModeUi(menuReturnMode);
+
+        if (levelChangedWhileMenuWasOpen)
+        {
+            // Loading from a menu happens while the menu camera is active. Recenter
+            // after the return world camera has been activated instead.
+            EventManager.Instance.RecenterCamera();
+        }
+
         menuReturnMode = WorldMode.None;
+        levelRevisionWhenMenuOpened = -1;
     }
 
     void HideActiveMenuWithoutRestoringWorldMode()
@@ -235,6 +250,7 @@ public class UIManager : MonoBehaviour
 
         activeMenu = null;
         menuReturnMode = WorldMode.None;
+        levelRevisionWhenMenuOpened = -1;
 
         if (CameraViewManager.Instance != null)
             CameraViewManager.Instance.DeactivateMenuCamera();
