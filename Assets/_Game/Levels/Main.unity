@@ -1877,6 +1877,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 849191386}
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+      propertyPath: playerStartPoint
+      value: 
+      objectReference: {fileID: 1981640280}
+    - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: startLocationIcon
       value: 
       objectReference: {fileID: 1231841329}

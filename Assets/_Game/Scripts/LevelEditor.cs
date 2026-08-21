@@ -24,6 +24,7 @@ public class LevelEditor : MonoBehaviour
     // world object references
     [Header("World Objects")]
     [SerializeField] GameObject levelObjectsCollection;
+    [SerializeField] GameObject playerStartPoint;
 
     [Header("Screen Space UI")]
     [SerializeField] SelectionControlsUI selectionControlsUI;
@@ -384,7 +385,10 @@ public class LevelEditor : MonoBehaviour
                 continue;
 
             Transform candidate = objectToSelect.transform;
-            if (!candidate.IsChildOf(levelObjectsCollection.transform))
+            if (playerStartPoint != null && candidate.IsChildOf(playerStartPoint.transform))
+                candidate = playerStartPoint.transform;
+
+            if (!IsEditorSelectableObject(candidate))
                 continue;
 
             bool isAlreadyCoveredBySelectionRoot = false;
@@ -405,7 +409,24 @@ public class LevelEditor : MonoBehaviour
                 selectionRoots.Add(candidate);
         }
 
+        if (playerStartPoint != null &&
+            selectionRoots.Count > 1 &&
+            selectionRoots.Remove(playerStartPoint.transform))
+        {
+            Debug.Log("Player start point can only be selected alone.");
+        }
+
         return selectionRoots;
+    }
+
+    bool IsEditorSelectableObject(Transform candidate)
+    {
+        if (candidate == null)
+            return false;
+
+        bool isPlayerStartPoint = playerStartPoint != null && candidate == playerStartPoint.transform;
+        return isPlayerStartPoint ||
+               (levelObjectsCollection != null && candidate.IsChildOf(levelObjectsCollection.transform));
     }
 
     void CreateTemporarySelectionGroup(List<Transform> selectionRoots)
