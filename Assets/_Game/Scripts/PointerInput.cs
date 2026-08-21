@@ -123,6 +123,30 @@ public class PointerInput : MonoBehaviour
         return TryGetWorldPosition(screenPosition, 0f, out worldPosition);
     }
 
+    // A UI control can capture the pointer that pressed it without changing the primary
+    // gameplay pointer. This lets a transform handle follow its own finger during multitouch.
+    public bool TryGetScreenPosition(int pointerId, out Vector2 screenPosition)
+    {
+        if (pointerId < 0)
+        {
+            screenPosition = Input.mousePosition;
+            return true;
+        }
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.fingerId == pointerId)
+            {
+                screenPosition = touch.position;
+                return true;
+            }
+        }
+
+        screenPosition = default;
+        return false;
+    }
+
     // The cached position is refreshed after cameras move, so it remains correct when the
     // pointer is stationary while the camera zooms or pans.
     public bool TryGetCurrentWorldPosition(out Vector3 worldPosition)

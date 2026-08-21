@@ -66,6 +66,8 @@ public class LevelEditor : MonoBehaviour
 
     ObjectTransformControl activeMoveControl;
     ObjectTransformControl activeScaleControl;
+    int activeTransformPointerId = int.MinValue;
+    Vector2 activeTransformPressScreenPosition;
 
     void Awake()
     {
@@ -347,7 +349,7 @@ public class LevelEditor : MonoBehaviour
 
     // These are called by the screen-space selection controls. Keeping the transform work here
     // means both the controls and the editor continue to have one owner for object edits.
-    public void BeginObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition)
+    public void BeginObjectTransformControl(ObjectTransformControl control, int pointerId, Vector2 screenPosition)
     {
         if (selectedObject == null || isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject)
             return;
@@ -369,27 +371,39 @@ public class LevelEditor : MonoBehaviour
                 BeginScaleSelectedObject(control, screenPosition);
                 break;
         }
+
+        if (isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject)
+        {
+            activeTransformPointerId = pointerId;
+            activeTransformPressScreenPosition = screenPosition;
+        }
     }
 
-    public void EndObjectTransformControl(ObjectTransformControl control, Vector2 screenPosition, float dragDistancePixels)
+    public void EndObjectTransformControl(ObjectTransformControl control, int pointerId)
     {
+        if (pointerId != activeTransformPointerId)
+            return;
+
         if (control == activeMoveControl && isTryingToMoveSelectedObject)
             EndMoveSelectedObject();
         else if (control == ObjectTransformControl.Rotate && isTryingToRotateSelectedObject)
             EndRotateSelectedObject();
         else if (control == activeScaleControl && isTryingToScaleSelectedObject)
             EndScaleSelectedObject();
+
+        activeTransformPointerId = int.MinValue;
     }
 
     void UpdateActiveScreenSpaceTransformControl()
     {
         PointerInput pointerInput = PointerInput.Instance;
-        if (pointerInput == null || !pointerInput.IsHeld ||
-            !pointerInput.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
+        if (pointerInput == null || activeTransformPointerId == int.MinValue ||
+            !pointerInput.TryGetScreenPosition(activeTransformPointerId, out Vector2 pointerScreenPosition) ||
+            !pointerInput.TryGetWorldPositionNoDepth(pointerScreenPosition, out Vector3 pointerWorldPosition))
             return;
 
         if (isTryingToMoveSelectedObject)
-            UpdateMoveSelectedObject(pointerWorldPosition, pointerInput.DragDistancePixels);
+            UpdateMoveSelectedObject(pointerWorldPosition, Vector2.Distance(activeTransformPressScreenPosition, pointerScreenPosition));
         else if (isTryingToRotateSelectedObject)
             UpdateRotateSelectedObject(pointerWorldPosition);
         else if (isTryingToScaleSelectedObject)

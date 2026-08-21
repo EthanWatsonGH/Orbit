@@ -78,16 +78,16 @@ public class SelectionControlsUI : MonoBehaviour
         controlsCanvasGroup.blocksRaycasts = shouldShow;
     }
 
-    public void BeginControl(ObjectTransformControl control, Vector2 screenPosition)
+    public void BeginControl(ObjectTransformControl control, int pointerId, Vector2 screenPosition)
     {
         if (levelEditor != null)
-            levelEditor.BeginObjectTransformControl(control, screenPosition);
+            levelEditor.BeginObjectTransformControl(control, pointerId, screenPosition);
     }
 
-    public void EndControl(ObjectTransformControl control, Vector2 screenPosition, Vector2 pressScreenPosition)
+    public void EndControl(ObjectTransformControl control, int pointerId)
     {
         if (levelEditor != null)
-            levelEditor.EndObjectTransformControl(control, screenPosition, Vector2.Distance(pressScreenPosition, screenPosition));
+            levelEditor.EndObjectTransformControl(control, pointerId);
     }
 
     void LateUpdate()

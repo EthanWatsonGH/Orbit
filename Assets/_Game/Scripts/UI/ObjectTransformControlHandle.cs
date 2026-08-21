@@ -22,13 +22,13 @@ public class ObjectTransformControlHandle : MonoBehaviour, IPointerDownHandler, 
             return;
 
         activePointerId = eventData.pointerId;
-        selectionControls.BeginControl(control, eventData.position);
+        selectionControls.BeginControl(control, activePointerId, eventData.position);
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
         if (selectionControls != null && eventData.pointerId == activePointerId)
-            selectionControls.EndControl(control, eventData.position, eventData.pressPosition);
+            selectionControls.EndControl(control, activePointerId);
 
         if (eventData.pointerId == activePointerId)
             activePointerId = int.MinValue;
