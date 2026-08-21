@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public class LevelEditor : MonoBehaviour
 {
+    public const string TemporarySelectionGroupName = "SelectionGroup";
+    public const string DuplicatingSelectionGroupName = "DuplicatingSelectionGroup";
+
     // self object references
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
@@ -548,7 +551,7 @@ public class LevelEditor : MonoBehaviour
 
     void CreateTemporarySelectionGroup(List<Transform> selectionRoots)
     {
-        selectionGroup = new GameObject("Group");
+        selectionGroup = new GameObject(TemporarySelectionGroupName);
         selectionGroup.transform.SetParent(levelObjectsCollection.transform, false);
         selectionGroup.transform.position = GetSelectionPivot(selectionRoots);
         selectionGroup.transform.rotation = Quaternion.identity;
@@ -831,10 +834,9 @@ public class LevelEditor : MonoBehaviour
             bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
             bool isPuller = selectedObject.name.Contains("Puller");
             bool isKillCircle = selectedObject.name.Contains("KillCircle");
-            bool isTemporarySelectionGroup = selectedObject == selectionGroup;
 
             selectionControlsUI.SetControlAvailability(
-                !isPlayerStartPoint && !isTemporarySelectionGroup,
+                !isPlayerStartPoint,
                 !isPlayerStartPoint,
                 !isPlayerStartPoint && !isPuller && !isKillCircle,
                 !isPlayerStartPoint && !isPuller && !isKillCircle,
@@ -934,8 +936,14 @@ public class LevelEditor : MonoBehaviour
 
         if (control == ObjectTransformControl.Duplicate)
         {
-            SelectObject(Instantiate(selectedObject, levelObjectsCollection.transform));
-            selectedObject.transform.name = selectedObject.transform.name.Replace("(Clone)", "");
+            if (selectedObject == selectionGroup)
+                DuplicateTemporarySelectionGroup();
+            else
+            {
+                SelectObject(Instantiate(selectedObject, levelObjectsCollection.transform));
+                selectedObject.transform.name = selectedObject.transform.name.Replace("(Clone)", "");
+            }
+
             ConfigureSelectionControlsForSelectedObject();
             SetMinimumScale();
         }
@@ -957,6 +965,36 @@ public class LevelEditor : MonoBehaviour
         }
 
         moveOffset = selectedObject.transform.position - pointerPositionAtStartMove;
+    }
+
+    void DuplicateTemporarySelectionGroup()
+    {
+        GameObject originalSelectionGroup = selectionGroup;
+        GameObject duplicatedSelectionGroup = Instantiate(originalSelectionGroup, levelObjectsCollection.transform);
+        duplicatedSelectionGroup.name = DuplicatingSelectionGroupName;
+
+        // The original objects become normal level objects again. The clone takes over
+        // as the temporary selection group that the duplicate drag will move.
+        DissolveTemporarySelectionGroup();
+
+        selectionGroup = duplicatedSelectionGroup;
+        temporarySelectionMembers.Clear();
+
+        int firstSiblingIndex = duplicatedSelectionGroup.transform.GetSiblingIndex();
+        int childIndex = 0;
+        foreach (Transform duplicatedChild in duplicatedSelectionGroup.transform)
+        {
+            temporarySelectionMembers.Add(new TemporarySelectionMember
+            {
+                gameObject = duplicatedChild.gameObject,
+                originalParent = levelObjectsCollection.transform,
+                originalSiblingIndex = firstSiblingIndex + childIndex
+            });
+            childIndex++;
+        }
+
+        duplicatedSelectionGroup.name = TemporarySelectionGroupName;
+        SetSelectedObject(duplicatedSelectionGroup, false);
     }
 
     void UpdateMoveSelectedObject(Vector3 pointerWorldPosition, float dragDistancePixels)

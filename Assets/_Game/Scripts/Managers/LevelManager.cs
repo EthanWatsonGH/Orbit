@@ -162,9 +162,9 @@ public class LevelManager : MonoBehaviour
     }
 
     #region Saving
-    LevelV2 GenerateLevelObject()
+    bool TryGenerateLevelObject(out LevelV2 level)
     {
-        LevelV2 level = new LevelV2();
+        level = new LevelV2();
         level.levelObjects = new List<LevelV2.LevelObjectV2>();
 
         // get level name input, or just create one if nothing was input
@@ -181,20 +181,30 @@ public class LevelManager : MonoBehaviour
         level.playerStartPointXPosition = playerStartPoint.transform.position.x;
         level.playerStartPointYPosition = playerStartPoint.transform.position.y;
 
-        AppendLevelObjects(levelObjectsContainer.transform, -1, level.levelObjects);
+        if (!AppendLevelObjects(levelObjectsContainer.transform, -1, level.levelObjects))
+        {
+            level = default;
+            return false;
+        }
 
-        return level;
+        return true;
     }
 
-    void AppendLevelObjects(Transform parentTransform, int parentIndex, List<LevelV2.LevelObjectV2> serializedObjects)
+    bool AppendLevelObjects(Transform parentTransform, int parentIndex, List<LevelV2.LevelObjectV2> serializedObjects)
     {
         foreach (Transform childTransform in parentTransform)
         {
             string type = GetLevelObjectType(childTransform);
+            if (IsTemporarySelectionGroupType(type))
+            {
+                Debug.LogError("Level could not be saved because a temporary selection group was still present. Deselect the objects and try again.", childTransform);
+                return false;
+            }
+
             if (!IsSupportedLevelObjectType(type))
             {
                 Debug.LogError("Level could not be saved because '" + childTransform.name + "' is not a recognized level object or Group.", childTransform);
-                continue;
+                return false;
             }
 
             int childIndex = serializedObjects.Count;
@@ -209,8 +219,17 @@ public class LevelManager : MonoBehaviour
                 rotation = childTransform.localEulerAngles.z
             });
 
-            AppendLevelObjects(childTransform, childIndex, serializedObjects);
+            if (!AppendLevelObjects(childTransform, childIndex, serializedObjects))
+                return false;
         }
+
+        return true;
+    }
+
+    static bool IsTemporarySelectionGroupType(string type)
+    {
+        return type == LevelEditor.TemporarySelectionGroupName ||
+               type == LevelEditor.DuplicatingSelectionGroupName;
     }
 
     static string GetLevelObjectType(Transform levelObjectTransform)
@@ -232,7 +251,8 @@ public class LevelManager : MonoBehaviour
 
     public void CopyLevelCodeToClipboard()
     {
-        LevelV2 level = GenerateLevelObject();
+        if (!TryGenerateLevelObject(out LevelV2 level))
+            return;
 
         string json = JsonUtility.ToJson(level, false);
 
@@ -276,7 +296,9 @@ public class LevelManager : MonoBehaviour
     {
         try
         {
-            LevelV2 level = GenerateLevelObject();
+            if (!TryGenerateLevelObject(out LevelV2 level))
+                yield break;
+
             string json = JsonUtility.ToJson(level, true);
 
             string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
