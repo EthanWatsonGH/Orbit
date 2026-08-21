@@ -588,7 +588,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5095047675884517836, guid: f552c022609315e47ac1f38141887611, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -10
       objectReference: {fileID: 0}
     - target: {fileID: 5095047675884517836, guid: f552c022609315e47ac1f38141887611, type: 3}
       propertyPath: m_LocalRotation.w
@@ -621,10 +621,6 @@ PrefabInstance:
     - target: {fileID: 5813491227285075281, guid: f552c022609315e47ac1f38141887611, type: 3}
       propertyPath: m_Name
       value: EditorCamera
-      objectReference: {fileID: 0}
-    - target: {fileID: 5813491227285075281, guid: f552c022609315e47ac1f38141887611, type: 3}
-      propertyPath: m_TagString
-      value: Untagged
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1309,7 +1305,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5095047675884517836, guid: f552c022609315e47ac1f38141887611, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -10
       objectReference: {fileID: 0}
     - target: {fileID: 5095047675884517836, guid: f552c022609315e47ac1f38141887611, type: 3}
       propertyPath: m_LocalRotation.w
