@@ -280,7 +280,10 @@ public class LevelManager : MonoBehaviour
         onComplete?.Invoke(previewImageBytes);
     }
 
-    public void SaveLevel(Action onFinished = null)
+    // Saving the JSON is synchronous; only preview capture and disk I/O need the coroutine.
+    // Callers that temporarily alter editor-only state may safely restore it once this method
+    // invokes onLevelSerialized, before the asynchronous part of the save begins.
+    public void SaveLevel(Action onLevelSerialized = null)
     {
         if (isSavingLevel)
         {
@@ -289,16 +292,35 @@ public class LevelManager : MonoBehaviour
         }
 
         isSavingLevel = true;
-        StartCoroutine(SaveLevelWithPreview(onFinished));
+        LevelV2 level;
+        bool didGenerateLevel;
+        try
+        {
+            didGenerateLevel = TryGenerateLevelObject(out level);
+        }
+        catch
+        {
+            isSavingLevel = false;
+            throw;
+        }
+        finally
+        {
+            onLevelSerialized?.Invoke();
+        }
+
+        if (!didGenerateLevel)
+        {
+            isSavingLevel = false;
+            return;
+        }
+
+        StartCoroutine(SaveLevelWithPreview(level));
     }
 
-    IEnumerator SaveLevelWithPreview(Action onFinished)
+    IEnumerator SaveLevelWithPreview(LevelV2 level)
     {
         try
         {
-            if (!TryGenerateLevelObject(out LevelV2 level))
-                yield break;
-
             string json = JsonUtility.ToJson(level, true);
 
             string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
@@ -333,7 +355,6 @@ public class LevelManager : MonoBehaviour
         finally
         {
             isSavingLevel = false;
-            onFinished?.Invoke();
         }
     }
     #endregion

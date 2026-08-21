@@ -322,7 +322,9 @@ public class LevelEditor : MonoBehaviour
             {
                 SelectObjectsInsideBox(shouldAddToSelection, shouldRemoveFromSelection);
             }
-            else // click select
+            // A box selection owns its whole drag even if it ends over UI. A normal click
+            // released over an interactive UI control belongs to that control, not the world.
+            else if (!PointerInput.Instance.WasReleasedOverSelectableUi)
             {
                 Debug.Log("LevelEditor: pointer cycle resolved as click-select.");
                 Ray ray = Camera.main.ScreenPointToRay(PointerInput.Instance.ScreenPosition);
@@ -604,9 +606,8 @@ public class LevelEditor : MonoBehaviour
 
     void UnselectObject()
     {
-        isSelectionSuspendedForSave = false;
-        suspendedSelectionObjects.Clear();
-
+        // A save may have temporarily flattened a selection group. Its snapshot belongs
+        // to SuspendSelectionForSave/RestoreSelectionAfterSave, not normal deselection.
         bool wasTemporarySelectionGroup = selectionGroup != null;
         if (wasTemporarySelectionGroup)
             DissolveTemporarySelectionGroup();
@@ -659,6 +660,12 @@ public class LevelEditor : MonoBehaviour
     {
         lastSelectedObject = null;
         deselectedObjectAwaitingReplacement = null;
+    }
+
+    void CancelSuspendedSelectionRestore()
+    {
+        isSelectionSuspendedForSave = false;
+        suspendedSelectionObjects.Clear();
     }
 
     void DissolveTemporarySelectionGroup()
@@ -820,7 +827,7 @@ public class LevelEditor : MonoBehaviour
         }
         suspendedSelectionObjects.Clear();
 
-        if (!isActiveAndEnabled || objectsToRestore.Count == 0)
+        if (objectsToRestore.Count == 0)
             return;
 
         SelectObjects(objectsToRestore);
@@ -1225,6 +1232,7 @@ public class LevelEditor : MonoBehaviour
 
     public void SwitchToPlayMode()
     {
+        CancelSuspendedSelectionRestore();
         UnselectObject();
         ClearSelectionHistory();
 
@@ -1323,6 +1331,7 @@ public class LevelEditor : MonoBehaviour
     }
     public void DeleteAllLevelObjects()
     {
+        CancelSuspendedSelectionRestore();
         UnselectObject();
         ClearSelectionHistory();
         LevelManager.Instance.DestroyAllExistingLevelObjects();
@@ -1341,6 +1350,7 @@ public class LevelEditor : MonoBehaviour
     }
     public void LoadLevelFromClipboard()
     {
+        CancelSuspendedSelectionRestore();
         UnselectObject();
         ClearSelectionHistory();
         LevelManager.Instance.GetLevelJsonFromClipboard();
