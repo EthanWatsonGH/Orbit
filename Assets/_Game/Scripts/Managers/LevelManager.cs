@@ -118,6 +118,9 @@ public class LevelManager : MonoBehaviour
     LevelStorage levelStorage;
     string levelLoadJson;
     string lastSavedLevelJson = string.Empty;
+    bool isSavingLevel;
+
+    public bool IsSavingLevel => isSavingLevel;
 
     [Header("World Object References")]
     [SerializeField] GameObject levelObjectsContainer;
@@ -257,44 +260,59 @@ public class LevelManager : MonoBehaviour
         onComplete?.Invoke(previewImageBytes);
     }
 
-    public void SaveLevel()
+    public void SaveLevel(Action onFinished = null)
     {
-        StartCoroutine(SaveLevelWithPreview());
+        if (isSavingLevel)
+        {
+            Debug.LogWarning("Level save was ignored because another save is already in progress.");
+            return;
+        }
+
+        isSavingLevel = true;
+        StartCoroutine(SaveLevelWithPreview(onFinished));
     }
 
-    IEnumerator SaveLevelWithPreview()
+    IEnumerator SaveLevelWithPreview(Action onFinished)
     {
-        LevelV2 level = GenerateLevelObject();
-        string json = JsonUtility.ToJson(level, true);
-
-        string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
-        string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
-        byte[] previewImageBytes = null;
-        yield return CaptureLevelPreview(capturedImageBytes => previewImageBytes = capturedImageBytes);
-
-        bool didSave = levelStorage.SaveLevel(LevelSource.PlayerLevels, new LevelCatalogRecord
+        try
         {
-            id = level.contentId,
-            contentType = "level",
-            displayName = level.levelName,
-            author = level.levelAuthor,
-            payloadFileName = payloadFileName,
-            previewFileName = previewFileName,
-            createdAtUtcTicks = level.savedAtUtcTicks,
-            updatedAtUtcTicks = level.savedAtUtcTicks,
-            sortOrder = 0
-        }, json, previewImageBytes);
+            LevelV2 level = GenerateLevelObject();
+            string json = JsonUtility.ToJson(level, true);
 
-        if (!didSave)
-            yield break;
+            string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
+            string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
+            byte[] previewImageBytes = null;
+            yield return CaptureLevelPreview(capturedImageBytes => previewImageBytes = capturedImageBytes);
 
-        MarkLevelSourceDirty(LevelSource.PlayerLevels);
-        lastSavedLevelJson = json;
+            bool didSave = levelStorage.SaveLevel(LevelSource.PlayerLevels, new LevelCatalogRecord
+            {
+                id = level.contentId,
+                contentType = "level",
+                displayName = level.levelName,
+                author = level.levelAuthor,
+                payloadFileName = payloadFileName,
+                previewFileName = previewFileName,
+                createdAtUtcTicks = level.savedAtUtcTicks,
+                updatedAtUtcTicks = level.savedAtUtcTicks,
+                sortOrder = 0
+            }, json, previewImageBytes);
 
-        SetLevelCodeToCopyInputToLastSavedLevelJson();
+            if (!didSave)
+                yield break;
 
-        // TODO: display a message in game
-        Debug.Log("Saved level.");
+            MarkLevelSourceDirty(LevelSource.PlayerLevels);
+            lastSavedLevelJson = json;
+
+            SetLevelCodeToCopyInputToLastSavedLevelJson();
+
+            // TODO: display a message in game
+            Debug.Log("Saved level.");
+        }
+        finally
+        {
+            isSavingLevel = false;
+            onFinished?.Invoke();
+        }
     }
     #endregion
 

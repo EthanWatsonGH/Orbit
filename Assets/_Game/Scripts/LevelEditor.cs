@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -32,12 +33,26 @@ public class LevelEditor : MonoBehaviour
     bool pointerIsOverObjectSelectionBar = false;
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
+    // A deselection is not a new selection yet. Keep it briefly so reselecting the
+    // same object preserves the previous snap target, while selecting another object
+    // promotes this object to the last selected object.
+    GameObject deselectedObjectAwaitingReplacement = null;
     bool isWorldTransform = true;
 
     // object selection
     const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
     bool hasSelectionDragExceededThreshold = false;
     GameObject selectionGroup;
+    readonly List<TemporarySelectionMember> temporarySelectionMembers = new List<TemporarySelectionMember>();
+    readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
+    bool isSelectionSuspendedForSave;
+
+    struct TemporarySelectionMember
+    {
+        public GameObject gameObject;
+        public Transform originalParent;
+        public int originalSiblingIndex;
+    }
 
     // object movement
     Vector3 moveOffset;
@@ -176,7 +191,7 @@ public class LevelEditor : MonoBehaviour
 
     public void SnapSelectedObjectToLastHorizontal()
     {
-        if (selectedObject != null && lastSelectedObject != null)
+        if (selectedObject != null && lastSelectedObject != null && selectedObject != lastSelectedObject)
         {
             selectedObject.transform.position = new Vector3(lastSelectedObject.transform.position.x, selectedObject.transform.position.y, 0f);
         }
@@ -184,7 +199,7 @@ public class LevelEditor : MonoBehaviour
 
     public void SnapSelectedObjectToLastVertical()
     {
-        if (selectedObject != null && lastSelectedObject != null)
+        if (selectedObject != null && lastSelectedObject != null && selectedObject != lastSelectedObject)
         {
             selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, lastSelectedObject.transform.position.y, 0f);
         }
@@ -281,33 +296,286 @@ public class LevelEditor : MonoBehaviour
                     // TODO: circle-collision fallback selection flow should be initiated here.
                     UnselectObject();
                 }
-
             }
         }
-
     }
 
-    void SelectObject(GameObject objectToSelect)
+    void SelectObject(GameObject objectToSelect, bool rememberPreviousSelection = true)
     {
-        if (selectedObject != null)
-            lastSelectedObject = selectedObject;
-        selectedObject = objectToSelect;
+        if (selectionGroup != null && objectToSelect != selectionGroup)
+            UnselectObject();
+
+        SetSelectedObject(objectToSelect, rememberPreviousSelection);
 
         if (selectionControlsUI != null)
             selectionControlsUI.SetSelectedTransform(selectedObject.transform);
     }
 
+    // Box selection will use this entry point once it can collect its matching objects. A
+    // temporary Group is an editor helper only: it is dissolved before saving or deselecting.
+    public void SelectObjects(IEnumerable<GameObject> objectsToSelect)
+    {
+        List<Transform> selectionRoots = GetSelectionRoots(objectsToSelect);
+        UnselectObject();
+
+        if (selectionRoots.Count == 0)
+            return;
+
+        if (selectionRoots.Count == 1)
+        {
+            SelectObject(selectionRoots[0].gameObject);
+            ConfigureSelectionControlsForSelectedObject();
+            SetMinimumScale();
+            return;
+        }
+
+        CreateTemporarySelectionGroup(selectionRoots);
+        ConfigureSelectionControlsForSelectedObject();
+        SetMinimumScale();
+    }
+
+    List<Transform> GetSelectionRoots(IEnumerable<GameObject> objectsToSelect)
+    {
+        List<Transform> selectionRoots = new List<Transform>();
+        if (objectsToSelect == null)
+            return selectionRoots;
+
+        foreach (GameObject objectToSelect in objectsToSelect)
+        {
+            if (objectToSelect == null)
+                continue;
+
+            Transform candidate = objectToSelect.transform;
+            if (!candidate.IsChildOf(levelObjectsCollection.transform))
+                continue;
+
+            bool isAlreadyCoveredBySelectionRoot = false;
+            for (int index = selectionRoots.Count - 1; index >= 0; index--)
+            {
+                Transform selectionRoot = selectionRoots[index];
+                if (candidate.IsChildOf(selectionRoot))
+                {
+                    isAlreadyCoveredBySelectionRoot = true;
+                    break;
+                }
+
+                if (selectionRoot.IsChildOf(candidate))
+                    selectionRoots.RemoveAt(index);
+            }
+
+            if (!isAlreadyCoveredBySelectionRoot && !selectionRoots.Contains(candidate))
+                selectionRoots.Add(candidate);
+        }
+
+        return selectionRoots;
+    }
+
+    void CreateTemporarySelectionGroup(List<Transform> selectionRoots)
+    {
+        selectionGroup = new GameObject("Group");
+        selectionGroup.transform.SetParent(levelObjectsCollection.transform, false);
+        selectionGroup.transform.position = GetSelectionPivot(selectionRoots);
+        selectionGroup.transform.rotation = Quaternion.identity;
+        selectionGroup.transform.localScale = Vector3.one;
+
+        temporarySelectionMembers.Clear();
+        foreach (Transform selectionRoot in selectionRoots)
+        {
+            temporarySelectionMembers.Add(new TemporarySelectionMember
+            {
+                gameObject = selectionRoot.gameObject,
+                originalParent = selectionRoot.parent,
+                originalSiblingIndex = selectionRoot.GetSiblingIndex()
+            });
+            selectionRoot.SetParent(selectionGroup.transform, true);
+        }
+
+        SelectObject(selectionGroup, false);
+    }
+
+    Vector3 GetSelectionPivot(List<Transform> selectionRoots)
+    {
+        bool hasBounds = false;
+        Bounds selectionBounds = default;
+        Vector3 averagePosition = Vector3.zero;
+
+        foreach (Transform selectionRoot in selectionRoots)
+        {
+            averagePosition += selectionRoot.position;
+
+            foreach (Collider2D collider in selectionRoot.GetComponentsInChildren<Collider2D>())
+            {
+                if (!hasBounds)
+                {
+                    selectionBounds = collider.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    selectionBounds.Encapsulate(collider.bounds);
+                }
+            }
+        }
+
+        if (hasBounds)
+            return selectionBounds.center;
+
+        return averagePosition / selectionRoots.Count;
+    }
+
     void UnselectObject()
     {
-        if (selectedObject != null)
-            lastSelectedObject = selectedObject;
-        selectedObject = null;
+        isSelectionSuspendedForSave = false;
+        suspendedSelectionObjects.Clear();
 
-        if (selectionControlsUI != null)
+        bool wasTemporarySelectionGroup = selectionGroup != null;
+        if (wasTemporarySelectionGroup)
+            DissolveTemporarySelectionGroup();
+
+        SetSelectedObject(null, !wasTemporarySelectionGroup);
+
+        HideSelectionControls();
+    }
+
+    // This is the sole owner of selected/previous-selection state. A deselection is
+    // provisional: it only replaces the snap target if the next selection is a
+    // different object. That lets reselecting an object retain the earlier target.
+    void SetSelectedObject(GameObject nextSelectedObject, bool updateSelectionHistory = true)
+    {
+        if (selectedObject == nextSelectedObject)
+            return;
+
+        if (!updateSelectionHistory)
         {
-            selectionControlsUI.SetSelectedTransform(null);
-            selectionControlsUI.SetVisible(false);
+            selectedObject = nextSelectedObject;
+            return;
         }
+
+        if (nextSelectedObject == null)
+        {
+            if (selectedObject != null)
+                deselectedObjectAwaitingReplacement = selectedObject;
+        }
+        else if (selectedObject != null)
+        {
+            lastSelectedObject = selectedObject;
+            deselectedObjectAwaitingReplacement = null;
+        }
+        else if (deselectedObjectAwaitingReplacement != null &&
+                 deselectedObjectAwaitingReplacement != nextSelectedObject)
+        {
+            lastSelectedObject = deselectedObjectAwaitingReplacement;
+            deselectedObjectAwaitingReplacement = null;
+        }
+        else
+        {
+            // Reselecting the object we just deselected: retain the prior snap target.
+            deselectedObjectAwaitingReplacement = null;
+        }
+
+        selectedObject = nextSelectedObject;
+    }
+
+    void ClearSelectionHistory()
+    {
+        lastSelectedObject = null;
+        deselectedObjectAwaitingReplacement = null;
+    }
+
+    void DissolveTemporarySelectionGroup()
+    {
+        temporarySelectionMembers.Sort((first, second) =>
+        {
+            int firstParentId = first.originalParent != null ? first.originalParent.GetInstanceID() : int.MinValue;
+            int secondParentId = second.originalParent != null ? second.originalParent.GetInstanceID() : int.MinValue;
+            int parentComparison = firstParentId.CompareTo(secondParentId);
+            if (parentComparison != 0)
+                return parentComparison;
+
+            return first.originalSiblingIndex.CompareTo(second.originalSiblingIndex);
+        });
+
+        foreach (TemporarySelectionMember member in temporarySelectionMembers)
+        {
+            if (member.gameObject == null)
+                continue;
+
+            Transform parentToRestore = member.originalParent != null
+                ? member.originalParent
+                : levelObjectsCollection.transform;
+            member.gameObject.transform.SetParent(parentToRestore, true);
+
+            if (member.originalParent != null)
+            {
+                int siblingIndex = Mathf.Min(member.originalSiblingIndex, parentToRestore.childCount - 1);
+                member.gameObject.transform.SetSiblingIndex(siblingIndex);
+            }
+        }
+
+        temporarySelectionMembers.Clear();
+
+        if (selectionGroup != null)
+        {
+            selectionGroup.transform.SetParent(null);
+            Destroy(selectionGroup);
+            selectionGroup = null;
+        }
+    }
+
+    void HideSelectionControls()
+    {
+        if (selectionControlsUI == null)
+            return;
+
+        selectionControlsUI.SetSelectedTransform(null);
+        selectionControlsUI.SetVisible(false);
+    }
+
+    void SuspendSelectionForSave()
+    {
+        if (isSelectionSuspendedForSave)
+            return;
+
+        suspendedSelectionObjects.Clear();
+        if (selectionGroup != null)
+        {
+            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            {
+                if (member.gameObject != null)
+                    suspendedSelectionObjects.Add(member.gameObject);
+            }
+
+            DissolveTemporarySelectionGroup();
+        }
+        else if (selectedObject != null)
+        {
+            suspendedSelectionObjects.Add(selectedObject);
+        }
+
+        SetSelectedObject(null, false);
+        HideSelectionControls();
+        isSelectionSuspendedForSave = suspendedSelectionObjects.Count > 0;
+    }
+
+    void RestoreSelectionAfterSave()
+    {
+        if (!isSelectionSuspendedForSave)
+            return;
+
+        isSelectionSuspendedForSave = false;
+
+        List<GameObject> objectsToRestore = new List<GameObject>();
+        foreach (GameObject selectedObjectBeforeSave in suspendedSelectionObjects)
+        {
+            if (selectedObjectBeforeSave != null)
+                objectsToRestore.Add(selectedObjectBeforeSave);
+        }
+        suspendedSelectionObjects.Clear();
+
+        if (!isActiveAndEnabled || objectsToRestore.Count == 0)
+            return;
+
+        SelectObjects(objectsToRestore);
     }
 
     void ConfigureSelectionControlsForSelectedObject()
@@ -318,9 +586,10 @@ public class LevelEditor : MonoBehaviour
             bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
             bool isPuller = selectedObject.name.Contains("Puller");
             bool isKillCircle = selectedObject.name.Contains("KillCircle");
+            bool isTemporarySelectionGroup = selectedObject == selectionGroup;
 
             selectionControlsUI.SetControlAvailability(
-                !isPlayerStartPoint,
+                !isPlayerStartPoint && !isTemporarySelectionGroup,
                 !isPlayerStartPoint,
                 !isPlayerStartPoint && !isPuller && !isKillCircle,
                 !isPlayerStartPoint && !isPuller && !isKillCircle,
@@ -463,7 +732,8 @@ public class LevelEditor : MonoBehaviour
             selectedObject.transform.position = new Vector3(newX, newY, 0f);
         }
 
-        if (pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+        bool canDeleteSelectedObject = selectedObject != selectionGroup && !selectedObject.name.Equals("PlayerStartPoint");
+        if (pointerIsOverObjectSelectionBar && canDeleteSelectedObject)
             selectedObject.SetActive(false);
         else
             selectedObject.SetActive(true);
@@ -498,7 +768,8 @@ public class LevelEditor : MonoBehaviour
 
         isTryingToMoveSelectedObject = false;
 
-        if (selectedObject != null && pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+        if (selectedObject != null && selectedObject != selectionGroup &&
+            pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
         {
             Destroy(selectedObject);
             UnselectObject();
@@ -656,9 +927,8 @@ public class LevelEditor : MonoBehaviour
 
     public void SwitchToPlayMode()
     {
-        lastSelectedObject = null;
-        selectedObject = null;
-        RefreshSelectionControls();
+        UnselectObject();
+        ClearSelectionHistory();
 
         startLocationIcon.SetActive(false);
         UIManager.Instance.SwitchToPlayerMode();
@@ -747,18 +1017,34 @@ public class LevelEditor : MonoBehaviour
     // expose level manager functions for level editor UI buttons
     public void SaveLevel()
     {
-        LevelManager.Instance.SaveLevel();
+        if (LevelManager.Instance == null || LevelManager.Instance.IsSavingLevel)
+            return;
+
+        SuspendSelectionForSave();
+        LevelManager.Instance.SaveLevel(RestoreSelectionAfterSave);
     }
     public void DeleteAllLevelObjects()
     {
+        UnselectObject();
+        ClearSelectionHistory();
         LevelManager.Instance.DestroyAllExistingLevelObjects();
     }
     public void CopyLevelCodeToClipboard()
     {
-        LevelManager.Instance.CopyLevelCodeToClipboard();
+        SuspendSelectionForSave();
+        try
+        {
+            LevelManager.Instance.CopyLevelCodeToClipboard();
+        }
+        finally
+        {
+            RestoreSelectionAfterSave();
+        }
     }
     public void LoadLevelFromClipboard()
     {
+        UnselectObject();
+        ClearSelectionHistory();
         LevelManager.Instance.GetLevelJsonFromClipboard();
         LevelManager.Instance.LoadLevel();
     }
