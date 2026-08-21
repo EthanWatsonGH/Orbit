@@ -314,9 +314,10 @@ public class LevelEditor : MonoBehaviour
             if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 
+            bool shouldAddToSelection = IsAddSelectionModifierHeld();
             if (shouldDoBoxSelect && !PointerInput.Instance.HadMultiplePointersDuringCurrentGesture)
             {
-                SelectObjectsInsideBox();
+                SelectObjectsInsideBox(shouldAddToSelection);
             }
             else // click select
             {
@@ -326,11 +327,18 @@ public class LevelEditor : MonoBehaviour
 
                 if (hit.collider != null) // object hit
                 {
-                    SelectObject(hit.collider.gameObject);
-                    ConfigureSelectionControlsForSelectedObject();
-                    SetMinimumScale();
+                    if (shouldAddToSelection)
+                    {
+                        AddObjectsToSelection(new[] { hit.collider.gameObject });
+                    }
+                    else
+                    {
+                        SelectObject(hit.collider.gameObject);
+                        ConfigureSelectionControlsForSelectedObject();
+                        SetMinimumScale();
+                    }
                 }
-                else // no object hit
+                else if (!shouldAddToSelection) // no object hit
                 {
                     // TODO: circle-collision fallback selection flow should be initiated here.
                     UnselectObject();
@@ -355,6 +363,7 @@ public class LevelEditor : MonoBehaviour
     public void SelectObjects(IEnumerable<GameObject> objectsToSelect)
     {
         List<Transform> selectionRoots = GetSelectionRoots(objectsToSelect);
+        RemovePlayerStartPointFromMultiSelection(selectionRoots);
         UnselectObject();
 
         if (selectionRoots.Count == 0)
@@ -371,6 +380,51 @@ public class LevelEditor : MonoBehaviour
         CreateTemporarySelectionGroup(selectionRoots);
         ConfigureSelectionControlsForSelectedObject();
         SetMinimumScale();
+    }
+
+    void AddObjectsToSelection(IEnumerable<GameObject> objectsToAdd)
+    {
+        List<Transform> rootsToAdd = GetSelectionRoots(objectsToAdd);
+        if (rootsToAdd.Count == 0)
+            return;
+
+        bool playerStartPointIsSelected = playerStartPoint != null && selectedObject == playerStartPoint;
+        bool isTryingToAddPlayerStartPoint = playerStartPoint != null && rootsToAdd.Contains(playerStartPoint.transform);
+        bool isTryingToAddAnotherObject = rootsToAdd.Exists(selectionRoot =>
+            playerStartPoint == null || selectionRoot != playerStartPoint.transform);
+
+        if (playerStartPointIsSelected && isTryingToAddAnotherObject)
+        {
+            LogPlayerStartPointCanOnlyBeSelectedAlone();
+            return;
+        }
+
+        if (!playerStartPointIsSelected && selectedObject != null && isTryingToAddPlayerStartPoint)
+        {
+            rootsToAdd.Remove(playerStartPoint.transform);
+            LogPlayerStartPointCanOnlyBeSelectedAlone();
+            if (rootsToAdd.Count == 0)
+                return;
+        }
+
+        List<GameObject> combinedSelection = new List<GameObject>();
+        if (selectionGroup != null)
+        {
+            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            {
+                if (member.gameObject != null)
+                    combinedSelection.Add(member.gameObject);
+            }
+        }
+        else if (selectedObject != null)
+        {
+            combinedSelection.Add(selectedObject);
+        }
+
+        foreach (Transform selectionRoot in rootsToAdd)
+            combinedSelection.Add(selectionRoot.gameObject);
+
+        SelectObjects(combinedSelection);
     }
 
     List<Transform> GetSelectionRoots(IEnumerable<GameObject> objectsToSelect)
@@ -409,14 +463,22 @@ public class LevelEditor : MonoBehaviour
                 selectionRoots.Add(candidate);
         }
 
+        return selectionRoots;
+    }
+
+    void RemovePlayerStartPointFromMultiSelection(List<Transform> selectionRoots)
+    {
         if (playerStartPoint != null &&
             selectionRoots.Count > 1 &&
             selectionRoots.Remove(playerStartPoint.transform))
         {
-            Debug.Log("Player start point can only be selected alone.");
+            LogPlayerStartPointCanOnlyBeSelectedAlone();
         }
+    }
 
-        return selectionRoots;
+    void LogPlayerStartPointCanOnlyBeSelectedAlone()
+    {
+        Debug.Log("Player start point can only be selected alone.");
     }
 
     bool IsEditorSelectableObject(Transform candidate)
@@ -581,7 +643,12 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    void SelectObjectsInsideBox()
+    bool IsAddSelectionModifierHeld()
+    {
+        return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+    }
+
+    void SelectObjectsInsideBox(bool addToCurrentSelection)
     {
         PointerInput pointerInput = PointerInput.Instance;
         if (!pointerInput.TryGetWorldPositionNoDepth(pointerInput.PressStartScreenPosition, out Vector3 pressStartWorldPosition) ||
@@ -596,7 +663,10 @@ public class LevelEditor : MonoBehaviour
         foreach (Collider2D collider in collidersInBox)
             objectsToSelect.Add(collider.gameObject);
 
-        SelectObjects(objectsToSelect);
+        if (addToCurrentSelection)
+            AddObjectsToSelection(objectsToSelect);
+        else
+            SelectObjects(objectsToSelect);
     }
 
     void UpdateBoxSelectionVisual(Vector2 pressStartScreenPosition, Vector2 currentScreenPosition)
