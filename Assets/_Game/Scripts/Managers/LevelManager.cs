@@ -89,7 +89,6 @@ public class LevelManager : MonoBehaviour
     [SerializeField] GameObject levelObjectsContainer;
     [SerializeField] GameObject playerStartPoint;
     [SerializeField] TMP_InputField levelSaveNameInput;
-    [SerializeField] TMP_InputField levelLoadNameInput;
     [SerializeField] TMP_InputField levelCodeToCopyInput;
     [SerializeField] TMP_InputField levelCodeInput;
 

@@ -32,6 +32,13 @@ public class LevelSelectionMenu : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    void OnDisable()
+    {
+        // Disabling a GameObject stops its coroutines immediately. Reset this state so a
+        // catalog marked dirty while the menu is closed can refresh the next time it opens.
+        isRefreshing = false;
+    }
+
     public void MarkDirty()
     {
         catalogVersion++;
