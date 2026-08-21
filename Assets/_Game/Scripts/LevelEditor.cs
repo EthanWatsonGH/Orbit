@@ -50,7 +50,10 @@ public class LevelEditor : MonoBehaviour
     GameObject selectionGroup;
     readonly List<TemporarySelectionMember> temporarySelectionMembers = new List<TemporarySelectionMember>();
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
+    readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
     bool isSelectionSuspendedForSave;
+    int levelRevisionWhenEditorWasLeft = -1;
+    bool hasRememberedEditorState;
     Canvas boxSelectionCanvas;
     RectTransform boxSelectionVisualParent;
 
@@ -833,6 +836,61 @@ public class LevelEditor : MonoBehaviour
         SelectObjects(objectsToRestore);
     }
 
+    // UIManager calls this before it disables the editor. The temporary wrapper itself
+    // is not kept; only its selected roots are remembered, so OnDisable can safely
+    // dissolve the wrapper as usual.
+    public void RememberStateBeforeLeavingEditor()
+    {
+        CancelSuspendedSelectionRestore();
+        selectionObjectsBeforeLeavingEditor.Clear();
+
+        if (selectionGroup != null)
+        {
+            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            {
+                if (member.gameObject != null)
+                    selectionObjectsBeforeLeavingEditor.Add(member.gameObject);
+            }
+        }
+        else if (selectedObject != null)
+        {
+            selectionObjectsBeforeLeavingEditor.Add(selectedObject);
+        }
+
+        levelRevisionWhenEditorWasLeft = LevelManager.Instance != null
+            ? LevelManager.Instance.CurrentLevelRevision
+            : -1;
+        hasRememberedEditorState = true;
+        ClearSelectionHistory();
+    }
+
+    // Returns true when a different level was loaded while the editor was inactive.
+    // In that case old object references must not be restored.
+    public bool RestoreStateAfterReturningToEditor()
+    {
+        if (!hasRememberedEditorState)
+            return false;
+
+        hasRememberedEditorState = false;
+        bool levelChanged = LevelManager.Instance == null ||
+                            LevelManager.Instance.CurrentLevelRevision != levelRevisionWhenEditorWasLeft;
+        levelRevisionWhenEditorWasLeft = -1;
+
+        if (levelChanged)
+        {
+            selectionObjectsBeforeLeavingEditor.Clear();
+            ClearSelectionHistory();
+            return true;
+        }
+
+        List<GameObject> objectsToRestore = new List<GameObject>(selectionObjectsBeforeLeavingEditor);
+        selectionObjectsBeforeLeavingEditor.Clear();
+        if (objectsToRestore.Count > 0)
+            SelectObjects(objectsToRestore);
+
+        return false;
+    }
+
     void ConfigureSelectionControlsForSelectedObject()
     {
         if (selectedObject != null)
@@ -1232,10 +1290,6 @@ public class LevelEditor : MonoBehaviour
 
     public void SwitchToPlayMode()
     {
-        CancelSuspendedSelectionRestore();
-        UnselectObject();
-        ClearSelectionHistory();
-
         startLocationIcon.SetActive(false);
         UIManager.Instance.SwitchToPlayerMode();
     }

@@ -119,8 +119,12 @@ public class LevelManager : MonoBehaviour
     string levelLoadJson;
     string lastSavedLevelJson = string.Empty;
     bool isSavingLevel;
+    int currentLevelRevision;
 
     public bool IsSavingLevel => isSavingLevel;
+    // This identifies the current in-memory level instance. It changes whenever the
+    // existing level contents are cleared or replaced, not when the user edits it.
+    public int CurrentLevelRevision => currentLevelRevision;
 
     [Header("World Object References")]
     [SerializeField] GameObject levelObjectsContainer;
@@ -139,6 +143,8 @@ public class LevelManager : MonoBehaviour
 
     public void DestroyAllExistingLevelObjects()
     {
+        currentLevelRevision++;
+
         // reset player start point position to center of world
         playerStartPoint.transform.position = Vector3.zero;
 

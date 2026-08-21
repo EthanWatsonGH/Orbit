@@ -64,6 +64,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] LevelSelectionMenu downloadedLevelSelectionMenu;
 
     LevelSelectionMenu activeMenu;
+    LevelEditor levelEditor;
     WorldMode menuReturnMode;
     bool isUiHiddenForPreviewCapture;
     bool uiRootWasActive;
@@ -94,6 +95,9 @@ public class UIManager : MonoBehaviour
             return;
         }
 
+        if (currentMode == WorldMode.LevelEditor)
+            GetLevelEditor()?.RememberStateBeforeLeavingEditor();
+
         EventManager.Instance.UnselectObject();
         EventManager.Instance.HidePlayerInWorldUiElements();
         HideWorldHud();
@@ -101,6 +105,14 @@ public class UIManager : MonoBehaviour
         SetWorldModeActive(currentMode, false);
         SetWorldModeActive(targetMode, true);
         ShowWorldModeUi(targetMode);
+
+        if (targetMode == WorldMode.LevelEditor &&
+            GetLevelEditor()?.RestoreStateAfterReturningToEditor() == true)
+        {
+            // The editor camera has just become active, so this recenters the correct
+            // camera when a different level was loaded during play mode.
+            EventManager.Instance.RecenterCamera();
+        }
     }
 
     public void HideAllUI()
@@ -251,6 +263,14 @@ public class UIManager : MonoBehaviour
             default:
                 return null;
         }
+    }
+
+    LevelEditor GetLevelEditor()
+    {
+        if (levelEditor == null && levelEditorModeRoot != null)
+            levelEditor = levelEditorModeRoot.GetComponent<LevelEditor>();
+
+        return levelEditor;
     }
 
     WorldMode GetActiveWorldMode()
