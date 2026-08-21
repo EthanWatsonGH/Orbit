@@ -15,7 +15,10 @@ public class ObjectTransformControlHandle : MonoBehaviour, IPointerDownHandler, 
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        if (selectionControls == null || activePointerId != int.MinValue)
+        // Right and middle mouse buttons are reserved for camera panning. Touch input is
+        // reported as the primary button, so it can still start a transform control.
+        if (eventData.button != PointerEventData.InputButton.Left ||
+            selectionControls == null || activePointerId != int.MinValue)
             return;
 
         activePointerId = eventData.pointerId;
