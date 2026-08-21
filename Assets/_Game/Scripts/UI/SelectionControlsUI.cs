@@ -15,6 +15,7 @@ public class SelectionControlsUI : MonoBehaviour
     Transform selectedTransform;
     RectTransform overlayRect;
     Canvas parentCanvas;
+    bool scaleHandlesFollowSelectionRotation;
     Quaternion scaleBothControlBaseRotation;
     Quaternion scaleXControlBaseRotation;
     Quaternion scaleYControlBaseRotation;
@@ -48,8 +49,16 @@ public class SelectionControlsUI : MonoBehaviour
         selectedTransform = newSelectedTransform;
     }
 
-    public void SetControlAvailability(bool canDuplicate, bool canScaleBoth, bool canScaleX, bool canScaleY, bool canRotate)
+    public void SetControlAvailability(
+        bool canDuplicate,
+        bool canScaleBoth,
+        bool canScaleX,
+        bool canScaleY,
+        bool canRotate,
+        bool shouldRotateScaleHandles)
     {
+        scaleHandlesFollowSelectionRotation = shouldRotateScaleHandles;
+
         if (duplicateControl != null)
             duplicateControl.SetActive(canDuplicate);
         if (scaleBothControl != null)
@@ -121,7 +130,9 @@ public class SelectionControlsUI : MonoBehaviour
 
     void UpdateScaleHandleRotations()
     {
-        Quaternion selectedRotation = Quaternion.Euler(0f, 0f, selectedTransform.eulerAngles.z);
+        Quaternion selectedRotation = scaleHandlesFollowSelectionRotation
+            ? Quaternion.Euler(0f, 0f, selectedTransform.eulerAngles.z)
+            : Quaternion.identity;
 
         if (scaleBothControl != null)
             scaleBothControl.transform.localRotation = selectedRotation * scaleBothControlBaseRotation;

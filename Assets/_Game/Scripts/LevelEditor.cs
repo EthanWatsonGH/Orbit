@@ -64,6 +64,44 @@ public class LevelEditor : MonoBehaviour
         public int originalSiblingIndex;
     }
 
+    struct SelectionControlAvailability
+    {
+        public bool canDuplicate;
+        public bool canScaleBoth;
+        public bool canScaleX;
+        public bool canScaleY;
+        public bool canRotate;
+        public bool scaleHandlesFollowSelectionRotation;
+
+        public static SelectionControlAvailability ForObject(GameObject levelObject)
+        {
+            bool isPlayerStartPoint = levelObject.name == "PlayerStartPoint";
+            bool isPuller = levelObject.name.Contains("Puller");
+            bool isKillCircle = levelObject.name.Contains("KillCircle");
+            bool supportsIndependentScaleAndRotation = !isPlayerStartPoint && !isPuller && !isKillCircle;
+
+            return new SelectionControlAvailability
+            {
+                canDuplicate = !isPlayerStartPoint,
+                canScaleBoth = !isPlayerStartPoint,
+                canScaleX = supportsIndependentScaleAndRotation,
+                canScaleY = supportsIndependentScaleAndRotation,
+                canRotate = supportsIndependentScaleAndRotation,
+                scaleHandlesFollowSelectionRotation = supportsIndependentScaleAndRotation
+            };
+        }
+
+        public void IntersectWith(SelectionControlAvailability other)
+        {
+            canDuplicate &= other.canDuplicate;
+            canScaleBoth &= other.canScaleBoth;
+            canScaleX &= other.canScaleX;
+            canScaleY &= other.canScaleY;
+            canRotate &= other.canRotate;
+            scaleHandlesFollowSelectionRotation &= other.scaleHandlesFollowSelectionRotation;
+        }
+    }
+
     // object movement
     Vector3 moveOffset;
     bool isTryingToMoveSelectedObject = false;
@@ -893,20 +931,53 @@ public class LevelEditor : MonoBehaviour
 
     void ConfigureSelectionControlsForSelectedObject()
     {
-        if (selectedObject != null)
-        {
-            // show/hide certain controls depending on the type of object selected
-            bool isPlayerStartPoint = selectedObject.name == "PlayerStartPoint";
-            bool isPuller = selectedObject.name.Contains("Puller");
-            bool isKillCircle = selectedObject.name.Contains("KillCircle");
+        if (selectedObject == null)
+            return;
 
-            selectionControlsUI.SetControlAvailability(
-                !isPlayerStartPoint,
-                !isPlayerStartPoint,
-                !isPlayerStartPoint && !isPuller && !isKillCircle,
-                !isPlayerStartPoint && !isPuller && !isKillCircle,
-                !isPlayerStartPoint && !isPuller && !isKillCircle);
+        bool hasSelectionMember = false;
+        SelectionControlAvailability availability = default;
+        if (selectionGroup != null)
+        {
+            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            {
+                if (member.gameObject == null)
+                    continue;
+
+                SelectionControlAvailability memberAvailability = SelectionControlAvailability.ForObject(member.gameObject);
+                if (hasSelectionMember)
+                    availability.IntersectWith(memberAvailability);
+                else
+                {
+                    availability = memberAvailability;
+                    hasSelectionMember = true;
+                }
+            }
         }
+        else
+        {
+            availability = SelectionControlAvailability.ForObject(selectedObject);
+            hasSelectionMember = true;
+        }
+
+        if (!hasSelectionMember)
+            return;
+
+        // Rotation here affects the temporary selection wrapper, not one member's
+        // individual transform. That remains valid for circles and other roots that
+        // intentionally hide their individual rotate control.
+        if (selectionGroup != null)
+        {
+            availability.canRotate = true;
+            availability.scaleHandlesFollowSelectionRotation = true;
+        }
+
+        selectionControlsUI.SetControlAvailability(
+            availability.canDuplicate,
+            availability.canScaleBoth,
+            availability.canScaleX,
+            availability.canScaleY,
+            availability.canRotate,
+            availability.scaleHandlesFollowSelectionRotation);
     }
 
     void SetMinimumScale()
