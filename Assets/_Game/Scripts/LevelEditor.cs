@@ -1015,7 +1015,7 @@ public class LevelEditor : MonoBehaviour
             selectedObject.transform.position = new Vector3(newX, newY, 0f);
         }
 
-        bool canDeleteSelectedObject = selectedObject != selectionGroup && !selectedObject.name.Equals("PlayerStartPoint");
+        bool canDeleteSelectedObject = !selectedObject.name.Equals("PlayerStartPoint");
         if (pointerIsOverObjectSelectionBar && canDeleteSelectedObject)
             selectedObject.SetActive(false);
         else
@@ -1051,13 +1051,26 @@ public class LevelEditor : MonoBehaviour
 
         isTryingToMoveSelectedObject = false;
 
-        if (selectedObject != null && selectedObject != selectionGroup &&
+        if (selectedObject != null &&
             pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
         {
-            Destroy(selectedObject);
+            if (selectedObject == selectionGroup)
+                DeleteTemporarySelectionGroup();
+            else
+                Destroy(selectedObject);
+
             UnselectObject();
             deselectObjectButton.gameObject.SetActive(false);
         }
+    }
+
+    void DeleteTemporarySelectionGroup()
+    {
+        temporarySelectionMembers.Clear();
+
+        GameObject temporaryGroupToDelete = selectionGroup;
+        selectionGroup = null;
+        Destroy(temporaryGroupToDelete);
     }
 
     void BeginRotateSelectedObject(Vector2 screenPosition)
