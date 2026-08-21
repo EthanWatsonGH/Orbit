@@ -1159,7 +1159,9 @@ public class LevelEditor : MonoBehaviour
 
     void RefreshSelectionControls()
     {
-        bool show = selectedObject != null && !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject || isTryingToPlace);
+        bool isBoxSelecting = hasSelectionDragExceededThreshold && PointerInput.Instance.IsHeld;
+        bool show = selectedObject != null &&
+                    !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject || isTryingToPlace || isBoxSelecting);
         selectionControlsUI.SetSelectedTransform(selectedObject != null ? selectedObject.transform : null);
         // Keep the object active while a UI drag is running, but hide its CanvasGroup. That
         // lets its pointer handler still receive the matching drag and release events.
