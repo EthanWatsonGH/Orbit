@@ -27,6 +27,7 @@ public class LevelEditor : MonoBehaviour
 
     [Header("Screen Space UI")]
     [SerializeField] SelectionControlsUI selectionControlsUI;
+    [SerializeField] RectTransform boxSelectionVisual;
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
@@ -46,6 +47,8 @@ public class LevelEditor : MonoBehaviour
     readonly List<TemporarySelectionMember> temporarySelectionMembers = new List<TemporarySelectionMember>();
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     bool isSelectionSuspendedForSave;
+    Canvas boxSelectionCanvas;
+    RectTransform boxSelectionVisualParent;
 
     struct TemporarySelectionMember
     {
@@ -111,6 +114,22 @@ public class LevelEditor : MonoBehaviour
 
         selectionControlsUI.Initialize(this);
 
+        if (boxSelectionVisual != null)
+        {
+            boxSelectionCanvas = boxSelectionVisual.GetComponentInParent<Canvas>();
+            boxSelectionVisualParent = boxSelectionVisual.parent as RectTransform;
+
+            if (boxSelectionCanvas == null || boxSelectionVisualParent == null)
+                Debug.LogError("LevelEditor requires Box Selection Visual to be inside a UI Canvas with a RectTransform parent.", boxSelectionVisual);
+
+            // The visual appears beneath the pointer while dragging, so it must never
+            // cause PointerInput to treat the release as a UI interaction.
+            foreach (Graphic graphic in boxSelectionVisual.GetComponentsInChildren<Graphic>(true))
+                graphic.raycastTarget = false;
+
+            SetBoxSelectionVisualVisible(false);
+        }
+
         // ensure toggleable elements are at proper default show/hide
         deselectObjectButton.SetActive(false);
         worldTransformButton.SetActive(true);
@@ -150,6 +169,7 @@ public class LevelEditor : MonoBehaviour
 
     private void OnDisable()
     {
+        SetBoxSelectionVisualVisible(false);
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
     }
@@ -211,9 +231,22 @@ public class LevelEditor : MonoBehaviour
     {
         PointerInput pointerInput = PointerInput.Instance;
         if (pointerInput.WasPressedThisFrame)
+        {
             hasSelectionDragExceededThreshold = false;
+            SetBoxSelectionVisualVisible(false);
+        }
 
-        if (!pointerInput.CurrentGestureStartedOverUi && pointerInput.IsHeld && !hasSelectionDragExceededThreshold)
+        if (isTryingToPlace ||
+            pointerInput.CurrentGestureStartedOverUi ||
+            pointerInput.HadMultiplePointersDuringCurrentGesture ||
+            !pointerInput.IsHeld ||
+            PointerInput.Instance.WasCanceledThisFrame)
+        {
+            SetBoxSelectionVisualVisible(false);
+            return;
+        }
+
+        if (!hasSelectionDragExceededThreshold)
         {
             float dragDistanceInPixels = pointerInput.DragDistancePixels;
             if (dragDistanceInPixels >= MINIMUM_DRAG_DISTANCE_PIXELS)
@@ -222,6 +255,9 @@ public class LevelEditor : MonoBehaviour
                 Debug.Log("LevelEditor: drag threshold crossed, box-select mode latched for this pointer cycle.");
             }
         }
+
+        if (hasSelectionDragExceededThreshold)
+            UpdateBoxSelectionVisual(pointerInput.PressStartScreenPosition, pointerInput.ScreenPosition);
     }
 
     void HandlePlacePrefab()
@@ -266,6 +302,10 @@ public class LevelEditor : MonoBehaviour
         {
             bool shouldDoBoxSelect = hasSelectionDragExceededThreshold;
             hasSelectionDragExceededThreshold = false;
+            SetBoxSelectionVisualVisible(false);
+
+            if (PointerInput.Instance.WasCanceledThisFrame)
+                return;
 
             if (PointerInput.Instance.CurrentGestureStartedOverUi)
                 return;
@@ -273,11 +313,9 @@ public class LevelEditor : MonoBehaviour
             if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 
-            if (shouldDoBoxSelect)
+            if (shouldDoBoxSelect && !PointerInput.Instance.HadMultiplePointersDuringCurrentGesture)
             {
-                Debug.Log("LevelEditor: pointer cycle resolved as box-select.");
-                // TODO: create/update visible box while dragging.
-                // TODO: collect objects inside selection box and apply selection grouping flow on pointer up.
+                SelectObjectsInsideBox();
             }
             else // click select
             {
@@ -520,6 +558,60 @@ public class LevelEditor : MonoBehaviour
             Destroy(selectionGroup);
             selectionGroup = null;
         }
+    }
+
+    void SelectObjectsInsideBox()
+    {
+        PointerInput pointerInput = PointerInput.Instance;
+        if (!pointerInput.TryGetWorldPositionNoDepth(pointerInput.PressStartScreenPosition, out Vector3 pressStartWorldPosition) ||
+            !pointerInput.TryGetWorldPositionNoDepth(pointerInput.ScreenPosition, out Vector3 releaseWorldPosition))
+        {
+            Debug.LogError("LevelEditor could not box-select objects because the pointer positions could not be converted to world positions.", this);
+            return;
+        }
+
+        Collider2D[] collidersInBox = Physics2D.OverlapAreaAll(pressStartWorldPosition, releaseWorldPosition);
+        List<GameObject> objectsToSelect = new List<GameObject>(collidersInBox.Length);
+        foreach (Collider2D collider in collidersInBox)
+            objectsToSelect.Add(collider.gameObject);
+
+        SelectObjects(objectsToSelect);
+    }
+
+    void UpdateBoxSelectionVisual(Vector2 pressStartScreenPosition, Vector2 currentScreenPosition)
+    {
+        if (boxSelectionVisual == null || boxSelectionCanvas == null || boxSelectionVisualParent == null)
+            return;
+
+        Camera canvasCamera = boxSelectionCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+            ? null
+            : boxSelectionCanvas.worldCamera;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                boxSelectionVisualParent,
+                pressStartScreenPosition,
+                canvasCamera,
+                out Vector2 pressStartLocalPosition) ||
+            !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                boxSelectionVisualParent,
+                currentScreenPosition,
+                canvasCamera,
+                out Vector2 currentLocalPosition))
+            return;
+
+        boxSelectionVisual.anchorMin = new Vector2(0.5f, 0.5f);
+        boxSelectionVisual.anchorMax = new Vector2(0.5f, 0.5f);
+        boxSelectionVisual.pivot = new Vector2(0.5f, 0.5f);
+        boxSelectionVisual.anchoredPosition = (pressStartLocalPosition + currentLocalPosition) * 0.5f;
+        boxSelectionVisual.sizeDelta = new Vector2(
+            Mathf.Abs(currentLocalPosition.x - pressStartLocalPosition.x),
+            Mathf.Abs(currentLocalPosition.y - pressStartLocalPosition.y));
+        SetBoxSelectionVisualVisible(true);
+    }
+
+    void SetBoxSelectionVisualVisible(bool shouldShow)
+    {
+        if (boxSelectionVisual != null && boxSelectionVisual.gameObject.activeSelf != shouldShow)
+            boxSelectionVisual.gameObject.SetActive(shouldShow);
     }
 
     void HideSelectionControls()
