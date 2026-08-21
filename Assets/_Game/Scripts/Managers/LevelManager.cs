@@ -36,26 +36,57 @@ public class LevelManager : MonoBehaviour
     }
     #endregion
 
-    // TODO: should i track level save date in file?
-    #region Level Struct
-    // TODO: may need to make more of these for different loader versions, and check which one to use for each
+    #region Level File Formats
     [System.Serializable]
-    struct Level
+    struct LevelHeader
+    {
+        public byte loaderVersion;
+    }
+
+    // Version 1 remains only so existing saved and built-in levels can still load.
+    [System.Serializable]
+    struct LevelV1
     {
         public string contentId;
         public byte loaderVersion;
         public string levelName;
-        //public string levelDescription;
-        //public string levelAuthorType; // TODO: change to enum?
         public string levelAuthor;
         public float playerStartPointXPosition;
         public float playerStartPointYPosition;
-        public List<LevelObject> levelObjects;
+        public List<LevelObjectV1> levelObjects;
 
         [System.Serializable]
-        public struct LevelObject
+        public struct LevelObjectV1
         {
             public string type;
+            public float xPosition;
+            public float yPosition;
+            public float xScale;
+            public float yScale;
+            public float rotation;
+        }
+    }
+
+    // Version 2 stores the same objects in parent-first order. parentIndex is the only
+    // hierarchy data needed: -1 means the level root, otherwise it points to an earlier object.
+    [System.Serializable]
+    struct LevelV2
+    {
+        public string contentId;
+        public byte loaderVersion;
+        public string levelName;
+        public string levelAuthor;
+        public long savedAtUtcTicks;
+        public float playerStartPointXPosition;
+        public float playerStartPointYPosition;
+        public List<LevelObjectV2> levelObjects;
+
+        [System.Serializable]
+        public struct LevelObjectV2
+        {
+            // "Group" is reserved for an empty hierarchy object. Other values are prefab names.
+            public string type;
+            public int parentIndex;
             public float xPosition;
             public float yPosition;
             public float xScale;
@@ -69,17 +100,20 @@ public class LevelManager : MonoBehaviour
     public GameObject BoosterPrefab;
     public GameObject BouncyWallPrefab;
     public GameObject ConstantBoosterPrefab;
+    public GameObject ConstantMomentumRedirectorPrefab;
     public GameObject ConstantPullerPrefab;
     public GameObject ConstantPusherPrefab;
     public GameObject FinishPrefab;
     public GameObject KillCirclePrefab;
     public GameObject KillWallPrefab;
+    public GameObject MomentumRedirectorPrefab;
     public GameObject PullerPrefab;
     public GameObject PusherPrefab;
     public GameObject SlipperyWallPrefab;
+    public GameObject TextPrefab;
 
-    // increment this if any changes are made to the level loading, with those new changes under a new case in the loading switch
-    public const byte LOADER_VERSION = 1;
+    const string GroupObjectType = "Group";
+    public const byte LOADER_VERSION = 2;
     public string playerLevelsDirectory { get; private set; }
     LevelStorage levelStorage;
     string levelLoadJson;
@@ -125,53 +159,66 @@ public class LevelManager : MonoBehaviour
     }
 
     #region Saving
-    Level GenerateLevelObject()
+    LevelV2 GenerateLevelObject()
     {
-        Level level = new Level();
-        level.levelObjects = new List<Level.LevelObject>();
+        LevelV2 level = new LevelV2();
+        level.levelObjects = new List<LevelV2.LevelObjectV2>();
 
         // get level name input, or just create one if nothing was input
         string levelName = "Custom Level " + DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
         if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
             levelName = levelSaveNameInput.text.Trim();
 
-        // TODO: make these values get properly set
         // set values to save
         level.contentId = Guid.NewGuid().ToString();
         level.levelName = levelName;
-        level.levelAuthor = "TO ADD";
+        level.levelAuthor = "TODO";
         level.loaderVersion = LOADER_VERSION;
+        level.savedAtUtcTicks = DateTime.UtcNow.Ticks;
         level.playerStartPointXPosition = playerStartPoint.transform.position.x;
         level.playerStartPointYPosition = playerStartPoint.transform.position.y;
 
-        bool endOfLevelObjects = false;
-        int levelObjectIndex = 0;
-
-        if (levelObjectsContainer.transform.childCount <= 0)
-            endOfLevelObjects = true;
-
-        // save level objects
-        while (!endOfLevelObjects)
-        {
-            Transform workingLevelObjectTransform = levelObjectsContainer.transform.GetChild(levelObjectIndex);
-
-            Level.LevelObject newLevelObject = new Level.LevelObject();
-
-            newLevelObject.type = workingLevelObjectTransform.name.Replace("(Clone)", "");
-            newLevelObject.xPosition = workingLevelObjectTransform.position.x;
-            newLevelObject.yPosition = workingLevelObjectTransform.position.y;
-            newLevelObject.xScale = workingLevelObjectTransform.localScale.x;
-            newLevelObject.yScale = workingLevelObjectTransform.localScale.y;
-            newLevelObject.rotation = workingLevelObjectTransform.rotation.eulerAngles.z;
-            level.levelObjects.Add(newLevelObject);
-
-            levelObjectIndex++;
-
-            if (levelObjectIndex >= levelObjectsContainer.transform.childCount)
-                endOfLevelObjects = true;
-        }
+        AppendLevelObjects(levelObjectsContainer.transform, -1, level.levelObjects);
 
         return level;
+    }
+
+    void AppendLevelObjects(Transform parentTransform, int parentIndex, List<LevelV2.LevelObjectV2> serializedObjects)
+    {
+        foreach (Transform childTransform in parentTransform)
+        {
+            string type = GetLevelObjectType(childTransform);
+            if (!IsSupportedLevelObjectType(type))
+            {
+                Debug.LogError("Level could not be saved because '" + childTransform.name + "' is not a recognized level object or Group.", childTransform);
+                continue;
+            }
+
+            int childIndex = serializedObjects.Count;
+            serializedObjects.Add(new LevelV2.LevelObjectV2
+            {
+                type = type,
+                parentIndex = parentIndex,
+                xPosition = childTransform.localPosition.x,
+                yPosition = childTransform.localPosition.y,
+                xScale = childTransform.localScale.x,
+                yScale = childTransform.localScale.y,
+                rotation = childTransform.localEulerAngles.z
+            });
+
+            AppendLevelObjects(childTransform, childIndex, serializedObjects);
+        }
+    }
+
+    static string GetLevelObjectType(Transform levelObjectTransform)
+    {
+        const string cloneSuffix = "(Clone)";
+        string type = levelObjectTransform.name.Trim();
+
+        if (type.EndsWith(cloneSuffix, StringComparison.Ordinal))
+            type = type.Substring(0, type.Length - cloneSuffix.Length).TrimEnd();
+
+        return type;
     }
 
     #region Copy Level To Clipboard
@@ -182,7 +229,7 @@ public class LevelManager : MonoBehaviour
 
     public void CopyLevelCodeToClipboard()
     {
-        Level level = GenerateLevelObject();
+        LevelV2 level = GenerateLevelObject();
 
         string json = JsonUtility.ToJson(level, false);
 
@@ -217,7 +264,7 @@ public class LevelManager : MonoBehaviour
 
     IEnumerator SaveLevelWithPreview()
     {
-        Level level = GenerateLevelObject();
+        LevelV2 level = GenerateLevelObject();
         string json = JsonUtility.ToJson(level, true);
 
         string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
@@ -233,8 +280,8 @@ public class LevelManager : MonoBehaviour
             author = level.levelAuthor,
             payloadFileName = payloadFileName,
             previewFileName = previewFileName,
-            createdAtUtcTicks = DateTime.UtcNow.Ticks,
-            updatedAtUtcTicks = DateTime.UtcNow.Ticks,
+            createdAtUtcTicks = level.savedAtUtcTicks,
+            updatedAtUtcTicks = level.savedAtUtcTicks,
             sortOrder = 0
         }, json, previewImageBytes);
 
@@ -310,87 +357,172 @@ public class LevelManager : MonoBehaviour
 
     public void LoadLevel()
     {
-        switch (LOADER_VERSION)
+        if (string.IsNullOrWhiteSpace(levelLoadJson))
         {
+            Debug.LogError("Level could not be loaded because its JSON is empty.");
+            return;
+        }
+
+        try
+        {
+            LevelHeader header = JsonUtility.FromJson<LevelHeader>(levelLoadJson);
+            switch (header.loaderVersion)
+            {
             case 1:
-                try
-                {
-                    // TODO: handle invalid levelLoadJson and display a message in game
-                    Level loadedLevel = JsonUtility.FromJson<Level>(levelLoadJson);
-
-                    DestroyAllExistingLevelObjects();
-
-                    // set the player start point position
-                    playerStartPoint.transform.position = new Vector3(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
-
-                    // loop through level objects, instantiating a new object in game for each object in the file, with the transforms of each
-                    foreach (Level.LevelObject levelObject in loadedLevel.levelObjects)
-                    {
-                        GameObject prefabToInstantiate = null;
-                        switch(levelObject.type)
-                        {
-                            case "Booster":
-                                prefabToInstantiate = BoosterPrefab;
-                                break;
-                            case "BouncyWall":
-                                prefabToInstantiate = BouncyWallPrefab;
-                                break;
-                            case "ConstantBooster":
-                                prefabToInstantiate = ConstantBoosterPrefab;
-                                break;
-                            case "ConstantPuller":
-                                prefabToInstantiate = ConstantPullerPrefab;
-                                break;
-                            case "ConstantPusher":
-                                prefabToInstantiate = ConstantPusherPrefab;
-                                break;
-                            case "Finish":
-                                prefabToInstantiate = FinishPrefab;
-                                break;
-                            case "KillCircle":
-                                prefabToInstantiate = KillCirclePrefab;
-                                break;
-                            case "KillWall":
-                                prefabToInstantiate = KillWallPrefab;
-                                break;
-                            case "Puller":
-                                prefabToInstantiate = PullerPrefab;
-                                break;
-                            case "Pusher":
-                                prefabToInstantiate = PusherPrefab;
-                                break;
-                            case "SlipperyWall":
-                                prefabToInstantiate = SlipperyWallPrefab;
-                                break;
-                            default:
-                                Debug.Log("ERROR: An object could not be loaded because its type is not valid.");
-                                break;
-                        }
-
-                        if (prefabToInstantiate != null)
-                        {
-                            Vector3 workingLevelObjectPostition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
-                            Quaternion workingLevelObjectQuaternion = Quaternion.Euler(0f, 0f, levelObject.rotation);
-
-                            GameObject lastPlacedObject = Instantiate(prefabToInstantiate, workingLevelObjectPostition, workingLevelObjectQuaternion, levelObjectsContainer.transform);
-
-                            lastPlacedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale);
-                        }
-                    }
-
-                    EventManager.Instance.RecenterCamera();
-                    EventManager.Instance.OnLevelLoad();
-
-                    Debug.Log("Loaded level.");
-                }
-                catch
-                {
-                    if (string.IsNullOrEmpty(levelLoadJson))
-                        Debug.Log("ERROR: The input string is empty.");
-                    else 
-                        Debug.Log("ERROR: The input string is not valid JSON and can't be loaded. Input: " + levelLoadJson);
-                }
+                LoadLevelVersionOne(JsonUtility.FromJson<LevelV1>(levelLoadJson));
                 break;
+            case 2:
+                LoadLevelVersionTwo(JsonUtility.FromJson<LevelV2>(levelLoadJson));
+                break;
+            default:
+                Debug.LogError("Level could not be loaded because loader version " + header.loaderVersion + " is not supported.");
+                break;
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError("Level could not be loaded because its JSON is invalid. " + exception.Message);
+        }
+    }
+
+    void LoadLevelVersionOne(LevelV1 loadedLevel)
+    {
+        BeginLoadingLevel(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
+
+        foreach (LevelV1.LevelObjectV1 levelObject in loadedLevel.levelObjects ?? new List<LevelV1.LevelObjectV1>())
+        {
+            GameObject prefabToInstantiate = GetPrefabForType(levelObject.type);
+            if (prefabToInstantiate == null)
+            {
+                Debug.LogError("Version 1 level object could not be loaded because type '" + levelObject.type + "' is not recognized.");
+                continue;
+            }
+
+            GameObject loadedObject = Instantiate(
+                prefabToInstantiate,
+                new Vector3(levelObject.xPosition, levelObject.yPosition, 0f),
+                Quaternion.Euler(0f, 0f, levelObject.rotation),
+                levelObjectsContainer.transform);
+            loadedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale, 1f);
+        }
+
+        FinishLoadingLevel();
+    }
+
+    void LoadLevelVersionTwo(LevelV2 loadedLevel)
+    {
+        BeginLoadingLevel(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
+
+        List<Transform> loadedTransforms = new List<Transform>();
+        foreach (LevelV2.LevelObjectV2 levelObject in loadedLevel.levelObjects ?? new List<LevelV2.LevelObjectV2>())
+        {
+            Transform parentTransform = levelObjectsContainer.transform;
+            if (levelObject.parentIndex != -1)
+            {
+                if (levelObject.parentIndex < 0 || levelObject.parentIndex >= loadedTransforms.Count)
+                {
+                    Debug.LogError("Version 2 level object '" + levelObject.type + "' has an invalid parent index.");
+                    loadedTransforms.Add(null);
+                    continue;
+                }
+
+                parentTransform = loadedTransforms[levelObject.parentIndex];
+                if (parentTransform == null)
+                {
+                    Debug.LogError("Version 2 level object '" + levelObject.type + "' cannot load because its parent could not be created.");
+                    loadedTransforms.Add(null);
+                    continue;
+                }
+            }
+
+            GameObject loadedObject = CreateLevelObject(levelObject.type, parentTransform);
+            if (loadedObject == null)
+            {
+                loadedTransforms.Add(null);
+                continue;
+            }
+
+            loadedObject.transform.localPosition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
+            loadedObject.transform.localRotation = Quaternion.Euler(0f, 0f, levelObject.rotation);
+            loadedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale, 1f);
+            loadedTransforms.Add(loadedObject.transform);
+        }
+
+        FinishLoadingLevel();
+    }
+
+    void BeginLoadingLevel(float playerStartXPosition, float playerStartYPosition)
+    {
+        DestroyAllExistingLevelObjects();
+        playerStartPoint.transform.position = new Vector3(playerStartXPosition, playerStartYPosition, 0f);
+    }
+
+    void FinishLoadingLevel()
+    {
+        EventManager.Instance.RecenterCamera();
+        EventManager.Instance.OnLevelLoad();
+        Debug.Log("Loaded level.");
+    }
+
+    GameObject CreateLevelObject(string type, Transform parentTransform)
+    {
+        string normalizedType = type?.Trim();
+        if (normalizedType == GroupObjectType)
+        {
+            GameObject groupObject = new GameObject(GroupObjectType);
+            groupObject.transform.SetParent(parentTransform, false);
+            return groupObject;
+        }
+
+        GameObject prefabToInstantiate = GetPrefabForType(normalizedType);
+        if (prefabToInstantiate == null)
+        {
+            Debug.LogError("Level object could not be loaded because type '" + type + "' is not recognized.");
+            return null;
+        }
+
+        return Instantiate(prefabToInstantiate, parentTransform);
+    }
+
+    bool IsSupportedLevelObjectType(string type)
+    {
+        return type == GroupObjectType || GetPrefabForType(type) != null;
+    }
+
+    GameObject GetPrefabForType(string type)
+    {
+        switch (type)
+        {
+            case "Booster":
+                return BoosterPrefab;
+            case "BouncyWall":
+                return BouncyWallPrefab;
+            case "ConstantBooster":
+                return ConstantBoosterPrefab;
+            case "ConstantMomentumRedirector":
+                return ConstantMomentumRedirectorPrefab;
+            case "ConstantPuller":
+                return ConstantPullerPrefab;
+            case "ConstantPusher":
+                return ConstantPusherPrefab;
+            case "Finish":
+                return FinishPrefab;
+            case "KillCircle":
+                return KillCirclePrefab;
+            case "KillWall":
+                return KillWallPrefab;
+            case "MomentumRedirector":
+                return MomentumRedirectorPrefab;
+            case "Puller":
+                return PullerPrefab;
+            case "Pusher":
+                return PusherPrefab;
+            case "SlipperyWall":
+                return SlipperyWallPrefab;
+            case "Text":
+                return TextPrefab;
+            default:
+                return null;
         }
     }
 

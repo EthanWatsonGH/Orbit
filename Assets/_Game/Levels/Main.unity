@@ -1151,6 +1151,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b702d720e133a4849a546a3a39922305, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &819458758 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1888872226671879561, guid: 4824b21244823934e83d45f884726f52, type: 3}
+  m_PrefabInstance: {fileID: 128809842}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &826014623
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1770,6 +1781,17 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 766494624433461529, guid: 52b56b07a05ad7b4f84894842f98b1fa, type: 3}
   m_PrefabInstance: {fileID: 1231841328}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1240236946 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8484187765647764792, guid: 4824b21244823934e83d45f884726f52, type: 3}
+  m_PrefabInstance: {fileID: 128809842}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1343076315
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2493,6 +2515,17 @@ Transform:
   - {fileID: 106027313}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2062961166 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9195067651806860657, guid: 4824b21244823934e83d45f884726f52, type: 3}
+  m_PrefabInstance: {fileID: 128809842}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!114 &2069215502 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4246731384885946849, guid: 2cba9dea2ca691844b468db017f000ea, type: 3}
@@ -3102,7 +3135,7 @@ PrefabInstance:
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelCodeInput
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1240236946}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: playerStartPoint
       value: 
@@ -3122,7 +3155,7 @@ PrefabInstance:
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelSaveNameInput
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 2062961166}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelsPreviewPanel
       value: 
@@ -3130,7 +3163,7 @@ PrefabInstance:
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelCodeToCopyInput
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 819458758}
     - target: {fileID: 4224550792364514184, guid: eaa9380ed975f7f4db935cddae6eb640, type: 3}
       propertyPath: levelObjectsContainer
       value: 
