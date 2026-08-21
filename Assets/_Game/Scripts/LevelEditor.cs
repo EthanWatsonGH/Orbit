@@ -311,9 +311,8 @@ public class LevelEditor : MonoBehaviour
             if (PointerInput.Instance.CurrentGestureStartedOverUi)
                 return;
 
-            if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
-                return;
-
+            // A world-origin gesture stays owned by the editor even when its release
+            // position overlaps UI, such as a box selection ending over a HUD control.
             bool shouldRemoveFromSelection = IsRemoveSelectionModifierHeld();
             bool shouldAddToSelection = !shouldRemoveFromSelection && IsAddSelectionModifierHeld();
             if (shouldDoBoxSelect && !PointerInput.Instance.HadMultiplePointersDuringCurrentGesture)
