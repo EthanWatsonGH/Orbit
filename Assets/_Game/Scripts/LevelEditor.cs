@@ -314,10 +314,11 @@ public class LevelEditor : MonoBehaviour
             if (PointerInput.Instance.WasReleasedOverUi) // click was on a UI element, so don't try to change selected object
                 return;
 
-            bool shouldAddToSelection = IsAddSelectionModifierHeld();
+            bool shouldRemoveFromSelection = IsRemoveSelectionModifierHeld();
+            bool shouldAddToSelection = !shouldRemoveFromSelection && IsAddSelectionModifierHeld();
             if (shouldDoBoxSelect && !PointerInput.Instance.HadMultiplePointersDuringCurrentGesture)
             {
-                SelectObjectsInsideBox(shouldAddToSelection);
+                SelectObjectsInsideBox(shouldAddToSelection, shouldRemoveFromSelection);
             }
             else // click select
             {
@@ -327,7 +328,11 @@ public class LevelEditor : MonoBehaviour
 
                 if (hit.collider != null) // object hit
                 {
-                    if (shouldAddToSelection)
+                    if (shouldRemoveFromSelection)
+                    {
+                        RemoveObjectsFromSelection(new[] { hit.collider.gameObject });
+                    }
+                    else if (shouldAddToSelection)
                     {
                         AddObjectsToSelection(new[] { hit.collider.gameObject });
                     }
@@ -338,7 +343,7 @@ public class LevelEditor : MonoBehaviour
                         SetMinimumScale();
                     }
                 }
-                else if (!shouldAddToSelection) // no object hit
+                else if (!shouldAddToSelection && !shouldRemoveFromSelection) // no object hit
                 {
                     // TODO: circle-collision fallback selection flow should be initiated here.
                     UnselectObject();
@@ -425,6 +430,57 @@ public class LevelEditor : MonoBehaviour
             combinedSelection.Add(selectionRoot.gameObject);
 
         SelectObjects(combinedSelection);
+    }
+
+    void RemoveObjectsFromSelection(IEnumerable<GameObject> objectsToRemove)
+    {
+        if (selectedObject == null)
+            return;
+
+        List<Transform> rootsToRemove = GetSelectionRoots(objectsToRemove);
+        if (rootsToRemove.Count == 0)
+            return;
+
+        List<GameObject> remainingSelection = new List<GameObject>();
+        bool removedAnObject = false;
+
+        if (selectionGroup != null)
+        {
+            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            {
+                if (member.gameObject == null)
+                    continue;
+
+                if (IsSelectionRootIncludedIn(rootsToRemove, member.gameObject.transform))
+                    removedAnObject = true;
+                else
+                    remainingSelection.Add(member.gameObject);
+            }
+        }
+        else if (IsSelectionRootIncludedIn(rootsToRemove, selectedObject.transform))
+        {
+            removedAnObject = true;
+        }
+        else
+        {
+            remainingSelection.Add(selectedObject);
+        }
+
+        if (removedAnObject)
+            SelectObjects(remainingSelection);
+    }
+
+    bool IsSelectionRootIncludedIn(List<Transform> selectionRoots, Transform candidate)
+    {
+        foreach (Transform selectionRoot in selectionRoots)
+        {
+            if (candidate == selectionRoot ||
+                candidate.IsChildOf(selectionRoot) ||
+                selectionRoot.IsChildOf(candidate))
+                return true;
+        }
+
+        return false;
     }
 
     List<Transform> GetSelectionRoots(IEnumerable<GameObject> objectsToSelect)
@@ -648,7 +704,12 @@ public class LevelEditor : MonoBehaviour
         return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
     }
 
-    void SelectObjectsInsideBox(bool addToCurrentSelection)
+    bool IsRemoveSelectionModifierHeld()
+    {
+        return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+    }
+
+    void SelectObjectsInsideBox(bool addToCurrentSelection, bool removeFromCurrentSelection)
     {
         PointerInput pointerInput = PointerInput.Instance;
         if (!pointerInput.TryGetWorldPositionNoDepth(pointerInput.PressStartScreenPosition, out Vector3 pressStartWorldPosition) ||
@@ -663,7 +724,9 @@ public class LevelEditor : MonoBehaviour
         foreach (Collider2D collider in collidersInBox)
             objectsToSelect.Add(collider.gameObject);
 
-        if (addToCurrentSelection)
+        if (removeFromCurrentSelection)
+            RemoveObjectsFromSelection(objectsToSelect);
+        else if (addToCurrentSelection)
             AddObjectsToSelection(objectsToSelect);
         else
             SelectObjects(objectsToSelect);
