@@ -102,6 +102,22 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    struct ScaleGesture
+    {
+        public Vector3 pointerWorldPositionAtStart;
+        public Vector3 selectedLocalScaleAtStart;
+        public float xExtentAtStart;
+        public float yExtentAtStart;
+        public float uniformExtentAtStart;
+        public Vector3 xOutwardDirection;
+        public Vector3 yOutwardDirection;
+        public Vector3 uniformOutwardDirection;
+        public float minimumXFactor;
+        public float minimumYFactor;
+        public float maximumXFactor;
+        public float maximumYFactor;
+    }
+
     // object movement
     Vector3 moveOffset;
     bool isTryingToMoveSelectedObject = false;
@@ -119,13 +135,9 @@ public class LevelEditor : MonoBehaviour
 
     // object scaling
     bool isTryingToScaleSelectedObject = false;
-    Vector3 pointerPositionAtStartScale;
-    Vector3 selectedObjectScaleAtStartScale;
-    float minimumScale = 0.2f;
     float maximumScale = 999999f;
-    float selectedObjectXScaleAtStartScale;
-    float selectedObjectYScaleAtStartScale;
     float scaleIncrement = 0f;
+    ScaleGesture activeScaleGesture;
 
     ObjectTransformControl activeMoveControl;
     ObjectTransformControl activeScaleControl;
@@ -332,7 +344,6 @@ public class LevelEditor : MonoBehaviour
                 {
                     SelectObject(objectCurrentlyTryingToPlace);
                     ConfigureSelectionControlsForSelectedObject();
-                    SetMinimumScale();
                 }
 
                 objectCurrentlyTryingToPlace = null;
@@ -385,7 +396,6 @@ public class LevelEditor : MonoBehaviour
                     {
                         SelectObject(hit.collider.gameObject);
                         ConfigureSelectionControlsForSelectedObject();
-                        SetMinimumScale();
                     }
                 }
                 else if (!shouldAddToSelection && !shouldRemoveFromSelection) // no object hit
@@ -423,13 +433,11 @@ public class LevelEditor : MonoBehaviour
         {
             SelectObject(selectionRoots[0].gameObject);
             ConfigureSelectionControlsForSelectedObject();
-            SetMinimumScale();
             return;
         }
 
         CreateTemporarySelectionGroup(selectionRoots);
         ConfigureSelectionControlsForSelectedObject();
-        SetMinimumScale();
     }
 
     void AddObjectsToSelection(IEnumerable<GameObject> objectsToAdd)
@@ -617,32 +625,50 @@ public class LevelEditor : MonoBehaviour
 
     Vector3 GetSelectionPivot(List<Transform> selectionRoots)
     {
-        bool hasBounds = false;
-        Bounds selectionBounds = default;
         Vector3 averagePosition = Vector3.zero;
 
         foreach (Transform selectionRoot in selectionRoots)
-        {
             averagePosition += selectionRoot.position;
 
-            foreach (Collider2D collider in selectionRoot.GetComponentsInChildren<Collider2D>())
-            {
-                if (!hasBounds)
-                {
-                    selectionBounds = collider.bounds;
-                    hasBounds = true;
-                }
-                else
-                {
-                    selectionBounds.Encapsulate(collider.bounds);
-                }
-            }
-        }
-
-        if (hasBounds)
+        if (TryGetWorldBounds(selectionRoots, out Bounds selectionBounds))
             return selectionBounds.center;
 
         return averagePosition / selectionRoots.Count;
+    }
+
+    bool TryGetWorldBounds(IEnumerable<Transform> transforms, out Bounds worldBounds)
+    {
+        bool hasBounds = false;
+        worldBounds = default;
+
+        foreach (Transform transformToMeasure in transforms)
+        {
+            if (transformToMeasure == null)
+                continue;
+
+            // Colliders represent the playable object bounds. Renderers are included
+            // too so objects such as text can participate before they have colliders.
+            foreach (Collider2D collider in transformToMeasure.GetComponentsInChildren<Collider2D>())
+                EncapsulateWorldBounds(collider.bounds, ref hasBounds, ref worldBounds);
+
+            foreach (Renderer renderer in transformToMeasure.GetComponentsInChildren<Renderer>())
+                EncapsulateWorldBounds(renderer.bounds, ref hasBounds, ref worldBounds);
+        }
+
+        return hasBounds;
+    }
+
+    static void EncapsulateWorldBounds(Bounds boundsToAdd, ref bool hasBounds, ref Bounds worldBounds)
+    {
+        if (!hasBounds)
+        {
+            worldBounds = boundsToAdd;
+            hasBounds = true;
+        }
+        else
+        {
+            worldBounds.Encapsulate(boundsToAdd);
+        }
     }
 
     void UnselectObject()
@@ -980,15 +1006,6 @@ public class LevelEditor : MonoBehaviour
             availability.scaleHandlesFollowSelectionRotation);
     }
 
-    void SetMinimumScale()
-    {
-        // set minimum scale depending on which type of object is selected
-        if (selectedObject.transform.name.Contains("Puller"))
-            minimumScale = 3f;
-        else
-            minimumScale = 0.2f;
-    }
-
     float RoundToIncrement(float val, float increment)
     {
         if (increment == 0)
@@ -1081,7 +1098,6 @@ public class LevelEditor : MonoBehaviour
             }
 
             ConfigureSelectionControlsForSelectedObject();
-            SetMinimumScale();
         }
 
         isTryingToMoveSelectedObject = true;
@@ -1255,17 +1271,37 @@ public class LevelEditor : MonoBehaviour
 
     void BeginScaleSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
     {
-        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out pointerPositionAtStartScale))
+        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPositionAtStart))
         {
             Debug.LogError("LevelEditor could not begin scaling an object because a valid pointer world position is unavailable.", this);
             return;
         }
 
+        Camera activeCamera = Camera.main;
+        if (activeCamera == null || !TryGetSelectedScaleExtents(out float xExtent, out float yExtent))
+        {
+            Debug.LogError("LevelEditor could not begin scaling because the selected object has no measurable world bounds or active world camera.", this);
+            return;
+        }
+
+        activeScaleGesture = new ScaleGesture
+        {
+            pointerWorldPositionAtStart = pointerWorldPositionAtStart,
+            selectedLocalScaleAtStart = selectedObject.transform.localScale,
+            xExtentAtStart = xExtent,
+            yExtentAtStart = yExtent,
+            uniformExtentAtStart = Mathf.Max(xExtent, yExtent),
+            xOutwardDirection = GetCameraFacingDirection(selectedObject.transform.right, activeCamera.transform.right),
+            yOutwardDirection = GetCameraFacingDirection(selectedObject.transform.up, activeCamera.transform.up),
+            uniformOutwardDirection = -activeCamera.transform.right
+        };
+        GetScaleFactorLimits(out activeScaleGesture.minimumXFactor,
+                             out activeScaleGesture.maximumXFactor,
+                             out activeScaleGesture.minimumYFactor,
+                             out activeScaleGesture.maximumYFactor);
+
         isTryingToScaleSelectedObject = true;
         activeScaleControl = control;
-        selectedObjectScaleAtStartScale = selectedObject.transform.localScale;
-        selectedObjectXScaleAtStartScale = selectedObject.transform.localScale.x;
-        selectedObjectYScaleAtStartScale = selectedObject.transform.localScale.y;
     }
 
     void UpdateScaleSelectedObject(Vector3 pointerWorldPosition)
@@ -1273,68 +1309,143 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject == null)
             return;
 
-        Vector3 newScale = selectedObject.transform.localScale;
-        float pointerScaleDeltaX = pointerPositionAtStartScale.x - pointerWorldPosition.x;
-        float pointerScaleDeltaY = pointerWorldPosition.y - pointerPositionAtStartScale.y;
+        Vector3 pointerDelta = pointerWorldPosition - activeScaleGesture.pointerWorldPositionAtStart;
+        Vector3 newScale = activeScaleGesture.selectedLocalScaleAtStart;
 
         switch (activeScaleControl)
         {
             case ObjectTransformControl.ScaleBoth:
-                Vector3 scaleReferencePoint = pointerPositionAtStartScale + selectedObject.transform.right * 9999f;
-                float distanceToReferenceAtStartScale = Vector3.Distance(pointerPositionAtStartScale, scaleReferencePoint);
-                float scaleDelta = (Vector3.Distance(pointerWorldPosition, scaleReferencePoint) - distanceToReferenceAtStartScale) * 2f;
-                float xScaleMultiplier = scaleDelta / selectedObjectXScaleAtStartScale;
-                float yScaleMultiplier = scaleDelta / selectedObjectYScaleAtStartScale;
-                float parentXScale = selectedObject.transform.parent.localScale.x;
-                float parentYScale = selectedObject.transform.parent.localScale.y;
-
-                if (selectedObjectXScaleAtStartScale > selectedObjectYScaleAtStartScale)
-                {
-                    float xAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.x / selectedObjectXScaleAtStartScale;
-                    newScale = new Vector3(
-                        Mathf.Clamp((1 + xScaleMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
-                        Mathf.Clamp(selectedObjectYScaleAtStartScale * xAxisScaleDifferenceSinceStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
-                        1f);
-                }
-                else if (selectedObjectYScaleAtStartScale > selectedObjectXScaleAtStartScale)
-                {
-                    float yAxisScaleDifferenceSinceStartScale = selectedObject.transform.localScale.y / selectedObjectYScaleAtStartScale;
-                    newScale = new Vector3(
-                        Mathf.Clamp(selectedObjectXScaleAtStartScale * yAxisScaleDifferenceSinceStartScale, minimumScale * parentXScale, maximumScale * parentXScale),
-                        Mathf.Clamp((1 + yScaleMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
-                        1f);
-                }
-                else
-                {
-                    newScale = new Vector3(
-                        Mathf.Clamp((1 + xScaleMultiplier / parentXScale) * selectedObjectXScaleAtStartScale, minimumScale / parentXScale, maximumScale / parentXScale),
-                        Mathf.Clamp((1 + yScaleMultiplier / parentYScale) * selectedObjectYScaleAtStartScale, minimumScale / parentYScale, maximumScale / parentYScale),
-                        1f);
-                }
+                float uniformScaleFactor = GetScaleFactor(
+                    activeScaleGesture.uniformExtentAtStart,
+                    Vector3.Dot(pointerDelta, activeScaleGesture.uniformOutwardDirection),
+                    Mathf.Max(activeScaleGesture.minimumXFactor, activeScaleGesture.minimumYFactor),
+                    Mathf.Min(activeScaleGesture.maximumXFactor, activeScaleGesture.maximumYFactor));
+                newScale.x *= uniformScaleFactor;
+                newScale.y *= uniformScaleFactor;
                 break;
 
             case ObjectTransformControl.ScaleX:
                 horizontalLine.gameObject.SetActive(true);
                 horizontalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.right * 9999f);
                 horizontalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.right * 9999f);
-                newScale = new Vector3(
-                    Mathf.Clamp(pointerScaleDeltaX * 2f + selectedObjectScaleAtStartScale.x, minimumScale, maximumScale),
-                    selectedObjectScaleAtStartScale.y,
-                    1f);
+                newScale.x *= GetScaleFactor(
+                    activeScaleGesture.xExtentAtStart,
+                    Vector3.Dot(pointerDelta, activeScaleGesture.xOutwardDirection),
+                    activeScaleGesture.minimumXFactor,
+                    activeScaleGesture.maximumXFactor);
                 break;
 
             case ObjectTransformControl.ScaleY:
                 verticalLine.gameObject.SetActive(true);
                 verticalLine.SetPosition(0, selectedObject.transform.position + selectedObject.transform.up * 9999f);
                 verticalLine.SetPosition(1, selectedObject.transform.position - selectedObject.transform.up * 9999f);
-                newScale = new Vector3(
-                    selectedObjectScaleAtStartScale.x,
-                    Mathf.Clamp(pointerScaleDeltaY * 2f + selectedObjectScaleAtStartScale.y, minimumScale, maximumScale),
-                    1f);
+                newScale.y *= GetScaleFactor(
+                    activeScaleGesture.yExtentAtStart,
+                    Vector3.Dot(pointerDelta, activeScaleGesture.yOutwardDirection),
+                    activeScaleGesture.minimumYFactor,
+                    activeScaleGesture.maximumYFactor);
                 break;
         }
 
         selectedObject.transform.localScale = newScale;
+    }
+
+    bool TryGetSelectedScaleExtents(out float xExtent, out float yExtent)
+    {
+        xExtent = 0f;
+        yExtent = 0f;
+
+        if (selectedObject == null || !TryGetWorldBounds(GetScaleConstraintTransforms(), out Bounds selectionBounds))
+            return false;
+
+        xExtent = GetBoundsExtentAlongAxis(selectionBounds, selectedObject.transform.right);
+        yExtent = GetBoundsExtentAlongAxis(selectionBounds, selectedObject.transform.up);
+        return xExtent > Mathf.Epsilon && yExtent > Mathf.Epsilon;
+    }
+
+    static float GetBoundsExtentAlongAxis(Bounds bounds, Vector3 axis)
+    {
+        axis.z = 0f;
+        axis.Normalize();
+        return 2f * (Mathf.Abs(axis.x) * bounds.extents.x + Mathf.Abs(axis.y) * bounds.extents.y);
+    }
+
+    static Vector3 GetCameraFacingDirection(Vector3 selectionAxis, Vector3 cameraAxis)
+    {
+        selectionAxis.z = 0f;
+        cameraAxis.z = 0f;
+        selectionAxis.Normalize();
+        cameraAxis.Normalize();
+        return Vector3.Dot(selectionAxis, cameraAxis) > 0f ? -selectionAxis : selectionAxis;
+    }
+
+    void GetScaleFactorLimits(out float minimumXFactor, out float maximumXFactor, out float minimumYFactor, out float maximumYFactor)
+    {
+        minimumXFactor = 0f;
+        minimumYFactor = 0f;
+        maximumXFactor = float.PositiveInfinity;
+        maximumYFactor = float.PositiveInfinity;
+
+        foreach (Transform scaleConstrainedTransform in GetScaleConstraintTransforms())
+        {
+            if (scaleConstrainedTransform == null)
+                continue;
+
+            float minimumObjectScale = GetMinimumObjectScale(scaleConstrainedTransform.gameObject);
+            float startingXScale = GetStartingEffectiveScale(scaleConstrainedTransform, true);
+            float startingYScale = GetStartingEffectiveScale(scaleConstrainedTransform, false);
+
+            minimumXFactor = Mathf.Max(minimumXFactor, minimumObjectScale / startingXScale);
+            minimumYFactor = Mathf.Max(minimumYFactor, minimumObjectScale / startingYScale);
+            maximumXFactor = Mathf.Min(maximumXFactor, maximumScale / startingXScale);
+            maximumYFactor = Mathf.Min(maximumYFactor, maximumScale / startingYScale);
+        }
+    }
+
+    IEnumerable<Transform> GetScaleConstraintTransforms()
+    {
+        if (selectionGroup != null)
+        {
+            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            {
+                if (member.gameObject != null)
+                    yield return member.gameObject.transform;
+            }
+
+            yield break;
+        }
+
+        if (selectedObject != null)
+            yield return selectedObject.transform;
+    }
+
+    float GetStartingEffectiveScale(Transform scaleConstrainedTransform, bool xAxis)
+    {
+        float memberScale = Mathf.Abs(xAxis
+            ? scaleConstrainedTransform.localScale.x
+            : scaleConstrainedTransform.localScale.y);
+
+        if (selectionGroup != null)
+        {
+            float groupScale = Mathf.Abs(xAxis
+                ? activeScaleGesture.selectedLocalScaleAtStart.x
+                : activeScaleGesture.selectedLocalScaleAtStart.y);
+            memberScale *= groupScale;
+        }
+
+        return Mathf.Max(memberScale, Mathf.Epsilon);
+    }
+
+    static float GetMinimumObjectScale(GameObject levelObject)
+    {
+        return levelObject.name.Contains("Puller") ? 3f : 0.2f;
+    }
+
+    static float GetScaleFactor(float startExtent, float outwardPointerDistance, float minimumFactor, float maximumFactor)
+    {
+        float desiredFactor = 1f + (2f * outwardPointerDistance / startExtent);
+        maximumFactor = Mathf.Max(minimumFactor, maximumFactor);
+        return Mathf.Clamp(desiredFactor, minimumFactor, maximumFactor);
     }
 
     void EndScaleSelectedObject()
