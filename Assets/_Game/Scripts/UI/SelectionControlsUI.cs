@@ -7,8 +7,6 @@ public class SelectionControlsUI : MonoBehaviour
     [SerializeField] CanvasGroup controlsCanvasGroup;
     [SerializeField] GameObject duplicateControl;
     [SerializeField] GameObject scaleBothControl;
-    [SerializeField] GameObject scaleXControl;
-    [SerializeField] GameObject scaleYControl;
     [SerializeField] GameObject rotateControl;
 
     LevelEditor levelEditor;
@@ -17,8 +15,6 @@ public class SelectionControlsUI : MonoBehaviour
     Canvas parentCanvas;
     bool scaleHandlesFollowSelectionRotation;
     Quaternion scaleBothControlBaseRotation;
-    Quaternion scaleXControlBaseRotation;
-    Quaternion scaleYControlBaseRotation;
 
     void Awake()
     {
@@ -29,10 +25,6 @@ public class SelectionControlsUI : MonoBehaviour
 
         if (scaleBothControl != null)
             scaleBothControlBaseRotation = scaleBothControl.transform.localRotation;
-        if (scaleXControl != null)
-            scaleXControlBaseRotation = scaleXControl.transform.localRotation;
-        if (scaleYControl != null)
-            scaleYControlBaseRotation = scaleYControl.transform.localRotation;
 
         overlayRect = transform.parent as RectTransform;
         parentCanvas = GetComponentInParent<Canvas>();
@@ -52,8 +44,6 @@ public class SelectionControlsUI : MonoBehaviour
     public void SetControlAvailability(
         bool canDuplicate,
         bool canScaleBoth,
-        bool canScaleX,
-        bool canScaleY,
         bool canRotate,
         bool shouldRotateScaleHandles)
     {
@@ -63,10 +53,6 @@ public class SelectionControlsUI : MonoBehaviour
             duplicateControl.SetActive(canDuplicate);
         if (scaleBothControl != null)
             scaleBothControl.SetActive(canScaleBoth);
-        if (scaleXControl != null)
-            scaleXControl.SetActive(canScaleX);
-        if (scaleYControl != null)
-            scaleYControl.SetActive(canScaleY);
         if (rotateControl != null)
             rotateControl.SetActive(canRotate);
     }
@@ -136,9 +122,5 @@ public class SelectionControlsUI : MonoBehaviour
 
         if (scaleBothControl != null)
             scaleBothControl.transform.localRotation = selectedRotation * scaleBothControlBaseRotation;
-        if (scaleXControl != null)
-            scaleXControl.transform.localRotation = selectedRotation * scaleXControlBaseRotation;
-        if (scaleYControl != null)
-            scaleYControl.transform.localRotation = selectedRotation * scaleYControlBaseRotation;
     }
 }
