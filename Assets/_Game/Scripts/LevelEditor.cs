@@ -167,6 +167,7 @@ public class LevelEditor : MonoBehaviour
     {
         public ScaleFromEdgeHandle handle;
         public bool scalesFromBothSides;
+        public bool scalesIndependently;
         public ScaleFromEdgeFrame frameAtStart;
         public Vector3 selectedLocalScaleAtStart;
         public Vector3 selectedWorldPositionAtStart;
@@ -1684,7 +1685,8 @@ public class LevelEditor : MonoBehaviour
             handle,
             frameAtStart,
             pointerWorldPositionAtStart,
-            IsScaleFromEdgeBothSidesModeHeld());
+            IsScaleFromEdgeBothSidesModeHeld(),
+            IsIndependentCornerScaleModeHeld(handle));
         return true;
     }
 
@@ -1692,10 +1694,12 @@ public class LevelEditor : MonoBehaviour
     {
         ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
         bool shouldScaleFromBothSides = IsScaleFromEdgeBothSidesModeHeld();
-        if (gesture.scalesFromBothSides != shouldScaleFromBothSides)
+        bool shouldScaleIndependently = IsIndependentCornerScaleModeHeld(gesture.handle);
+        if (gesture.scalesFromBothSides != shouldScaleFromBothSides ||
+            gesture.scalesIndependently != shouldScaleIndependently)
         {
             // Begin a fresh gesture at the current size and pointer location when
-            // the modifier changes. This changes the anchor without a visual jump.
+            // a modifier changes. This changes the anchor without a visual jump.
             if (!TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame currentFrame))
                 return;
 
@@ -1703,7 +1707,8 @@ public class LevelEditor : MonoBehaviour
                 gesture.handle,
                 currentFrame,
                 pointerWorldPosition,
-                shouldScaleFromBothSides);
+                shouldScaleFromBothSides,
+                shouldScaleIndependently);
             gesture = activeScaleFromEdgeGesture;
         }
 
@@ -1714,7 +1719,7 @@ public class LevelEditor : MonoBehaviour
 
         float xFactor = 1f;
         float yFactor = 1f;
-        if (scalesUniformly)
+        if (scalesUniformly && !gesture.scalesIndependently)
         {
             Vector3 movingCornerDirection =
                 (GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right * gesture.frameAtStart.Width +
@@ -1731,25 +1736,29 @@ public class LevelEditor : MonoBehaviour
             xFactor = uniformFactor;
             yFactor = uniformFactor;
         }
-        else if (scalesX)
+        else
         {
-            Vector3 outwardDirection = GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right;
-            xFactor = GetScaleFromEdgeGestureFactor(
-                gesture.scalesFromBothSides,
-                gesture.frameAtStart.Width,
-                Vector3.Dot(pointerDelta, outwardDirection),
-                gesture.minimumXFactor,
-                gesture.maximumXFactor);
-        }
-        else if (scalesY)
-        {
-            Vector3 outwardDirection = GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up;
-            yFactor = GetScaleFromEdgeGestureFactor(
-                gesture.scalesFromBothSides,
-                gesture.frameAtStart.Height,
-                Vector3.Dot(pointerDelta, outwardDirection),
-                gesture.minimumYFactor,
-                gesture.maximumYFactor);
+            if (scalesX)
+            {
+                Vector3 outwardDirection = GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right;
+                xFactor = GetScaleFromEdgeGestureFactor(
+                    gesture.scalesFromBothSides,
+                    gesture.frameAtStart.Width,
+                    Vector3.Dot(pointerDelta, outwardDirection),
+                    gesture.minimumXFactor,
+                    gesture.maximumXFactor);
+            }
+
+            if (scalesY)
+            {
+                Vector3 outwardDirection = GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up;
+                yFactor = GetScaleFromEdgeGestureFactor(
+                    gesture.scalesFromBothSides,
+                    gesture.frameAtStart.Height,
+                    Vector3.Dot(pointerDelta, outwardDirection),
+                    gesture.minimumYFactor,
+                    gesture.maximumYFactor);
+            }
         }
 
         Vector3 newScale = gesture.selectedLocalScaleAtStart;
@@ -1781,12 +1790,14 @@ public class LevelEditor : MonoBehaviour
         ScaleFromEdgeHandle handle,
         ScaleFromEdgeFrame frameAtStart,
         Vector3 pointerWorldPositionAtStart,
-        bool scalesFromBothSides)
+        bool scalesFromBothSides,
+        bool scalesIndependently)
     {
         activeScaleFromEdgeGesture = new ScaleFromEdgeGesture
         {
             handle = handle,
             scalesFromBothSides = scalesFromBothSides,
+            scalesIndependently = scalesIndependently,
             frameAtStart = frameAtStart,
             selectedLocalScaleAtStart = selectedObject.transform.localScale,
             selectedWorldPositionAtStart = selectedObject.transform.position,
@@ -1803,6 +1814,16 @@ public class LevelEditor : MonoBehaviour
     bool IsScaleFromEdgeBothSidesModeHeld()
     {
         return IsShiftModeHeld;
+    }
+
+    bool IsIndependentCornerScaleModeHeld(ScaleFromEdgeHandle handle)
+    {
+        return IsCtrlModeHeld &&
+               DoesScaleFromEdgeHandleScaleX(handle) &&
+               DoesScaleFromEdgeHandleScaleY(handle) &&
+               TryGetSelectionControlAvailability(out SelectionControlAvailability availability) &&
+               availability.canScaleHorizontally &&
+               availability.canScaleVertically;
     }
 
     static bool DoesScaleFromEdgeHandleScaleX(ScaleFromEdgeHandle handle)
