@@ -163,17 +163,6 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    struct ScaleGesture
-    {
-        public Vector3 selectedLocalScaleAtStart;
-        public float uniformExtentAtStart;
-        public Vector3 uniformReferencePoint;
-        public Vector3 uniformOutwardDirection;
-        public float uniformPointerDistanceAtStart;
-        public float minimumUniformFactor;
-        public float maximumUniformFactor;
-    }
-
     struct ScaleFromEdgeGesture
     {
         public ScaleFromEdgeHandle handle;
@@ -220,14 +209,11 @@ public class LevelEditor : MonoBehaviour
     bool isTryingToScaleSelectedObject = false;
     float maximumScale = 999999f;
     float scaleIncrement = 0f;
-    ScaleGesture activeScaleGesture;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
-    bool isScalingFromEdge;
     bool isShiftModeButtonHeld;
     bool isCtrlModeButtonHeld;
 
     ObjectTransformControl activeMoveControl;
-    ObjectTransformControl activeScaleControl;
     int activeTransformPointerId = int.MinValue;
     Vector2 activeTransformPressScreenPosition;
 
@@ -1175,7 +1161,6 @@ public class LevelEditor : MonoBehaviour
 
         selectionControlsUI.SetControlAvailability(
             availability.canDuplicate,
-            availability.canScaleBoth,
             availability.canRotate);
 
         if (scaleFromEdgeControlsUI != null)
@@ -1256,16 +1241,11 @@ public class LevelEditor : MonoBehaviour
         switch (control)
         {
             case ObjectTransformControl.MoveBoth:
-            case ObjectTransformControl.MoveX:
-            case ObjectTransformControl.MoveY:
             case ObjectTransformControl.Duplicate:
                 BeginMoveSelectedObject(control, screenPosition);
                 break;
             case ObjectTransformControl.Rotate:
                 BeginRotateSelectedObject(screenPosition);
-                break;
-            case ObjectTransformControl.ScaleBoth:
-                BeginScaleSelectedObject(control, screenPosition);
                 break;
         }
 
@@ -1285,8 +1265,6 @@ public class LevelEditor : MonoBehaviour
             EndMoveSelectedObject();
         else if (control == ObjectTransformControl.Rotate && isTryingToRotateSelectedObject)
             EndRotateSelectedObject();
-        else if (control == activeScaleControl && isTryingToScaleSelectedObject)
-            EndScaleSelectedObject();
 
         activeTransformPointerId = int.MinValue;
     }
@@ -1310,7 +1288,6 @@ public class LevelEditor : MonoBehaviour
     {
         if (pointerId != activeTransformPointerId ||
             !isTryingToScaleSelectedObject ||
-            !isScalingFromEdge ||
             handle != activeScaleFromEdgeGesture.handle)
             return;
 
@@ -1364,7 +1341,7 @@ public class LevelEditor : MonoBehaviour
         else if (isTryingToRotateSelectedObject)
             UpdateRotateSelectedObject(pointerWorldPosition);
         else if (isTryingToScaleSelectedObject)
-            UpdateScaleSelectedObject(pointerWorldPosition);
+            UpdateScaleFromEdgeSelectedObject(pointerWorldPosition);
     }
 
     void BeginMoveSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
@@ -1467,27 +1444,6 @@ public class LevelEditor : MonoBehaviour
         else
             selectedObject.SetActive(true);
 
-        if (activeMoveControl == ObjectTransformControl.MoveX)
-        {
-            float newX = RoundToIncrement(selectedObject.transform.position.x, moveIncrement) + moveIncrementOffset.x;
-            selectedObject.transform.position = new Vector3(newX, selectedObjectPositionAtStartMove.y, 0f);
-
-            horizontalLine.gameObject.SetActive(true);
-            horizontalLine.transform.position = selectedObject.transform.position;
-            horizontalLine.SetPosition(0, new Vector3(horizontalLine.transform.position.x + 9999f, horizontalLine.transform.position.y, 0f));
-            horizontalLine.SetPosition(1, new Vector3(horizontalLine.transform.position.x - 9999f, horizontalLine.transform.position.y, 0f));
-        }
-
-        if (activeMoveControl == ObjectTransformControl.MoveY)
-        {
-            float newY = RoundToIncrement(selectedObject.transform.position.y, moveIncrement) + moveIncrementOffset.y;
-            selectedObject.transform.position = new Vector3(selectedObjectPositionAtStartMove.x, newY, 0f);
-
-            verticalLine.gameObject.SetActive(true);
-            verticalLine.transform.position = selectedObject.transform.position;
-            verticalLine.SetPosition(0, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y + 9999f, 0f));
-            verticalLine.SetPosition(1, new Vector3(verticalLine.transform.position.x, verticalLine.transform.position.y - 9999f, 0f));
-        }
     }
 
     void UpdateShiftMoveGuides(ref Vector3 desiredPosition)
@@ -1650,78 +1606,6 @@ public class LevelEditor : MonoBehaviour
             NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
     }
 
-    void BeginScaleSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
-    {
-        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPositionAtStart))
-        {
-            Debug.LogError("LevelEditor could not begin scaling an object because a valid pointer world position is unavailable.", this);
-            return;
-        }
-
-        Camera activeCamera = Camera.main;
-        if (activeCamera == null ||
-            !TryGetWorldBounds(GetScaleConstraintTransforms(), out Bounds selectionBounds))
-        {
-            Debug.LogError("LevelEditor could not begin scaling because the selected object has no measurable world bounds or active world camera.", this);
-            return;
-        }
-
-        Vector3 cameraLeft = -activeCamera.transform.right;
-        float cameraWidth = GetBoundsExtentAlongAxis(selectionBounds, activeCamera.transform.right);
-        float cameraHeight = GetBoundsExtentAlongAxis(selectionBounds, activeCamera.transform.up);
-        float uniformExtent = Mathf.Max(cameraWidth, cameraHeight);
-        if (uniformExtent <= Mathf.Epsilon)
-        {
-            Debug.LogError("LevelEditor could not begin scaling because the selected bounds have no measurable size.", this);
-            return;
-        }
-
-        Vector3 uniformReferencePoint = GetBoundsSideCenter(selectionBounds, cameraLeft);
-        Vector3 selectionPivot = selectedObject.transform.position;
-        Vector3 uniformOutwardDirection = GetDirectionFromPivotToReference(selectionPivot, uniformReferencePoint, cameraLeft);
-
-        activeScaleGesture = new ScaleGesture
-        {
-            selectedLocalScaleAtStart = selectedObject.transform.localScale,
-            uniformExtentAtStart = uniformExtent,
-            uniformReferencePoint = uniformReferencePoint,
-            uniformOutwardDirection = uniformOutwardDirection,
-            uniformPointerDistanceAtStart = GetPointerDistanceFromReference(pointerWorldPositionAtStart, uniformReferencePoint, uniformOutwardDirection)
-        };
-        GetUniformScaleFactorLimits(out activeScaleGesture.minimumUniformFactor,
-                                    out activeScaleGesture.maximumUniformFactor);
-
-        isTryingToScaleSelectedObject = true;
-        isScalingFromEdge = false;
-        activeScaleControl = control;
-    }
-
-    void UpdateScaleSelectedObject(Vector3 pointerWorldPosition)
-    {
-        if (selectedObject == null)
-            return;
-
-        if (isScalingFromEdge)
-        {
-            UpdateScaleFromEdgeSelectedObject(pointerWorldPosition);
-            return;
-        }
-
-        float uniformScaleFactor = GetCenteredScaleFactor(
-            activeScaleGesture.uniformExtentAtStart,
-            GetPointerDistanceFromReference(
-                pointerWorldPosition,
-                activeScaleGesture.uniformReferencePoint,
-                activeScaleGesture.uniformOutwardDirection) - activeScaleGesture.uniformPointerDistanceAtStart,
-            activeScaleGesture.minimumUniformFactor,
-            activeScaleGesture.maximumUniformFactor);
-        Vector3 newScale = activeScaleGesture.selectedLocalScaleAtStart;
-        newScale.x *= uniformScaleFactor;
-        newScale.y *= uniformScaleFactor;
-
-        selectedObject.transform.localScale = newScale;
-    }
-
     void BeginScaleFromEdgeSelectedObject(ScaleFromEdgeHandle handle, Vector2 screenPosition)
     {
         if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPositionAtStart))
@@ -1743,7 +1627,6 @@ public class LevelEditor : MonoBehaviour
             IsScaleFromEdgeBothSidesModeHeld());
 
         isTryingToScaleSelectedObject = true;
-        isScalingFromEdge = true;
     }
 
     void UpdateScaleFromEdgeSelectedObject(Vector3 pointerWorldPosition)
@@ -1883,48 +1766,6 @@ public class LevelEditor : MonoBehaviour
         return handle is ScaleFromEdgeHandle.Up or ScaleFromEdgeHandle.UpLeft or ScaleFromEdgeHandle.UpRight ? 1f : -1f;
     }
 
-    static float GetBoundsExtentAlongAxis(Bounds bounds, Vector3 axis)
-    {
-        axis.z = 0f;
-        axis.Normalize();
-        return 2f * (Mathf.Abs(axis.x) * bounds.extents.x + Mathf.Abs(axis.y) * bounds.extents.y);
-    }
-
-    static Vector3 GetBoundsSideCenter(Bounds bounds, Vector3 sideNormal)
-    {
-        sideNormal.z = 0f;
-        sideNormal.Normalize();
-        float halfExtent = GetBoundsExtentAlongAxis(bounds, sideNormal) * 0.5f;
-        return bounds.center + sideNormal * halfExtent;
-    }
-
-    static Vector3 GetDirectionFromPivotToReference(Vector3 pivot, Vector3 referencePoint, Vector3 fallbackDirection)
-    {
-        Vector3 referenceDirection = referencePoint - pivot;
-        referenceDirection.z = 0f;
-        if (referenceDirection.sqrMagnitude <= Mathf.Epsilon)
-            referenceDirection = fallbackDirection;
-
-        return referenceDirection.normalized;
-    }
-
-    static float GetPointerDistanceFromReference(Vector3 pointerWorldPosition, Vector3 referencePoint, Vector3 outwardDirection)
-    {
-        return Vector3.Dot(pointerWorldPosition - referencePoint, outwardDirection);
-    }
-
-    void GetUniformScaleFactorLimits(out float minimumUniformFactor, out float maximumUniformFactor)
-    {
-        GetScaleFactorLimits(
-            activeScaleGesture.selectedLocalScaleAtStart,
-            out float minimumXFactor,
-            out float maximumXFactor,
-            out float minimumYFactor,
-            out float maximumYFactor);
-        minimumUniformFactor = Mathf.Max(minimumXFactor, minimumYFactor);
-        maximumUniformFactor = Mathf.Min(maximumXFactor, maximumYFactor);
-    }
-
     void GetScaleFactorLimits(
         Vector3 selectedLocalScaleAtStart,
         out float minimumXFactor,
@@ -2021,9 +1862,6 @@ public class LevelEditor : MonoBehaviour
     void EndScaleSelectedObject()
     {
         isTryingToScaleSelectedObject = false;
-        isScalingFromEdge = false;
-        horizontalLine.gameObject.SetActive(false);
-        verticalLine.gameObject.SetActive(false);
 
         if (selectedObject != null && selectedObject != selectionGroup)
             NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
