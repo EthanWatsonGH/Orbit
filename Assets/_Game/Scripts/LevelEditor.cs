@@ -31,6 +31,7 @@ public class LevelEditor : MonoBehaviour
 
     [Header("Screen Space UI")]
     [SerializeField] SelectionControlsUI selectionControlsUI;
+    [SerializeField] ScaleFromEdgeControlsUI scaleFromEdgeControlsUI;
     [SerializeField] RectTransform boxSelectionVisual;
 
     bool isTryingToPlace = false;
@@ -64,10 +65,51 @@ public class LevelEditor : MonoBehaviour
         public int originalSiblingIndex;
     }
 
+    public struct ScaleFromEdgeFrame
+    {
+        public Vector3 pivot;
+        public Vector3 right;
+        public Vector3 up;
+        public float minX;
+        public float maxX;
+        public float minY;
+        public float maxY;
+
+        public Vector3 Center => GetPoint((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+        public float Width => maxX - minX;
+        public float Height => maxY - minY;
+
+        public Vector3 GetHandlePosition(ScaleFromEdgeHandle handle)
+        {
+            float centerX = (minX + maxX) * 0.5f;
+            float centerY = (minY + maxY) * 0.5f;
+
+            return handle switch
+            {
+                ScaleFromEdgeHandle.Up => GetPoint(centerX, maxY),
+                ScaleFromEdgeHandle.Down => GetPoint(centerX, minY),
+                ScaleFromEdgeHandle.Left => GetPoint(minX, centerY),
+                ScaleFromEdgeHandle.Right => GetPoint(maxX, centerY),
+                ScaleFromEdgeHandle.UpLeft => GetPoint(minX, maxY),
+                ScaleFromEdgeHandle.UpRight => GetPoint(maxX, maxY),
+                ScaleFromEdgeHandle.DownLeft => GetPoint(minX, minY),
+                ScaleFromEdgeHandle.DownRight => GetPoint(maxX, minY),
+                _ => pivot
+            };
+        }
+
+        Vector3 GetPoint(float x, float y)
+        {
+            return pivot + right * x + up * y;
+        }
+    }
+
     struct SelectionControlAvailability
     {
         public bool canDuplicate;
         public bool canScaleBoth;
+        public bool canScaleHorizontally;
+        public bool canScaleVertically;
         public bool canRotate;
         public bool scaleHandlesFollowSelectionRotation;
 
@@ -76,14 +118,16 @@ public class LevelEditor : MonoBehaviour
             bool isPlayerStartPoint = levelObject.name == "PlayerStartPoint";
             bool isPuller = levelObject.name.Contains("Puller");
             bool isKillCircle = levelObject.name.Contains("KillCircle");
-            bool supportsIndividualRotation = !isPlayerStartPoint && !isPuller && !isKillCircle;
+            bool supportsIndependentScaleAndRotation = !isPlayerStartPoint && !isPuller && !isKillCircle;
 
             return new SelectionControlAvailability
             {
                 canDuplicate = !isPlayerStartPoint,
                 canScaleBoth = !isPlayerStartPoint,
-                canRotate = supportsIndividualRotation,
-                scaleHandlesFollowSelectionRotation = supportsIndividualRotation
+                canScaleHorizontally = supportsIndependentScaleAndRotation,
+                canScaleVertically = supportsIndependentScaleAndRotation,
+                canRotate = supportsIndependentScaleAndRotation,
+                scaleHandlesFollowSelectionRotation = supportsIndependentScaleAndRotation
             };
         }
 
@@ -91,6 +135,8 @@ public class LevelEditor : MonoBehaviour
         {
             canDuplicate &= other.canDuplicate;
             canScaleBoth &= other.canScaleBoth;
+            canScaleHorizontally &= other.canScaleHorizontally;
+            canScaleVertically &= other.canScaleVertically;
             canRotate &= other.canRotate;
             scaleHandlesFollowSelectionRotation &= other.scaleHandlesFollowSelectionRotation;
         }
@@ -105,6 +151,19 @@ public class LevelEditor : MonoBehaviour
         public float uniformPointerDistanceAtStart;
         public float minimumUniformFactor;
         public float maximumUniformFactor;
+    }
+
+    struct ScaleFromEdgeGesture
+    {
+        public ScaleFromEdgeHandle handle;
+        public ScaleFromEdgeFrame frameAtStart;
+        public Vector3 selectedLocalScaleAtStart;
+        public Vector3 selectedWorldPositionAtStart;
+        public Vector3 pointerWorldPositionAtStart;
+        public float minimumXFactor;
+        public float maximumXFactor;
+        public float minimumYFactor;
+        public float maximumYFactor;
     }
 
     // object movement
@@ -127,6 +186,8 @@ public class LevelEditor : MonoBehaviour
     float maximumScale = 999999f;
     float scaleIncrement = 0f;
     ScaleGesture activeScaleGesture;
+    ScaleFromEdgeGesture activeScaleFromEdgeGesture;
+    bool isScalingFromEdge;
 
     ObjectTransformControl activeMoveControl;
     ObjectTransformControl activeScaleControl;
@@ -159,6 +220,18 @@ public class LevelEditor : MonoBehaviour
         }
 
         selectionControlsUI.Initialize(this);
+
+        if (scaleFromEdgeControlsUI == null)
+        {
+            ScaleFromEdgeControlsUI[] availableControls = FindObjectsByType<ScaleFromEdgeControlsUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (availableControls.Length == 1)
+                scaleFromEdgeControlsUI = availableControls[0];
+            else if (availableControls.Length > 1)
+                Debug.LogError("LevelEditor found more than one ScaleFromEdgeControlsUI. Assign the intended controls in the inspector.", this);
+        }
+
+        if (scaleFromEdgeControlsUI != null)
+            scaleFromEdgeControlsUI.Initialize(this);
 
         if (boxSelectionVisual != null)
         {
@@ -647,6 +720,108 @@ public class LevelEditor : MonoBehaviour
         return hasBounds;
     }
 
+    bool TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame frame)
+    {
+        frame = default;
+        if (selectedObject == null)
+            return false;
+
+        Vector3 right = selectedObject.transform.right;
+        Vector3 up = selectedObject.transform.up;
+        right.z = 0f;
+        up.z = 0f;
+        if (right.sqrMagnitude <= Mathf.Epsilon || up.sqrMagnitude <= Mathf.Epsilon)
+            return false;
+
+        frame.pivot = selectedObject.transform.position;
+        frame.right = right.normalized;
+        frame.up = up.normalized;
+        frame.minX = float.PositiveInfinity;
+        frame.maxX = float.NegativeInfinity;
+        frame.minY = float.PositiveInfinity;
+        frame.maxY = float.NegativeInfinity;
+
+        bool hasMeasuredPoint = false;
+        foreach (Transform selectionRoot in GetScaleConstraintTransforms())
+            AddScaleFromEdgeFramePoints(selectionRoot, ref frame, ref hasMeasuredPoint);
+
+        return hasMeasuredPoint && frame.Width > Mathf.Epsilon && frame.Height > Mathf.Epsilon;
+    }
+
+    void AddScaleFromEdgeFramePoints(Transform selectionRoot, ref ScaleFromEdgeFrame frame, ref bool hasMeasuredPoint)
+    {
+        if (selectionRoot == null)
+            return;
+
+        bool hasMeasuredPointForRoot = false;
+
+        foreach (Collider2D collider in selectionRoot.GetComponentsInChildren<Collider2D>())
+        {
+            if (collider is BoxCollider2D boxCollider)
+            {
+                Bounds localBounds = new Bounds(boxCollider.offset, boxCollider.size);
+                AddLocalBoundsCornersToScaleFromEdgeFrame(boxCollider.transform, localBounds, ref frame, ref hasMeasuredPointForRoot);
+            }
+            else
+            {
+                AddWorldBoundsCornersToScaleFromEdgeFrame(collider.bounds, ref frame, ref hasMeasuredPointForRoot);
+            }
+        }
+
+        foreach (Renderer renderer in selectionRoot.GetComponentsInChildren<Renderer>())
+            AddLocalBoundsCornersToScaleFromEdgeFrame(renderer.transform, renderer.localBounds, ref frame, ref hasMeasuredPointForRoot);
+
+        // Objects without a collider or renderer still need a stable frame for their
+        // UI controls. Their transform position is the best available fallback.
+        if (!hasMeasuredPointForRoot)
+            AddScaleFromEdgeFramePoint(selectionRoot.position, ref frame, ref hasMeasuredPointForRoot);
+
+        hasMeasuredPoint |= hasMeasuredPointForRoot;
+    }
+
+    static void AddLocalBoundsCornersToScaleFromEdgeFrame(
+        Transform boundsTransform,
+        Bounds localBounds,
+        ref ScaleFromEdgeFrame frame,
+        ref bool hasMeasuredPoint)
+    {
+        Vector3 min = localBounds.min;
+        Vector3 max = localBounds.max;
+        AddScaleFromEdgeFramePoint(boundsTransform.TransformPoint(new Vector3(min.x, min.y, localBounds.center.z)), ref frame, ref hasMeasuredPoint);
+        AddScaleFromEdgeFramePoint(boundsTransform.TransformPoint(new Vector3(min.x, max.y, localBounds.center.z)), ref frame, ref hasMeasuredPoint);
+        AddScaleFromEdgeFramePoint(boundsTransform.TransformPoint(new Vector3(max.x, min.y, localBounds.center.z)), ref frame, ref hasMeasuredPoint);
+        AddScaleFromEdgeFramePoint(boundsTransform.TransformPoint(new Vector3(max.x, max.y, localBounds.center.z)), ref frame, ref hasMeasuredPoint);
+    }
+
+    static void AddWorldBoundsCornersToScaleFromEdgeFrame(
+        Bounds worldBounds,
+        ref ScaleFromEdgeFrame frame,
+        ref bool hasMeasuredPoint)
+    {
+        Vector3 min = worldBounds.min;
+        Vector3 max = worldBounds.max;
+        float z = worldBounds.center.z;
+        AddScaleFromEdgeFramePoint(new Vector3(min.x, min.y, z), ref frame, ref hasMeasuredPoint);
+        AddScaleFromEdgeFramePoint(new Vector3(min.x, max.y, z), ref frame, ref hasMeasuredPoint);
+        AddScaleFromEdgeFramePoint(new Vector3(max.x, min.y, z), ref frame, ref hasMeasuredPoint);
+        AddScaleFromEdgeFramePoint(new Vector3(max.x, max.y, z), ref frame, ref hasMeasuredPoint);
+    }
+
+    static void AddScaleFromEdgeFramePoint(
+        Vector3 worldPoint,
+        ref ScaleFromEdgeFrame frame,
+        ref bool hasMeasuredPoint)
+    {
+        Vector3 fromPivot = worldPoint - frame.pivot;
+        float x = Vector3.Dot(fromPivot, frame.right);
+        float y = Vector3.Dot(fromPivot, frame.up);
+        frame.minX = Mathf.Min(frame.minX, x);
+        frame.maxX = Mathf.Max(frame.maxX, x);
+        frame.minY = Mathf.Min(frame.minY, y);
+        frame.maxY = Mathf.Max(frame.maxY, y);
+        hasMeasuredPoint = true;
+    }
+
     static void EncapsulateWorldBounds(Bounds boundsToAdd, ref bool hasBounds, ref Bounds worldBounds)
     {
         if (!hasBounds)
@@ -835,11 +1010,14 @@ public class LevelEditor : MonoBehaviour
 
     void HideSelectionControls()
     {
-        if (selectionControlsUI == null)
-            return;
+        if (selectionControlsUI != null)
+        {
+            selectionControlsUI.SetSelectedTransform(null);
+            selectionControlsUI.SetVisible(false);
+        }
 
-        selectionControlsUI.SetSelectedTransform(null);
-        selectionControlsUI.SetVisible(false);
+        if (scaleFromEdgeControlsUI != null)
+            scaleFromEdgeControlsUI.SetVisible(false);
     }
 
     void SuspendSelectionForSave()
@@ -946,11 +1124,31 @@ public class LevelEditor : MonoBehaviour
 
     void ConfigureSelectionControlsForSelectedObject()
     {
-        if (selectedObject == null)
+        if (!TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
             return;
 
+        selectionControlsUI.SetControlAvailability(
+            availability.canDuplicate,
+            availability.canScaleBoth,
+            availability.canRotate,
+            availability.scaleHandlesFollowSelectionRotation);
+
+        if (scaleFromEdgeControlsUI != null)
+        {
+            scaleFromEdgeControlsUI.SetControlAvailability(
+                availability.canScaleHorizontally,
+                availability.canScaleVertically,
+                availability.canScaleBoth);
+        }
+    }
+
+    bool TryGetSelectionControlAvailability(out SelectionControlAvailability availability)
+    {
+        availability = default;
+        if (selectedObject == null)
+            return false;
+
         bool hasSelectionMember = false;
-        SelectionControlAvailability availability = default;
         if (selectionGroup != null)
         {
             foreach (TemporarySelectionMember member in temporarySelectionMembers)
@@ -975,7 +1173,7 @@ public class LevelEditor : MonoBehaviour
         }
 
         if (!hasSelectionMember)
-            return;
+            return false;
 
         // Rotation here affects the temporary selection wrapper, not one member's
         // individual transform. That remains valid for circles and other roots that
@@ -986,11 +1184,7 @@ public class LevelEditor : MonoBehaviour
             availability.scaleHandlesFollowSelectionRotation = true;
         }
 
-        selectionControlsUI.SetControlAvailability(
-            availability.canDuplicate,
-            availability.canScaleBoth,
-            availability.canRotate,
-            availability.scaleHandlesFollowSelectionRotation);
+        return true;
     }
 
     float RoundToIncrement(float val, float increment)
@@ -1046,6 +1240,43 @@ public class LevelEditor : MonoBehaviour
             EndScaleSelectedObject();
 
         activeTransformPointerId = int.MinValue;
+    }
+
+    public void BeginScaleFromEdgeControl(ScaleFromEdgeHandle handle, int pointerId, Vector2 screenPosition)
+    {
+        if (selectedObject == null || isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject ||
+            !TryGetSelectionControlAvailability(out SelectionControlAvailability availability) ||
+            !IsScaleFromEdgeHandleAvailable(handle, availability))
+            return;
+
+        BeginScaleFromEdgeSelectedObject(handle, screenPosition);
+        if (isTryingToScaleSelectedObject)
+        {
+            activeTransformPointerId = pointerId;
+            activeTransformPressScreenPosition = screenPosition;
+        }
+    }
+
+    public void EndScaleFromEdgeControl(ScaleFromEdgeHandle handle, int pointerId)
+    {
+        if (pointerId != activeTransformPointerId ||
+            !isTryingToScaleSelectedObject ||
+            !isScalingFromEdge ||
+            handle != activeScaleFromEdgeGesture.handle)
+            return;
+
+        EndScaleSelectedObject();
+        activeTransformPointerId = int.MinValue;
+    }
+
+    static bool IsScaleFromEdgeHandleAvailable(ScaleFromEdgeHandle handle, SelectionControlAvailability availability)
+    {
+        return handle switch
+        {
+            ScaleFromEdgeHandle.Left or ScaleFromEdgeHandle.Right => availability.canScaleHorizontally,
+            ScaleFromEdgeHandle.Up or ScaleFromEdgeHandle.Down => availability.canScaleVertically,
+            _ => availability.canScaleBoth
+        };
     }
 
     void UpdateActiveScreenSpaceTransformControl()
@@ -1296,6 +1527,7 @@ public class LevelEditor : MonoBehaviour
                                     out activeScaleGesture.maximumUniformFactor);
 
         isTryingToScaleSelectedObject = true;
+        isScalingFromEdge = false;
         activeScaleControl = control;
     }
 
@@ -1304,7 +1536,13 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject == null)
             return;
 
-        float uniformScaleFactor = GetScaleFactor(
+        if (isScalingFromEdge)
+        {
+            UpdateScaleFromEdgeSelectedObject(pointerWorldPosition);
+            return;
+        }
+
+        float uniformScaleFactor = GetCenteredScaleFactor(
             activeScaleGesture.uniformExtentAtStart,
             GetPointerDistanceFromReference(
                 pointerWorldPosition,
@@ -1317,6 +1555,129 @@ public class LevelEditor : MonoBehaviour
         newScale.y *= uniformScaleFactor;
 
         selectedObject.transform.localScale = newScale;
+    }
+
+    void BeginScaleFromEdgeSelectedObject(ScaleFromEdgeHandle handle, Vector2 screenPosition)
+    {
+        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPositionAtStart))
+        {
+            Debug.LogError("LevelEditor could not begin edge scaling because a valid pointer world position is unavailable.", this);
+            return;
+        }
+
+        if (!TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame frameAtStart))
+        {
+            Debug.LogError("LevelEditor could not begin edge scaling because the selected object has no measurable scale frame.", this);
+            return;
+        }
+
+        activeScaleFromEdgeGesture = new ScaleFromEdgeGesture
+        {
+            handle = handle,
+            frameAtStart = frameAtStart,
+            selectedLocalScaleAtStart = selectedObject.transform.localScale,
+            selectedWorldPositionAtStart = selectedObject.transform.position,
+            pointerWorldPositionAtStart = pointerWorldPositionAtStart
+        };
+        GetScaleFactorLimits(
+            activeScaleFromEdgeGesture.selectedLocalScaleAtStart,
+            out activeScaleFromEdgeGesture.minimumXFactor,
+            out activeScaleFromEdgeGesture.maximumXFactor,
+            out activeScaleFromEdgeGesture.minimumYFactor,
+            out activeScaleFromEdgeGesture.maximumYFactor);
+
+        isTryingToScaleSelectedObject = true;
+        isScalingFromEdge = true;
+    }
+
+    void UpdateScaleFromEdgeSelectedObject(Vector3 pointerWorldPosition)
+    {
+        ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
+        Vector3 pointerDelta = pointerWorldPosition - gesture.pointerWorldPositionAtStart;
+        bool scalesX = DoesScaleFromEdgeHandleScaleX(gesture.handle);
+        bool scalesY = DoesScaleFromEdgeHandleScaleY(gesture.handle);
+        bool scalesUniformly = scalesX && scalesY;
+
+        float xFactor = 1f;
+        float yFactor = 1f;
+        if (scalesUniformly)
+        {
+            Vector3 movingCornerDirection =
+                (GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right * gesture.frameAtStart.Width +
+                 GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up * gesture.frameAtStart.Height).normalized;
+            float diagonalExtent = Mathf.Sqrt(
+                gesture.frameAtStart.Width * gesture.frameAtStart.Width +
+                gesture.frameAtStart.Height * gesture.frameAtStart.Height);
+            float uniformFactor = GetEdgeScaleFactor(
+                diagonalExtent,
+                Vector3.Dot(pointerDelta, movingCornerDirection),
+                Mathf.Max(gesture.minimumXFactor, gesture.minimumYFactor),
+                Mathf.Min(gesture.maximumXFactor, gesture.maximumYFactor));
+            xFactor = uniformFactor;
+            yFactor = uniformFactor;
+        }
+        else if (scalesX)
+        {
+            Vector3 outwardDirection = GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right;
+            xFactor = GetEdgeScaleFactor(
+                gesture.frameAtStart.Width,
+                Vector3.Dot(pointerDelta, outwardDirection),
+                gesture.minimumXFactor,
+                gesture.maximumXFactor);
+        }
+        else if (scalesY)
+        {
+            Vector3 outwardDirection = GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up;
+            yFactor = GetEdgeScaleFactor(
+                gesture.frameAtStart.Height,
+                Vector3.Dot(pointerDelta, outwardDirection),
+                gesture.minimumYFactor,
+                gesture.maximumYFactor);
+        }
+
+        Vector3 newScale = gesture.selectedLocalScaleAtStart;
+        newScale.x *= xFactor;
+        newScale.y *= yFactor;
+        selectedObject.transform.localScale = newScale;
+
+        Vector3 newPosition = gesture.selectedWorldPositionAtStart;
+        if (scalesX)
+        {
+            float fixedX = GetScaleFromEdgeHandleXSign(gesture.handle) > 0f
+                ? gesture.frameAtStart.minX
+                : gesture.frameAtStart.maxX;
+            newPosition += gesture.frameAtStart.right * ((1f - xFactor) * fixedX);
+        }
+
+        if (scalesY)
+        {
+            float fixedY = GetScaleFromEdgeHandleYSign(gesture.handle) > 0f
+                ? gesture.frameAtStart.minY
+                : gesture.frameAtStart.maxY;
+            newPosition += gesture.frameAtStart.up * ((1f - yFactor) * fixedY);
+        }
+
+        selectedObject.transform.position = newPosition;
+    }
+
+    static bool DoesScaleFromEdgeHandleScaleX(ScaleFromEdgeHandle handle)
+    {
+        return handle != ScaleFromEdgeHandle.Up && handle != ScaleFromEdgeHandle.Down;
+    }
+
+    static bool DoesScaleFromEdgeHandleScaleY(ScaleFromEdgeHandle handle)
+    {
+        return handle != ScaleFromEdgeHandle.Left && handle != ScaleFromEdgeHandle.Right;
+    }
+
+    static float GetScaleFromEdgeHandleXSign(ScaleFromEdgeHandle handle)
+    {
+        return handle is ScaleFromEdgeHandle.Right or ScaleFromEdgeHandle.UpRight or ScaleFromEdgeHandle.DownRight ? 1f : -1f;
+    }
+
+    static float GetScaleFromEdgeHandleYSign(ScaleFromEdgeHandle handle)
+    {
+        return handle is ScaleFromEdgeHandle.Up or ScaleFromEdgeHandle.UpLeft or ScaleFromEdgeHandle.UpRight ? 1f : -1f;
     }
 
     static float GetBoundsExtentAlongAxis(Bounds bounds, Vector3 axis)
@@ -1351,8 +1712,27 @@ public class LevelEditor : MonoBehaviour
 
     void GetUniformScaleFactorLimits(out float minimumUniformFactor, out float maximumUniformFactor)
     {
-        minimumUniformFactor = 0f;
-        maximumUniformFactor = float.PositiveInfinity;
+        GetScaleFactorLimits(
+            activeScaleGesture.selectedLocalScaleAtStart,
+            out float minimumXFactor,
+            out float maximumXFactor,
+            out float minimumYFactor,
+            out float maximumYFactor);
+        minimumUniformFactor = Mathf.Max(minimumXFactor, minimumYFactor);
+        maximumUniformFactor = Mathf.Min(maximumXFactor, maximumYFactor);
+    }
+
+    void GetScaleFactorLimits(
+        Vector3 selectedLocalScaleAtStart,
+        out float minimumXFactor,
+        out float maximumXFactor,
+        out float minimumYFactor,
+        out float maximumYFactor)
+    {
+        minimumXFactor = 0f;
+        minimumYFactor = 0f;
+        maximumXFactor = float.PositiveInfinity;
+        maximumYFactor = float.PositiveInfinity;
 
         foreach (Transform scaleConstrainedTransform in GetScaleConstraintTransforms())
         {
@@ -1360,17 +1740,13 @@ public class LevelEditor : MonoBehaviour
                 continue;
 
             float minimumObjectScale = GetMinimumObjectScale(scaleConstrainedTransform.gameObject);
-            float startingXScale = GetStartingEffectiveScale(scaleConstrainedTransform, true);
-            float startingYScale = GetStartingEffectiveScale(scaleConstrainedTransform, false);
+            float startingXScale = GetStartingEffectiveScale(scaleConstrainedTransform, true, selectedLocalScaleAtStart);
+            float startingYScale = GetStartingEffectiveScale(scaleConstrainedTransform, false, selectedLocalScaleAtStart);
 
-            minimumUniformFactor = Mathf.Max(
-                minimumUniformFactor,
-                minimumObjectScale / startingXScale,
-                minimumObjectScale / startingYScale);
-            maximumUniformFactor = Mathf.Min(
-                maximumUniformFactor,
-                maximumScale / startingXScale,
-                maximumScale / startingYScale);
+            minimumXFactor = Mathf.Max(minimumXFactor, minimumObjectScale / startingXScale);
+            maximumXFactor = Mathf.Min(maximumXFactor, maximumScale / startingXScale);
+            minimumYFactor = Mathf.Max(minimumYFactor, minimumObjectScale / startingYScale);
+            maximumYFactor = Mathf.Min(maximumYFactor, maximumScale / startingYScale);
         }
     }
 
@@ -1391,7 +1767,7 @@ public class LevelEditor : MonoBehaviour
             yield return selectedObject.transform;
     }
 
-    float GetStartingEffectiveScale(Transform scaleConstrainedTransform, bool xAxis)
+    float GetStartingEffectiveScale(Transform scaleConstrainedTransform, bool xAxis, Vector3 selectedLocalScaleAtStart)
     {
         float memberScale = Mathf.Abs(xAxis
             ? scaleConstrainedTransform.localScale.x
@@ -1400,8 +1776,8 @@ public class LevelEditor : MonoBehaviour
         if (selectionGroup != null)
         {
             float groupScale = Mathf.Abs(xAxis
-                ? activeScaleGesture.selectedLocalScaleAtStart.x
-                : activeScaleGesture.selectedLocalScaleAtStart.y);
+                ? selectedLocalScaleAtStart.x
+                : selectedLocalScaleAtStart.y);
             memberScale *= groupScale;
         }
 
@@ -1413,9 +1789,16 @@ public class LevelEditor : MonoBehaviour
         return levelObject.name.Contains("Puller") ? 3f : 0.2f;
     }
 
-    static float GetScaleFactor(float startExtent, float outwardPointerDistance, float minimumFactor, float maximumFactor)
+    static float GetCenteredScaleFactor(float startExtent, float outwardPointerDistance, float minimumFactor, float maximumFactor)
     {
         float desiredFactor = 1f + (2f * outwardPointerDistance / startExtent);
+        maximumFactor = Mathf.Max(minimumFactor, maximumFactor);
+        return Mathf.Clamp(desiredFactor, minimumFactor, maximumFactor);
+    }
+
+    static float GetEdgeScaleFactor(float startExtent, float outwardPointerDistance, float minimumFactor, float maximumFactor)
+    {
+        float desiredFactor = 1f + (outwardPointerDistance / startExtent);
         maximumFactor = Mathf.Max(minimumFactor, maximumFactor);
         return Mathf.Clamp(desiredFactor, minimumFactor, maximumFactor);
     }
@@ -1423,6 +1806,7 @@ public class LevelEditor : MonoBehaviour
     void EndScaleSelectedObject()
     {
         isTryingToScaleSelectedObject = false;
+        isScalingFromEdge = false;
         horizontalLine.gameObject.SetActive(false);
         verticalLine.gameObject.SetActive(false);
     }
@@ -1437,6 +1821,16 @@ public class LevelEditor : MonoBehaviour
         // lets its pointer handler still receive the matching drag and release events.
         selectionControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
         selectionControlsUI.SetControlsVisible(show);
+
+        if (scaleFromEdgeControlsUI != null)
+        {
+            ScaleFromEdgeFrame scaleFromEdgeFrame = default;
+            bool hasScaleFromEdgeFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out scaleFromEdgeFrame);
+            scaleFromEdgeControlsUI.SetSelectionFrame(hasScaleFromEdgeFrame, scaleFromEdgeFrame);
+            scaleFromEdgeControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
+            scaleFromEdgeControlsUI.SetControlsVisible(show && hasScaleFromEdgeFrame);
+        }
+
         deselectObjectButton.SetActive(show);
         snapVerticalButton.SetActive(show);
         snapHorizontalButton.SetActive(show);

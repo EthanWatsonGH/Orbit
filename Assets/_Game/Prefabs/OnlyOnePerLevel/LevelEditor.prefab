@@ -91,7 +91,10 @@ MonoBehaviour:
   rotateIncrementDropdown: {fileID: 0}
   moveIncrementDropdown: {fileID: 0}
   levelObjectsCollection: {fileID: 0}
+  playerStartPoint: {fileID: 0}
   selectionControlsUI: {fileID: 0}
+  scaleFromEdgeControlsUI: {fileID: 0}
+  boxSelectionVisual: {fileID: 0}
 --- !u!1 &4909395341240096876
 GameObject:
   m_ObjectHideFlags: 0
