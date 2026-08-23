@@ -177,6 +177,7 @@ public class LevelEditor : MonoBehaviour
     struct ScaleFromEdgeGesture
     {
         public ScaleFromEdgeHandle handle;
+        public bool scalesFromBothSides;
         public ScaleFromEdgeFrame frameAtStart;
         public Vector3 selectedLocalScaleAtStart;
         public Vector3 selectedWorldPositionAtStart;
@@ -209,6 +210,7 @@ public class LevelEditor : MonoBehaviour
     ScaleGesture activeScaleGesture;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
     bool isScalingFromEdge;
+    bool isScaleFromEdgeBothSidesButtonHeld;
 
     ObjectTransformControl activeMoveControl;
     ObjectTransformControl activeScaleControl;
@@ -314,6 +316,7 @@ public class LevelEditor : MonoBehaviour
 
     private void OnDisable()
     {
+        isScaleFromEdgeBothSidesButtonHeld = false;
         SetBoxSelectionVisualVisible(false);
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
@@ -1299,6 +1302,13 @@ public class LevelEditor : MonoBehaviour
         activeTransformPointerId = int.MinValue;
     }
 
+    // Wire a screen button's Pointer Down and Pointer Up events to this with true
+    // and false respectively. Its state is combined with either Shift key below.
+    public void SetScaleFromEdgeBothSidesButtonHeld(bool isHeld)
+    {
+        isScaleFromEdgeBothSidesButtonHeld = isHeld;
+    }
+
     static bool IsScaleFromEdgeHandleAvailable(ScaleFromEdgeHandle handle, SelectionControlAvailability availability)
     {
         return handle switch
@@ -1607,20 +1617,11 @@ public class LevelEditor : MonoBehaviour
             return;
         }
 
-        activeScaleFromEdgeGesture = new ScaleFromEdgeGesture
-        {
-            handle = handle,
-            frameAtStart = frameAtStart,
-            selectedLocalScaleAtStart = selectedObject.transform.localScale,
-            selectedWorldPositionAtStart = selectedObject.transform.position,
-            pointerWorldPositionAtStart = pointerWorldPositionAtStart
-        };
-        GetScaleFactorLimits(
-            activeScaleFromEdgeGesture.selectedLocalScaleAtStart,
-            out activeScaleFromEdgeGesture.minimumXFactor,
-            out activeScaleFromEdgeGesture.maximumXFactor,
-            out activeScaleFromEdgeGesture.minimumYFactor,
-            out activeScaleFromEdgeGesture.maximumYFactor);
+        ConfigureScaleFromEdgeGesture(
+            handle,
+            frameAtStart,
+            pointerWorldPositionAtStart,
+            IsScaleFromEdgeBothSidesModeHeld());
 
         isTryingToScaleSelectedObject = true;
         isScalingFromEdge = true;
@@ -1629,6 +1630,22 @@ public class LevelEditor : MonoBehaviour
     void UpdateScaleFromEdgeSelectedObject(Vector3 pointerWorldPosition)
     {
         ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
+        bool shouldScaleFromBothSides = IsScaleFromEdgeBothSidesModeHeld();
+        if (gesture.scalesFromBothSides != shouldScaleFromBothSides)
+        {
+            // Begin a fresh gesture at the current size and pointer location when
+            // the modifier changes. This changes the anchor without a visual jump.
+            if (!TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame currentFrame))
+                return;
+
+            ConfigureScaleFromEdgeGesture(
+                gesture.handle,
+                currentFrame,
+                pointerWorldPosition,
+                shouldScaleFromBothSides);
+            gesture = activeScaleFromEdgeGesture;
+        }
+
         Vector3 pointerDelta = pointerWorldPosition - gesture.pointerWorldPositionAtStart;
         bool scalesX = DoesScaleFromEdgeHandleScaleX(gesture.handle);
         bool scalesY = DoesScaleFromEdgeHandleScaleY(gesture.handle);
@@ -1644,7 +1661,8 @@ public class LevelEditor : MonoBehaviour
             float diagonalExtent = Mathf.Sqrt(
                 gesture.frameAtStart.Width * gesture.frameAtStart.Width +
                 gesture.frameAtStart.Height * gesture.frameAtStart.Height);
-            float uniformFactor = GetEdgeScaleFactor(
+            float uniformFactor = GetScaleFromEdgeGestureFactor(
+                gesture.scalesFromBothSides,
                 diagonalExtent,
                 Vector3.Dot(pointerDelta, movingCornerDirection),
                 Mathf.Max(gesture.minimumXFactor, gesture.minimumYFactor),
@@ -1655,7 +1673,8 @@ public class LevelEditor : MonoBehaviour
         else if (scalesX)
         {
             Vector3 outwardDirection = GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right;
-            xFactor = GetEdgeScaleFactor(
+            xFactor = GetScaleFromEdgeGestureFactor(
+                gesture.scalesFromBothSides,
                 gesture.frameAtStart.Width,
                 Vector3.Dot(pointerDelta, outwardDirection),
                 gesture.minimumXFactor,
@@ -1664,7 +1683,8 @@ public class LevelEditor : MonoBehaviour
         else if (scalesY)
         {
             Vector3 outwardDirection = GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up;
-            yFactor = GetEdgeScaleFactor(
+            yFactor = GetScaleFromEdgeGestureFactor(
+                gesture.scalesFromBothSides,
                 gesture.frameAtStart.Height,
                 Vector3.Dot(pointerDelta, outwardDirection),
                 gesture.minimumYFactor,
@@ -1677,7 +1697,7 @@ public class LevelEditor : MonoBehaviour
         selectedObject.transform.localScale = newScale;
 
         Vector3 newPosition = gesture.selectedWorldPositionAtStart;
-        if (scalesX)
+        if (!gesture.scalesFromBothSides && scalesX)
         {
             float fixedX = GetScaleFromEdgeHandleXSign(gesture.handle) > 0f
                 ? gesture.frameAtStart.minX
@@ -1685,7 +1705,7 @@ public class LevelEditor : MonoBehaviour
             newPosition += gesture.frameAtStart.right * ((1f - xFactor) * fixedX);
         }
 
-        if (scalesY)
+        if (!gesture.scalesFromBothSides && scalesY)
         {
             float fixedY = GetScaleFromEdgeHandleYSign(gesture.handle) > 0f
                 ? gesture.frameAtStart.minY
@@ -1694,6 +1714,34 @@ public class LevelEditor : MonoBehaviour
         }
 
         selectedObject.transform.position = newPosition;
+    }
+
+    void ConfigureScaleFromEdgeGesture(
+        ScaleFromEdgeHandle handle,
+        ScaleFromEdgeFrame frameAtStart,
+        Vector3 pointerWorldPositionAtStart,
+        bool scalesFromBothSides)
+    {
+        activeScaleFromEdgeGesture = new ScaleFromEdgeGesture
+        {
+            handle = handle,
+            scalesFromBothSides = scalesFromBothSides,
+            frameAtStart = frameAtStart,
+            selectedLocalScaleAtStart = selectedObject.transform.localScale,
+            selectedWorldPositionAtStart = selectedObject.transform.position,
+            pointerWorldPositionAtStart = pointerWorldPositionAtStart
+        };
+        GetScaleFactorLimits(
+            activeScaleFromEdgeGesture.selectedLocalScaleAtStart,
+            out activeScaleFromEdgeGesture.minimumXFactor,
+            out activeScaleFromEdgeGesture.maximumXFactor,
+            out activeScaleFromEdgeGesture.minimumYFactor,
+            out activeScaleFromEdgeGesture.maximumYFactor);
+    }
+
+    bool IsScaleFromEdgeBothSidesModeHeld()
+    {
+        return isScaleFromEdgeBothSidesButtonHeld || IsAddSelectionModifierHeld();
     }
 
     static bool DoesScaleFromEdgeHandleScaleX(ScaleFromEdgeHandle handle)
@@ -1837,6 +1885,18 @@ public class LevelEditor : MonoBehaviour
         float desiredFactor = 1f + (outwardPointerDistance / startExtent);
         maximumFactor = Mathf.Max(minimumFactor, maximumFactor);
         return Mathf.Clamp(desiredFactor, minimumFactor, maximumFactor);
+    }
+
+    static float GetScaleFromEdgeGestureFactor(
+        bool scalesFromBothSides,
+        float startExtent,
+        float outwardPointerDistance,
+        float minimumFactor,
+        float maximumFactor)
+    {
+        return scalesFromBothSides
+            ? GetCenteredScaleFactor(startExtent, outwardPointerDistance, minimumFactor, maximumFactor)
+            : GetEdgeScaleFactor(startExtent, outwardPointerDistance, minimumFactor, maximumFactor);
     }
 
     void EndScaleSelectedObject()
