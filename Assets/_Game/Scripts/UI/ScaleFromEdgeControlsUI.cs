@@ -13,7 +13,13 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
     Canvas parentCanvas;
     bool hasSelectionFrame;
     LevelEditor.ScaleFromEdgeFrame selectionFrame;
-    readonly Dictionary<ScaleFromEdgeHandle, Quaternion> handleBaseRotations = new Dictionary<ScaleFromEdgeHandle, Quaternion>();
+    readonly Dictionary<ScaleFromEdgeHandle, HandleView> handleViews = new Dictionary<ScaleFromEdgeHandle, HandleView>();
+
+    struct HandleView
+    {
+        public RectTransform transform;
+        public Quaternion baseLocalRotation;
+    }
 
     void Awake()
     {
@@ -24,12 +30,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
         if (controlsCanvasGroup == null)
             controlsCanvasGroup = gameObject.AddComponent<CanvasGroup>();
 
-        foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
-        {
-            RectTransform handleTransform = FindHandle(handle);
-            if (handleTransform != null)
-                handleBaseRotations[handle] = handleTransform.localRotation;
-        }
+        CacheHandleViews();
 
         overlayRect = transform.parent as RectTransform;
         parentCanvas = GetComponentInParent<Canvas>();
@@ -118,12 +119,10 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
 
         foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
         {
-            RectTransform handleTransform = FindHandle(handle);
-            if (handleTransform == null)
+            if (!handleViews.TryGetValue(handle, out HandleView handleView))
                 continue;
 
-            if (handleBaseRotations.TryGetValue(handle, out Quaternion baseRotation))
-                handleTransform.localRotation = selectionRotation * baseRotation;
+            handleView.transform.localRotation = selectionRotation * handleView.baseLocalRotation;
 
             Vector2 handleScreenPosition = GetDisplayedHandleScreenPosition(
                 handle,
@@ -133,7 +132,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
                 displayedHalfWidth,
                 displayedHalfHeight);
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(overlayRect, handleScreenPosition, eventCamera, out Vector2 handleLocalPosition))
-                handleTransform.anchoredPosition = handleLocalPosition - centerLocalPosition;
+                handleView.transform.anchoredPosition = handleLocalPosition - centerLocalPosition;
         }
     }
 
@@ -170,17 +169,28 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
 
     void SetHandleVisible(ScaleFromEdgeHandle handle, bool shouldShow)
     {
-        RectTransform handleTransform = FindHandle(handle);
-        if (handleTransform != null && handleTransform.gameObject.activeSelf != shouldShow)
-            handleTransform.gameObject.SetActive(shouldShow);
+        if (handleViews.TryGetValue(handle, out HandleView handleView) &&
+            handleView.transform.gameObject.activeSelf != shouldShow)
+        {
+            handleView.transform.gameObject.SetActive(shouldShow);
+        }
     }
 
-    RectTransform FindHandle(ScaleFromEdgeHandle handle)
+    void CacheHandleViews()
     {
         if (controlsRoot == null)
-            return null;
+            return;
 
-        Transform handleTransform = controlsRoot.Find(handle.ToString());
-        return handleTransform as RectTransform;
+        foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
+        {
+            if (controlsRoot.Find(handle.ToString()) is RectTransform handleTransform)
+            {
+                handleViews[handle] = new HandleView
+                {
+                    transform = handleTransform,
+                    baseLocalRotation = handleTransform.localRotation
+                };
+            }
+        }
     }
 }

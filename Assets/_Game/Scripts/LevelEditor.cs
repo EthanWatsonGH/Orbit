@@ -185,9 +185,19 @@ public class LevelEditor : MonoBehaviour
         AlongUp
     }
 
+    // Exactly one transform may own a pointer at a time. The individual move,
+    // rotate, and scale gesture data remains separate, but this is the single
+    // source of truth for whether the editor is currently transforming.
+    enum ActiveTransform
+    {
+        None,
+        Move,
+        Rotate,
+        ScaleFromEdge
+    }
+
     const float MOVE_GUIDE_LINE_HALF_LENGTH = 9999f;
     Vector3 moveOffset;
-    bool isTryingToMoveSelectedObject = false;
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
     float moveIncrement = 0f;
@@ -199,20 +209,19 @@ public class LevelEditor : MonoBehaviour
     ShiftMoveConstraint activeShiftMoveConstraint;
 
     // object rotation
-    bool isTryingToRotateSelectedObject = false;
     float selectedObjectRotationAtStartRotate;
     float angleToPointerAtStartRotate;
     float rotateIncrement = 0f;
     float rotationIncrementOffset = 0f;
 
     // object scaling
-    bool isTryingToScaleSelectedObject = false;
     float maximumScale = 999999f;
     float scaleIncrement = 0f;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
     bool isShiftModeButtonHeld;
     bool isCtrlModeButtonHeld;
 
+    ActiveTransform activeTransform;
     ObjectTransformControl activeMoveControl;
     int activeTransformPointerId = int.MinValue;
     Vector2 activeTransformPressScreenPosition;
@@ -316,6 +325,7 @@ public class LevelEditor : MonoBehaviour
 
     private void OnDisable()
     {
+        CancelActiveTransform();
         isShiftModeButtonHeld = false;
         isCtrlModeButtonHeld = false;
         SetBoxSelectionVisualVisible(false);
@@ -402,7 +412,6 @@ public class LevelEditor : MonoBehaviour
             if (dragDistanceInPixels >= MINIMUM_DRAG_DISTANCE_PIXELS)
             {
                 hasSelectionDragExceededThreshold = true;
-                Debug.Log("LevelEditor: drag threshold crossed, box-select mode latched for this pointer cycle.");
             }
         }
 
@@ -471,7 +480,6 @@ public class LevelEditor : MonoBehaviour
             // released over an interactive UI control belongs to that control, not the world.
             else if (!PointerInput.Instance.WasReleasedOverSelectableUi)
             {
-                Debug.Log("LevelEditor: pointer cycle resolved as click-select.");
                 Ray ray = Camera.main.ScreenPointToRay(PointerInput.Instance.ScreenPosition);
                 RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
@@ -868,6 +876,8 @@ public class LevelEditor : MonoBehaviour
 
     void UnselectObject()
     {
+        CancelActiveTransform();
+
         // A save may have temporarily flattened a selection group. Its snapshot belongs
         // to SuspendSelectionForSave/RestoreSelectionAfterSave, not normal deselection.
         bool wasTemporarySelectionGroup = selectionGroup != null;
@@ -1235,24 +1245,20 @@ public class LevelEditor : MonoBehaviour
     // means both the controls and the editor continue to have one owner for object edits.
     public void BeginObjectTransformControl(ObjectTransformControl control, int pointerId, Vector2 screenPosition)
     {
-        if (selectedObject == null || isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject)
+        if (selectedObject == null || activeTransform != ActiveTransform.None)
             return;
 
         switch (control)
         {
             case ObjectTransformControl.MoveBoth:
             case ObjectTransformControl.Duplicate:
-                BeginMoveSelectedObject(control, screenPosition);
+                if (TryBeginMoveSelectedObject(control, screenPosition))
+                    BeginActiveTransform(ActiveTransform.Move, pointerId, screenPosition);
                 break;
             case ObjectTransformControl.Rotate:
-                BeginRotateSelectedObject(screenPosition);
+                if (TryBeginRotateSelectedObject(screenPosition))
+                    BeginActiveTransform(ActiveTransform.Rotate, pointerId, screenPosition);
                 break;
-        }
-
-        if (isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject)
-        {
-            activeTransformPointerId = pointerId;
-            activeTransformPressScreenPosition = screenPosition;
         }
     }
 
@@ -1261,38 +1267,31 @@ public class LevelEditor : MonoBehaviour
         if (pointerId != activeTransformPointerId)
             return;
 
-        if (control == activeMoveControl && isTryingToMoveSelectedObject)
-            EndMoveSelectedObject();
-        else if (control == ObjectTransformControl.Rotate && isTryingToRotateSelectedObject)
-            EndRotateSelectedObject();
-
-        activeTransformPointerId = int.MinValue;
+        if (activeTransform == ActiveTransform.Move && control == activeMoveControl)
+            CompleteActiveTransform();
+        else if (activeTransform == ActiveTransform.Rotate && control == ObjectTransformControl.Rotate)
+            CompleteActiveTransform();
     }
 
     public void BeginScaleFromEdgeControl(ScaleFromEdgeHandle handle, int pointerId, Vector2 screenPosition)
     {
-        if (selectedObject == null || isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject ||
+        if (selectedObject == null || activeTransform != ActiveTransform.None ||
             !TryGetSelectionControlAvailability(out SelectionControlAvailability availability) ||
             !IsScaleFromEdgeHandleAvailable(handle, availability))
             return;
 
-        BeginScaleFromEdgeSelectedObject(handle, screenPosition);
-        if (isTryingToScaleSelectedObject)
-        {
-            activeTransformPointerId = pointerId;
-            activeTransformPressScreenPosition = screenPosition;
-        }
+        if (TryBeginScaleFromEdgeSelectedObject(handle, screenPosition))
+            BeginActiveTransform(ActiveTransform.ScaleFromEdge, pointerId, screenPosition);
     }
 
     public void EndScaleFromEdgeControl(ScaleFromEdgeHandle handle, int pointerId)
     {
         if (pointerId != activeTransformPointerId ||
-            !isTryingToScaleSelectedObject ||
+            activeTransform != ActiveTransform.ScaleFromEdge ||
             handle != activeScaleFromEdgeGesture.handle)
             return;
 
-        EndScaleSelectedObject();
-        activeTransformPointerId = int.MinValue;
+        CompleteActiveTransform();
     }
 
     // These combine the physical keyboard keys with the matching held screen button.
@@ -1331,25 +1330,83 @@ public class LevelEditor : MonoBehaviour
     void UpdateActiveScreenSpaceTransformControl()
     {
         PointerInput pointerInput = PointerInput.Instance;
-        if (pointerInput == null || activeTransformPointerId == int.MinValue ||
-            !pointerInput.TryGetScreenPosition(activeTransformPointerId, out Vector2 pointerScreenPosition) ||
-            !pointerInput.TryGetWorldPositionNoDepth(pointerScreenPosition, out Vector3 pointerWorldPosition))
+        if (pointerInput == null || activeTransform == ActiveTransform.None || activeTransformPointerId == int.MinValue)
             return;
 
-        if (isTryingToMoveSelectedObject)
-            UpdateMoveSelectedObject(pointerWorldPosition, Vector2.Distance(activeTransformPressScreenPosition, pointerScreenPosition));
-        else if (isTryingToRotateSelectedObject)
-            UpdateRotateSelectedObject(pointerWorldPosition);
-        else if (isTryingToScaleSelectedObject)
-            UpdateScaleFromEdgeSelectedObject(pointerWorldPosition);
+        if (!pointerInput.TryGetScreenPosition(activeTransformPointerId, out Vector2 pointerScreenPosition) ||
+            !pointerInput.TryGetWorldPositionNoDepth(pointerScreenPosition, out Vector3 pointerWorldPosition))
+        {
+            CancelActiveTransform();
+            return;
+        }
+
+        if (selectedObject == null)
+        {
+            CancelActiveTransform();
+            return;
+        }
+
+        switch (activeTransform)
+        {
+            case ActiveTransform.Move:
+                UpdateMoveSelectedObject(pointerWorldPosition, Vector2.Distance(activeTransformPressScreenPosition, pointerScreenPosition));
+                break;
+            case ActiveTransform.Rotate:
+                UpdateRotateSelectedObject(pointerWorldPosition);
+                break;
+            case ActiveTransform.ScaleFromEdge:
+                UpdateScaleFromEdgeSelectedObject(pointerWorldPosition);
+                break;
+        }
     }
 
-    void BeginMoveSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
+    void BeginActiveTransform(ActiveTransform transform, int pointerId, Vector2 screenPosition)
+    {
+        activeTransform = transform;
+        activeTransformPointerId = pointerId;
+        activeTransformPressScreenPosition = screenPosition;
+    }
+
+    void CompleteActiveTransform()
+    {
+        EndActiveTransform(deleteMovedObject: true);
+    }
+
+    void CancelActiveTransform()
+    {
+        EndActiveTransform(deleteMovedObject: false);
+    }
+
+    void EndActiveTransform(bool deleteMovedObject)
+    {
+        ActiveTransform transformToEnd = activeTransform;
+        if (transformToEnd == ActiveTransform.None)
+            return;
+
+        activeTransform = ActiveTransform.None;
+        activeTransformPointerId = int.MinValue;
+        activeTransformPressScreenPosition = default;
+
+        switch (transformToEnd)
+        {
+            case ActiveTransform.Move:
+                EndMoveSelectedObject(deleteMovedObject);
+                break;
+            case ActiveTransform.Rotate:
+                EndRotateSelectedObject();
+                break;
+            case ActiveTransform.ScaleFromEdge:
+                EndScaleSelectedObject();
+                break;
+        }
+    }
+
+    bool TryBeginMoveSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
     {
         if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out pointerPositionAtStartMove))
         {
             Debug.LogError("LevelEditor could not begin moving an object because a valid pointer world position is unavailable.", this);
-            return;
+            return false;
         }
 
         if (control == ObjectTransformControl.Duplicate)
@@ -1365,7 +1422,6 @@ public class LevelEditor : MonoBehaviour
             ConfigureSelectionControlsForSelectedObject();
         }
 
-        isTryingToMoveSelectedObject = true;
         activeMoveControl = control;
         selectedObjectPositionAtStartMove = selectedObject.transform.position;
         wasShiftModeHeldDuringMove = false;
@@ -1384,6 +1440,7 @@ public class LevelEditor : MonoBehaviour
         }
 
         moveOffset = selectedObject.transform.position - pointerPositionAtStartMove;
+        return true;
     }
 
     void DuplicateTemporarySelectionGroup()
@@ -1526,18 +1583,16 @@ public class LevelEditor : MonoBehaviour
         horizontalLine.gameObject.SetActive(visible);
     }
 
-    void EndMoveSelectedObject()
+    void EndMoveSelectedObject(bool deleteMovedObject)
     {
         SetMoveGuideLinesVisible(false);
         wasShiftModeHeldDuringMove = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
-        isTryingToMoveSelectedObject = false;
-
         if (selectedObject != null && selectedObject != selectionGroup)
             NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
 
-        if (selectedObject != null &&
+        if (deleteMovedObject && selectedObject != null &&
             pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
         {
             if (selectedObject == selectionGroup)
@@ -1547,6 +1602,12 @@ public class LevelEditor : MonoBehaviour
 
             UnselectObject();
             deselectObjectButton.gameObject.SetActive(false);
+        }
+        else if (selectedObject != null)
+        {
+            // A cancelled move must not leave an object hidden merely because the
+            // pointer last passed over the delete area.
+            selectedObject.SetActive(true);
         }
     }
 
@@ -1559,18 +1620,17 @@ public class LevelEditor : MonoBehaviour
         Destroy(temporaryGroupToDelete);
     }
 
-    void BeginRotateSelectedObject(Vector2 screenPosition)
+    bool TryBeginRotateSelectedObject(Vector2 screenPosition)
     {
         if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPosition))
         {
             Debug.LogError("LevelEditor could not begin rotating an object because a valid pointer world position is unavailable.", this);
-            return;
+            return false;
         }
 
         rotationLine.gameObject.SetActive(true);
         rotationLine.SetPosition(0, selectedObject.transform.position);
 
-        isTryingToRotateSelectedObject = true;
         selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
         Vector3 direction = pointerWorldPosition - selectedObject.transform.position;
         angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
@@ -1578,6 +1638,7 @@ public class LevelEditor : MonoBehaviour
         rotationIncrementOffset = isWorldTransform
             ? 0f
             : selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
+        return true;
     }
 
     void UpdateRotateSelectedObject(Vector3 pointerWorldPosition)
@@ -1600,24 +1661,23 @@ public class LevelEditor : MonoBehaviour
     void EndRotateSelectedObject()
     {
         rotationLine.gameObject.SetActive(false);
-        isTryingToRotateSelectedObject = false;
 
         if (selectedObject != null && selectedObject != selectionGroup)
             NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
     }
 
-    void BeginScaleFromEdgeSelectedObject(ScaleFromEdgeHandle handle, Vector2 screenPosition)
+    bool TryBeginScaleFromEdgeSelectedObject(ScaleFromEdgeHandle handle, Vector2 screenPosition)
     {
         if (!PointerInput.Instance.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPositionAtStart))
         {
             Debug.LogError("LevelEditor could not begin edge scaling because a valid pointer world position is unavailable.", this);
-            return;
+            return false;
         }
 
         if (!TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame frameAtStart))
         {
             Debug.LogError("LevelEditor could not begin edge scaling because the selected object has no measurable scale frame.", this);
-            return;
+            return false;
         }
 
         ConfigureScaleFromEdgeGesture(
@@ -1625,8 +1685,7 @@ public class LevelEditor : MonoBehaviour
             frameAtStart,
             pointerWorldPositionAtStart,
             IsScaleFromEdgeBothSidesModeHeld());
-
-        isTryingToScaleSelectedObject = true;
+        return true;
     }
 
     void UpdateScaleFromEdgeSelectedObject(Vector3 pointerWorldPosition)
@@ -1861,8 +1920,6 @@ public class LevelEditor : MonoBehaviour
 
     void EndScaleSelectedObject()
     {
-        isTryingToScaleSelectedObject = false;
-
         if (selectedObject != null && selectedObject != selectionGroup)
             NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
     }
@@ -1871,7 +1928,7 @@ public class LevelEditor : MonoBehaviour
     {
         bool isBoxSelecting = hasSelectionDragExceededThreshold && PointerInput.Instance.IsHeld;
         bool show = selectedObject != null &&
-                    !(isTryingToMoveSelectedObject || isTryingToRotateSelectedObject || isTryingToScaleSelectedObject || isTryingToPlace || isBoxSelecting);
+                    !(activeTransform != ActiveTransform.None || isTryingToPlace || isBoxSelecting);
         selectionControlsUI.SetSelectedTransform(selectedObject != null ? selectedObject.transform : null);
         // Keep the object active while a UI drag is running, but hide its CanvasGroup. That
         // lets its pointer handler still receive the matching drag and release events.
