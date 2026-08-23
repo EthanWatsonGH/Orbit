@@ -189,12 +189,25 @@ public class LevelEditor : MonoBehaviour
     }
 
     // object movement
+    enum ShiftMoveConstraint
+    {
+        None,
+        AlongRight,
+        AlongUp
+    }
+
+    const float MOVE_GUIDE_LINE_HALF_LENGTH = 9999f;
     Vector3 moveOffset;
     bool isTryingToMoveSelectedObject = false;
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
     float moveIncrement = 0f;
     Vector3 moveIncrementOffset = new Vector3(0f, 0f, 0f);
+    bool wasShiftModeHeldDuringMove;
+    Vector3 shiftMoveGuideOrigin;
+    Vector3 shiftMoveGuideRight;
+    Vector3 shiftMoveGuideUp;
+    ShiftMoveConstraint activeShiftMoveConstraint;
 
     // object rotation
     bool isTryingToRotateSelectedObject = false;
@@ -320,6 +333,7 @@ public class LevelEditor : MonoBehaviour
         isShiftModeButtonHeld = false;
         isCtrlModeButtonHeld = false;
         SetBoxSelectionVisualVisible(false);
+        SetMoveGuideLinesVisible(false);
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
     }
@@ -1377,6 +1391,8 @@ public class LevelEditor : MonoBehaviour
         isTryingToMoveSelectedObject = true;
         activeMoveControl = control;
         selectedObjectPositionAtStartMove = selectedObject.transform.position;
+        wasShiftModeHeldDuringMove = false;
+        activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
         if (isWorldTransform)
         {
@@ -1430,16 +1446,20 @@ public class LevelEditor : MonoBehaviour
 
         // A quick click duplicates in place. It starts moving only after the same threshold the
         // legacy world-space control used, so the two control systems feel the same.
+        Vector3 desiredPosition;
         if (activeMoveControl == ObjectTransformControl.Duplicate && dragDistancePixels < MINIMUM_DRAG_DISTANCE_PIXELS)
         {
-            selectedObject.transform.position = selectedObjectPositionAtStartMove;
+            desiredPosition = selectedObjectPositionAtStartMove;
         }
         else
         {
             float newX = RoundToIncrement(pointerWorldPosition.x + moveOffset.x, moveIncrement) + moveIncrementOffset.x;
             float newY = RoundToIncrement(pointerWorldPosition.y + moveOffset.y, moveIncrement) + moveIncrementOffset.y;
-            selectedObject.transform.position = new Vector3(newX, newY, 0f);
+            desiredPosition = new Vector3(newX, newY, 0f);
         }
+
+        UpdateShiftMoveGuides(pointerWorldPosition, ref desiredPosition);
+        selectedObject.transform.position = desiredPosition;
 
         bool canDeleteSelectedObject = !selectedObject.name.Equals("PlayerStartPoint");
         if (pointerIsOverObjectSelectionBar && canDeleteSelectedObject)
@@ -1470,10 +1490,78 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
+    void UpdateShiftMoveGuides(Vector3 pointerWorldPosition, ref Vector3 desiredPosition)
+    {
+        bool canUseShiftMoveGuides = activeMoveControl is ObjectTransformControl.MoveBoth or ObjectTransformControl.Duplicate;
+        bool shouldShowGuides = canUseShiftMoveGuides && IsShiftModeHeld;
+        if (!shouldShowGuides)
+        {
+            if (wasShiftModeHeldDuringMove)
+                SetMoveGuideLinesVisible(false);
+
+            wasShiftModeHeldDuringMove = false;
+            activeShiftMoveConstraint = ShiftMoveConstraint.None;
+            return;
+        }
+
+        if (!wasShiftModeHeldDuringMove)
+            BeginShiftMoveGuides();
+
+        Vector3 pointerOffsetFromGuideOrigin = pointerWorldPosition - shiftMoveGuideOrigin;
+        float distanceToRightGuide = Mathf.Abs(Vector3.Dot(pointerOffsetFromGuideOrigin, shiftMoveGuideUp));
+        float distanceToUpGuide = Mathf.Abs(Vector3.Dot(pointerOffsetFromGuideOrigin, shiftMoveGuideRight));
+
+        // Keep the current guide when the pointer is exactly between them, avoiding
+        // visual flicker while the user crosses the intersection point.
+        if (distanceToRightGuide < distanceToUpGuide)
+            activeShiftMoveConstraint = ShiftMoveConstraint.AlongRight;
+        else if (distanceToUpGuide < distanceToRightGuide)
+            activeShiftMoveConstraint = ShiftMoveConstraint.AlongUp;
+
+        if (activeShiftMoveConstraint == ShiftMoveConstraint.AlongRight)
+        {
+            float movementAlongRight = Vector3.Dot(desiredPosition - shiftMoveGuideOrigin, shiftMoveGuideRight);
+            desiredPosition = shiftMoveGuideOrigin + shiftMoveGuideRight * movementAlongRight;
+        }
+        else if (activeShiftMoveConstraint == ShiftMoveConstraint.AlongUp)
+        {
+            float movementAlongUp = Vector3.Dot(desiredPosition - shiftMoveGuideOrigin, shiftMoveGuideUp);
+            desiredPosition = shiftMoveGuideOrigin + shiftMoveGuideUp * movementAlongUp;
+        }
+    }
+
+    void BeginShiftMoveGuides()
+    {
+        wasShiftModeHeldDuringMove = true;
+        shiftMoveGuideOrigin = selectedObject.transform.position;
+        shiftMoveGuideOrigin.z = 0f;
+
+        shiftMoveGuideRight = isWorldTransform ? Vector3.right : selectedObject.transform.right;
+        shiftMoveGuideUp = isWorldTransform ? Vector3.up : selectedObject.transform.up;
+        shiftMoveGuideRight.z = 0f;
+        shiftMoveGuideUp.z = 0f;
+        shiftMoveGuideRight.Normalize();
+        shiftMoveGuideUp.Normalize();
+        activeShiftMoveConstraint = ShiftMoveConstraint.AlongRight;
+
+        horizontalLine.SetPosition(0, shiftMoveGuideOrigin - shiftMoveGuideRight * MOVE_GUIDE_LINE_HALF_LENGTH);
+        horizontalLine.SetPosition(1, shiftMoveGuideOrigin + shiftMoveGuideRight * MOVE_GUIDE_LINE_HALF_LENGTH);
+        verticalLine.SetPosition(0, shiftMoveGuideOrigin - shiftMoveGuideUp * MOVE_GUIDE_LINE_HALF_LENGTH);
+        verticalLine.SetPosition(1, shiftMoveGuideOrigin + shiftMoveGuideUp * MOVE_GUIDE_LINE_HALF_LENGTH);
+        SetMoveGuideLinesVisible(true);
+    }
+
+    void SetMoveGuideLinesVisible(bool visible)
+    {
+        verticalLine.gameObject.SetActive(visible);
+        horizontalLine.gameObject.SetActive(visible);
+    }
+
     void EndMoveSelectedObject()
     {
-        verticalLine.gameObject.SetActive(false);
-        horizontalLine.gameObject.SetActive(false);
+        SetMoveGuideLinesVisible(false);
+        wasShiftModeHeldDuringMove = false;
+        activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
         isTryingToMoveSelectedObject = false;
 
