@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [DefaultExecutionOrder(100)]
@@ -11,6 +12,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
     Canvas parentCanvas;
     bool hasSelectionFrame;
     LevelEditor.ScaleFromEdgeFrame selectionFrame;
+    readonly Dictionary<ScaleFromEdgeHandle, Quaternion> handleBaseRotations = new Dictionary<ScaleFromEdgeHandle, Quaternion>();
 
     void Awake()
     {
@@ -20,6 +22,13 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
             controlsCanvasGroup = GetComponent<CanvasGroup>();
         if (controlsCanvasGroup == null)
             controlsCanvasGroup = gameObject.AddComponent<CanvasGroup>();
+
+        foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
+        {
+            RectTransform handleTransform = FindHandle(handle);
+            if (handleTransform != null)
+                handleBaseRotations[handle] = handleTransform.localRotation;
+        }
 
         overlayRect = transform.parent as RectTransform;
         parentCanvas = GetComponentInParent<Canvas>();
@@ -96,11 +105,16 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
             return;
 
         controlsRoot.anchoredPosition = centerLocalPosition;
+        float selectionRotationDegrees = Mathf.Atan2(selectionFrame.right.y, selectionFrame.right.x) * Mathf.Rad2Deg;
+        Quaternion selectionRotation = Quaternion.Euler(0f, 0f, selectionRotationDegrees);
         foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
         {
             RectTransform handleTransform = FindHandle(handle);
             if (handleTransform == null)
                 continue;
+
+            if (handleBaseRotations.TryGetValue(handle, out Quaternion baseRotation))
+                handleTransform.localRotation = selectionRotation * baseRotation;
 
             Vector3 handleScreenPosition = activeCamera.WorldToScreenPoint(selectionFrame.GetHandlePosition(handle));
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(overlayRect, handleScreenPosition, eventCamera, out Vector2 handleLocalPosition))
