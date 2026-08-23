@@ -1180,6 +1180,11 @@ public class LevelEditor : MonoBehaviour
         // intentionally hide their individual rotate control.
         if (selectionGroup != null)
         {
+            // Groups scale uniformly from their corners. Independent edge scaling is
+            // intentionally limited to one selected object, where the affected axis
+            // and fixed opposite edge remain unambiguous.
+            availability.canScaleHorizontally = false;
+            availability.canScaleVertically = false;
             availability.canRotate = true;
             availability.scaleHandlesFollowSelectionRotation = true;
         }
@@ -1824,6 +1829,18 @@ public class LevelEditor : MonoBehaviour
 
         if (scaleFromEdgeControlsUI != null)
         {
+            if (TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
+            {
+                // Reapply this during the regular refresh as well as at selection
+                // time. The edge-controls prefab can become active after its first
+                // selection was configured, so this prevents its default handle
+                // visibility from leaking into that first selection.
+                scaleFromEdgeControlsUI.SetControlAvailability(
+                    availability.canScaleHorizontally,
+                    availability.canScaleVertically,
+                    availability.canScaleBoth);
+            }
+
             ScaleFromEdgeFrame scaleFromEdgeFrame = default;
             bool hasScaleFromEdgeFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out scaleFromEdgeFrame);
             scaleFromEdgeControlsUI.SetSelectionFrame(hasScaleFromEdgeFrame, scaleFromEdgeFrame);
