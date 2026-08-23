@@ -1536,8 +1536,7 @@ public class LevelEditor : MonoBehaviour
     void BeginShiftMoveGuides()
     {
         wasShiftModeHeldDuringMove = true;
-        shiftMoveGuideOrigin = selectedObject.transform.position;
-        shiftMoveGuideOrigin.z = 0f;
+        shiftMoveGuideOrigin = GetMoveIncrementAlignedPosition(selectedObject.transform.position);
 
         shiftMoveGuideRight = isWorldTransform ? Vector3.right : selectedObject.transform.right;
         shiftMoveGuideUp = isWorldTransform ? Vector3.up : selectedObject.transform.up;
@@ -1552,6 +1551,17 @@ public class LevelEditor : MonoBehaviour
         verticalLine.SetPosition(0, shiftMoveGuideOrigin - shiftMoveGuideUp * MOVE_GUIDE_LINE_HALF_LENGTH);
         verticalLine.SetPosition(1, shiftMoveGuideOrigin + shiftMoveGuideUp * MOVE_GUIDE_LINE_HALF_LENGTH);
         SetMoveGuideLinesVisible(true);
+    }
+
+    Vector3 GetMoveIncrementAlignedPosition(Vector3 position)
+    {
+        // This is the same grid used by the unconstrained move candidate above.
+        // In local mode, moveIncrementOffset preserves the object's initial offset
+        // from the world grid, so the guide remains on that same effective lattice.
+        return new Vector3(
+            RoundToIncrement(position.x - moveIncrementOffset.x, moveIncrement) + moveIncrementOffset.x,
+            RoundToIncrement(position.y - moveIncrementOffset.y, moveIncrement) + moveIncrementOffset.y,
+            0f);
     }
 
     void SetMoveGuideLinesVisible(bool visible)
