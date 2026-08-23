@@ -43,34 +43,10 @@ public class LevelManager : MonoBehaviour
         public byte loaderVersion;
     }
 
-    // Version 1 remains only so existing saved and built-in levels can still load.
-    [System.Serializable]
-    struct LevelV1
-    {
-        public string contentId;
-        public byte loaderVersion;
-        public string levelName;
-        public string levelAuthor;
-        public float playerStartPointXPosition;
-        public float playerStartPointYPosition;
-        public List<LevelObjectV1> levelObjects;
-
-        [System.Serializable]
-        public struct LevelObjectV1
-        {
-            public string type;
-            public float xPosition;
-            public float yPosition;
-            public float xScale;
-            public float yScale;
-            public float rotation;
-        }
-    }
-
-    // Version 2 stores the same objects in parent-first order. parentIndex is the only
+    // Version 1 stores objects in parent-first order. parentIndex is the only
     // hierarchy data needed: -1 means the level root, otherwise it points to an earlier object.
     [System.Serializable]
-    struct LevelV2
+    struct LevelV1
     {
         public string contentId;
         public byte loaderVersion;
@@ -79,10 +55,10 @@ public class LevelManager : MonoBehaviour
         public long savedAtUtcTicks;
         public float playerStartPointXPosition;
         public float playerStartPointYPosition;
-        public List<LevelObjectV2> levelObjects;
+        public List<LevelObjectV1> levelObjects;
 
         [System.Serializable]
-        public struct LevelObjectV2
+        public struct LevelObjectV1
         {
             // "Group" is reserved for an empty hierarchy object. Other values are prefab names.
             public string type;
@@ -113,7 +89,7 @@ public class LevelManager : MonoBehaviour
     public GameObject TextPrefab;
 
     const string GroupObjectType = "Group";
-    public const byte LOADER_VERSION = 2;
+    public const byte LOADER_VERSION = 1;
     public string playerLevelsDirectory { get; private set; }
     LevelStorage levelStorage;
     string levelLoadJson;
@@ -168,10 +144,10 @@ public class LevelManager : MonoBehaviour
     }
 
     #region Saving
-    bool TryGenerateLevelObject(out LevelV2 level)
+    bool TryGenerateLevelObject(out LevelV1 level)
     {
-        level = new LevelV2();
-        level.levelObjects = new List<LevelV2.LevelObjectV2>();
+        level = new LevelV1();
+        level.levelObjects = new List<LevelV1.LevelObjectV1>();
 
         // get level name input, or just create one if nothing was input
         string levelName = "Custom Level " + DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
@@ -196,7 +172,7 @@ public class LevelManager : MonoBehaviour
         return true;
     }
 
-    bool AppendLevelObjects(Transform parentTransform, int parentIndex, List<LevelV2.LevelObjectV2> serializedObjects)
+    bool AppendLevelObjects(Transform parentTransform, int parentIndex, List<LevelV1.LevelObjectV1> serializedObjects)
     {
         foreach (Transform childTransform in parentTransform)
         {
@@ -214,7 +190,7 @@ public class LevelManager : MonoBehaviour
             }
 
             int childIndex = serializedObjects.Count;
-            serializedObjects.Add(new LevelV2.LevelObjectV2
+            serializedObjects.Add(new LevelV1.LevelObjectV1
             {
                 type = type,
                 parentIndex = parentIndex,
@@ -257,7 +233,7 @@ public class LevelManager : MonoBehaviour
 
     public void CopyLevelCodeToClipboard()
     {
-        if (!TryGenerateLevelObject(out LevelV2 level))
+        if (!TryGenerateLevelObject(out LevelV1 level))
             return;
 
         string json = JsonUtility.ToJson(level, false);
@@ -298,7 +274,7 @@ public class LevelManager : MonoBehaviour
         }
 
         isSavingLevel = true;
-        LevelV2 level;
+        LevelV1 level;
         bool didGenerateLevel;
         try
         {
@@ -323,7 +299,7 @@ public class LevelManager : MonoBehaviour
         StartCoroutine(SaveLevelWithPreview(level));
     }
 
-    IEnumerator SaveLevelWithPreview(LevelV2 level)
+    IEnumerator SaveLevelWithPreview(LevelV1 level)
     {
         try
         {
@@ -435,15 +411,12 @@ public class LevelManager : MonoBehaviour
             LevelHeader header = JsonUtility.FromJson<LevelHeader>(levelLoadJson);
             switch (header.loaderVersion)
             {
-            case 1:
-                LoadLevelVersionOne(JsonUtility.FromJson<LevelV1>(levelLoadJson));
-                break;
-            case 2:
-                LoadLevelVersionTwo(JsonUtility.FromJson<LevelV2>(levelLoadJson));
-                break;
-            default:
-                Debug.LogError("Level could not be loaded because loader version " + header.loaderVersion + " is not supported.");
-                break;
+                case 1:
+                    LoadLevelVersionOne(JsonUtility.FromJson<LevelV1>(levelLoadJson));
+                    break;
+                default:
+                    Debug.LogError("Level could not be loaded because loader version " + header.loaderVersion + " is not supported.");
+                    break;
             }
         }
         catch (Exception exception)
@@ -456,39 +429,15 @@ public class LevelManager : MonoBehaviour
     {
         BeginLoadingLevel(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
 
-        foreach (LevelV1.LevelObjectV1 levelObject in loadedLevel.levelObjects ?? new List<LevelV1.LevelObjectV1>())
-        {
-            GameObject prefabToInstantiate = GetPrefabForType(levelObject.type);
-            if (prefabToInstantiate == null)
-            {
-                Debug.LogError("Version 1 level object could not be loaded because type '" + levelObject.type + "' is not recognized.");
-                continue;
-            }
-
-            GameObject loadedObject = Instantiate(
-                prefabToInstantiate,
-                new Vector3(levelObject.xPosition, levelObject.yPosition, 0f),
-                Quaternion.Euler(0f, 0f, levelObject.rotation),
-                levelObjectsContainer.transform);
-            loadedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale, 1f);
-        }
-
-        FinishLoadingLevel();
-    }
-
-    void LoadLevelVersionTwo(LevelV2 loadedLevel)
-    {
-        BeginLoadingLevel(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
-
         List<Transform> loadedTransforms = new List<Transform>();
-        foreach (LevelV2.LevelObjectV2 levelObject in loadedLevel.levelObjects ?? new List<LevelV2.LevelObjectV2>())
+        foreach (LevelV1.LevelObjectV1 levelObject in loadedLevel.levelObjects ?? new List<LevelV1.LevelObjectV1>())
         {
             Transform parentTransform = levelObjectsContainer.transform;
             if (levelObject.parentIndex != -1)
             {
                 if (levelObject.parentIndex < 0 || levelObject.parentIndex >= loadedTransforms.Count)
                 {
-                    Debug.LogError("Version 2 level object '" + levelObject.type + "' has an invalid parent index.");
+                    Debug.LogError("Version 1 level object '" + levelObject.type + "' has an invalid parent index.");
                     loadedTransforms.Add(null);
                     continue;
                 }
@@ -496,7 +445,7 @@ public class LevelManager : MonoBehaviour
                 parentTransform = loadedTransforms[levelObject.parentIndex];
                 if (parentTransform == null)
                 {
-                    Debug.LogError("Version 2 level object '" + levelObject.type + "' cannot load because its parent could not be created.");
+                    Debug.LogError("Version 1 level object '" + levelObject.type + "' cannot load because its parent could not be created.");
                     loadedTransforms.Add(null);
                     continue;
                 }
