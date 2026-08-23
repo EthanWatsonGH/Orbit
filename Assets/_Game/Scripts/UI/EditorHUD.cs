@@ -31,6 +31,7 @@ public class EditorHUD : MonoBehaviour
     public void PlacePuller() => levelEditor?.PlacePuller();
     public void PlacePusher() => levelEditor?.PlacePusher();
     public void PlaceSlipperyWall() => levelEditor?.PlaceSlipperyWall();
+    public void SetModifierButtonHeld(EditorModifier modifier, bool isHeld) => levelEditor?.SetModifierButtonHeld(modifier, isHeld);
 
     public void SetTouchPointIsOverButtonTrue()
     {

@@ -20,7 +20,7 @@ public class PointerInput : MonoBehaviour
     public bool CurrentGestureStartedOverSelectableUi { get; private set; }
     public bool WasReleasedOverSelectableUi { get; private set; }
     public bool HadMultiplePointersDuringCurrentGesture { get; private set; }
-    public bool IsSinglePointerHeld => IsHeld && Input.touchCount <= 1;
+    public bool IsSinglePointerHeld => IsHeld && GetGameplayTouchCount() <= 1;
     public float PointerDurationSeconds => (IsHeld ? Time.unscaledTime : pointerReleaseUnscaledTime) - PressStartUnscaledTime;
     public float DragDistancePixels => Vector2.Distance(PressStartScreenPosition, ScreenPosition);
 
@@ -45,6 +45,7 @@ public class PointerInput : MonoBehaviour
     bool isTouchPinchGestureActive;
     float previousTouchPinchDistance;
     readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>();
+    readonly HashSet<int> excludedTouchFingerIds = new HashSet<int>();
 
     void Awake()
     {
@@ -69,6 +70,7 @@ public class PointerInput : MonoBehaviour
         WasPressedThisFrame = false;
         WasReleasedThisFrame = false;
         WasCanceledThisFrame = false;
+        UpdateExcludedModifierTouches();
         UpdateInputGestures();
 
         if (isTrackingTouch)
@@ -80,7 +82,7 @@ public class PointerInput : MonoBehaviour
         for (int i = 0; i < Input.touchCount; i++)
         {
             Touch touch = Input.GetTouch(i);
-            if (touch.phase == TouchPhase.Began)
+            if (touch.phase == TouchPhase.Began && !IsExcludedTouch(touch))
             {
                 isTrackingTouch = true;
                 primaryFingerId = touch.fingerId;
@@ -193,16 +195,7 @@ public class PointerInput : MonoBehaviour
     {
         // Camera panning requires exactly two live touches. The first touch remains the gameplay pointer;
         // this midpoint is used only by the camera and never replaces ScreenPosition or primaryFingerId.
-        if (Input.touchCount != 2)
-        {
-            isTouchPanGestureActive = false;
-            return;
-        }
-
-        Touch firstTouch = Input.GetTouch(0);
-        Touch secondTouch = Input.GetTouch(1);
-        if (firstTouch.phase == TouchPhase.Ended || firstTouch.phase == TouchPhase.Canceled ||
-            secondTouch.phase == TouchPhase.Ended || secondTouch.phase == TouchPhase.Canceled)
+        if (!TryGetTwoGameplayTouches(out Touch firstTouch, out Touch secondTouch))
         {
             isTouchPanGestureActive = false;
             return;
@@ -249,16 +242,7 @@ public class PointerInput : MonoBehaviour
 
     void UpdateTouchPinchGesture()
     {
-        if (Input.touchCount != 2)
-        {
-            isTouchPinchGestureActive = false;
-            return;
-        }
-
-        Touch firstTouch = Input.GetTouch(0);
-        Touch secondTouch = Input.GetTouch(1);
-        if (firstTouch.phase == TouchPhase.Ended || firstTouch.phase == TouchPhase.Canceled ||
-            secondTouch.phase == TouchPhase.Ended || secondTouch.phase == TouchPhase.Canceled)
+        if (!TryGetTwoGameplayTouches(out Touch firstTouch, out Touch secondTouch))
         {
             isTouchPinchGestureActive = false;
             return;
@@ -288,7 +272,7 @@ public class PointerInput : MonoBehaviour
 
     void UpdateTrackedTouch()
     {
-        if (Input.touchCount > 1)
+        if (GetGameplayTouchCount() > 1)
             HadMultiplePointersDuringCurrentGesture = true;
 
         for (int i = 0; i < Input.touchCount; i++)
@@ -331,7 +315,7 @@ public class PointerInput : MonoBehaviour
         PressStartUnscaledTime = Time.unscaledTime;
         WasPressedThisFrame = true;
         IsHeld = true;
-        HadMultiplePointersDuringCurrentGesture = Input.touchCount > 1;
+        HadMultiplePointersDuringCurrentGesture = GetGameplayTouchCount() > 1;
 
         GetUiStateAtScreenPosition(screenPosition, out bool isOverUi, out bool isOverSelectableUi);
         CurrentGestureStartedOverUi = isOverUi;
@@ -376,5 +360,90 @@ public class PointerInput : MonoBehaviour
         }
 
         isOverUi = uiRaycastResults.Count > 0;
+    }
+
+    void UpdateExcludedModifierTouches()
+    {
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase == TouchPhase.Began && IsScreenPositionOverEditorModifierButton(touch.position))
+                excludedTouchFingerIds.Add(touch.fingerId);
+            else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                excludedTouchFingerIds.Remove(touch.fingerId);
+        }
+
+        if (Input.touchCount == 0)
+            excludedTouchFingerIds.Clear();
+    }
+
+    bool IsExcludedTouch(Touch touch)
+    {
+        return excludedTouchFingerIds.Contains(touch.fingerId);
+    }
+
+    int GetGameplayTouchCount()
+    {
+        int gameplayTouchCount = 0;
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (!IsExcludedTouch(touch) &&
+                touch.phase != TouchPhase.Ended &&
+                touch.phase != TouchPhase.Canceled)
+            {
+                gameplayTouchCount++;
+            }
+        }
+
+        return gameplayTouchCount;
+    }
+
+    bool TryGetTwoGameplayTouches(out Touch firstGameplayTouch, out Touch secondGameplayTouch)
+    {
+        firstGameplayTouch = default;
+        secondGameplayTouch = default;
+        int gameplayTouchCount = 0;
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (IsExcludedTouch(touch) ||
+                touch.phase == TouchPhase.Ended ||
+                touch.phase == TouchPhase.Canceled)
+            {
+                continue;
+            }
+
+            if (gameplayTouchCount == 0)
+                firstGameplayTouch = touch;
+            else if (gameplayTouchCount == 1)
+                secondGameplayTouch = touch;
+
+            gameplayTouchCount++;
+        }
+
+        return gameplayTouchCount == 2;
+    }
+
+    bool IsScreenPositionOverEditorModifierButton(Vector2 screenPosition)
+    {
+        if (EventSystem.current == null)
+            return false;
+
+        PointerEventData pointerEventData = new PointerEventData(EventSystem.current)
+        {
+            position = screenPosition
+        };
+
+        uiRaycastResults.Clear();
+        EventSystem.current.RaycastAll(pointerEventData, uiRaycastResults);
+        for (int i = 0; i < uiRaycastResults.Count; i++)
+        {
+            if (uiRaycastResults[i].gameObject.GetComponentInParent<EditorModifierButton>() != null)
+                return true;
+        }
+
+        return false;
     }
 }

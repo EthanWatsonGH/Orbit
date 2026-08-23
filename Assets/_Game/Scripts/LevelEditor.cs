@@ -210,7 +210,8 @@ public class LevelEditor : MonoBehaviour
     ScaleGesture activeScaleGesture;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
     bool isScalingFromEdge;
-    bool isScaleFromEdgeBothSidesButtonHeld;
+    bool isShiftModeButtonHeld;
+    bool isCtrlModeButtonHeld;
 
     ObjectTransformControl activeMoveControl;
     ObjectTransformControl activeScaleControl;
@@ -316,7 +317,8 @@ public class LevelEditor : MonoBehaviour
 
     private void OnDisable()
     {
-        isScaleFromEdgeBothSidesButtonHeld = false;
+        isShiftModeButtonHeld = false;
+        isCtrlModeButtonHeld = false;
         SetBoxSelectionVisualVisible(false);
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
@@ -971,12 +973,12 @@ public class LevelEditor : MonoBehaviour
 
     bool IsAddSelectionModifierHeld()
     {
-        return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        return IsShiftModeHeld;
     }
 
     bool IsRemoveSelectionModifierHeld()
     {
-        return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        return IsCtrlModeHeld;
     }
 
     void SelectObjectsInsideBox(bool addToCurrentSelection, bool removeFromCurrentSelection)
@@ -1302,11 +1304,27 @@ public class LevelEditor : MonoBehaviour
         activeTransformPointerId = int.MinValue;
     }
 
-    // Wire a screen button's Pointer Down and Pointer Up events to this with true
-    // and false respectively. Its state is combined with either Shift key below.
-    public void SetScaleFromEdgeBothSidesButtonHeld(bool isHeld)
+    // These combine the physical keyboard keys with the matching held screen button.
+    // Keep consumers dependent on the modes rather than on either input source.
+    public bool IsShiftModeHeld => isShiftModeButtonHeld ||
+                                   Input.GetKey(KeyCode.LeftShift) ||
+                                   Input.GetKey(KeyCode.RightShift);
+
+    public bool IsCtrlModeHeld => isCtrlModeButtonHeld ||
+                                  Input.GetKey(KeyCode.LeftControl) ||
+                                  Input.GetKey(KeyCode.RightControl);
+
+    public void SetModifierButtonHeld(EditorModifier modifier, bool isHeld)
     {
-        isScaleFromEdgeBothSidesButtonHeld = isHeld;
+        switch (modifier)
+        {
+            case EditorModifier.Shift:
+                isShiftModeButtonHeld = isHeld;
+                break;
+            case EditorModifier.Ctrl:
+                isCtrlModeButtonHeld = isHeld;
+                break;
+        }
     }
 
     static bool IsScaleFromEdgeHandleAvailable(ScaleFromEdgeHandle handle, SelectionControlAvailability availability)
@@ -1741,7 +1759,7 @@ public class LevelEditor : MonoBehaviour
 
     bool IsScaleFromEdgeBothSidesModeHeld()
     {
-        return isScaleFromEdgeBothSidesButtonHeld || IsAddSelectionModifierHeld();
+        return IsShiftModeHeld;
     }
 
     static bool DoesScaleFromEdgeHandleScaleX(ScaleFromEdgeHandle handle)
