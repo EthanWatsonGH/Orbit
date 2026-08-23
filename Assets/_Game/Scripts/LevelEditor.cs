@@ -1458,7 +1458,7 @@ public class LevelEditor : MonoBehaviour
             desiredPosition = new Vector3(newX, newY, 0f);
         }
 
-        UpdateShiftMoveGuides(pointerWorldPosition, ref desiredPosition);
+        UpdateShiftMoveGuides(ref desiredPosition);
         selectedObject.transform.position = desiredPosition;
 
         bool canDeleteSelectedObject = !selectedObject.name.Equals("PlayerStartPoint");
@@ -1490,7 +1490,7 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    void UpdateShiftMoveGuides(Vector3 pointerWorldPosition, ref Vector3 desiredPosition)
+    void UpdateShiftMoveGuides(ref Vector3 desiredPosition)
     {
         bool canUseShiftMoveGuides = activeMoveControl is ObjectTransformControl.MoveBoth or ObjectTransformControl.Duplicate;
         bool shouldShowGuides = canUseShiftMoveGuides && IsShiftModeHeld;
@@ -1507,9 +1507,12 @@ public class LevelEditor : MonoBehaviour
         if (!wasShiftModeHeldDuringMove)
             BeginShiftMoveGuides();
 
-        Vector3 pointerOffsetFromGuideOrigin = pointerWorldPosition - shiftMoveGuideOrigin;
-        float distanceToRightGuide = Mathf.Abs(Vector3.Dot(pointerOffsetFromGuideOrigin, shiftMoveGuideUp));
-        float distanceToUpGuide = Mathf.Abs(Vector3.Dot(pointerOffsetFromGuideOrigin, shiftMoveGuideRight));
+        // Decide using the same candidate position the object would have without
+        // guides. That includes the grab offset and move increment, so the visual
+        // object and the guide-selection point stay aligned.
+        Vector3 candidateOffsetFromGuideOrigin = desiredPosition - shiftMoveGuideOrigin;
+        float distanceToRightGuide = Mathf.Abs(Vector3.Dot(candidateOffsetFromGuideOrigin, shiftMoveGuideUp));
+        float distanceToUpGuide = Mathf.Abs(Vector3.Dot(candidateOffsetFromGuideOrigin, shiftMoveGuideRight));
 
         // Keep the current guide when the pointer is exactly between them, avoiding
         // visual flicker while the user crosses the intersection point.
