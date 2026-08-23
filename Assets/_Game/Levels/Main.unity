@@ -350,16 +350,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 6784540414466410386, guid: 4824b21244823934e83d45f884726f52, type: 3}
   m_PrefabInstance: {fileID: 128809842}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &128809850 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 672343245589659817, guid: 4824b21244823934e83d45f884726f52, type: 3}
-  m_PrefabInstance: {fileID: 128809842}
-  m_PrefabAsset: {fileID: 0}
---- !u!1 &128809851 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 4341401846880710791, guid: 4824b21244823934e83d45f884726f52, type: 3}
-  m_PrefabInstance: {fileID: 128809842}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &128809852 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7515563979155428390, guid: 4824b21244823934e83d45f884726f52, type: 3}
@@ -1959,7 +1949,7 @@ PrefabInstance:
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: localTransformButton
       value: 
-      objectReference: {fileID: 128809851}
+      objectReference: {fileID: 0}
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: snapHorizontalButton
       value: 
@@ -1967,7 +1957,11 @@ PrefabInstance:
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: worldTransformButton
       value: 
-      objectReference: {fileID: 128809850}
+      objectReference: {fileID: 0}
+    - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+      propertyPath: worldTransformToggle
+      value: 
+      objectReference: {fileID: 1351077372}
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: moveIncrementDropdown
       value: 
@@ -2002,6 +1996,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 453ae5ec52e01684b8cf09ae84c51ab4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1351077372 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2246114113779788858, guid: 4824b21244823934e83d45f884726f52, type: 3}
+  m_PrefabInstance: {fileID: 128809842}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9e0c91b723949f3866bdecd156d8f20, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1 &1366396561
