@@ -11,7 +11,7 @@ public enum EditorModifier
 // Add this to a held Shift or Ctrl screen button. PointerInput recognizes this
 // component too, so the finger holding the modifier does not become a world
 // gesture or interfere with the finger editing the level.
-public class EditorModifierButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+public class EditorModifierButton : PointerGestureExclusion, IPointerDownHandler, IPointerUpHandler
 {
     [SerializeField] EditorModifier modifier;
     [SerializeField] EditorHUD editorHUD;

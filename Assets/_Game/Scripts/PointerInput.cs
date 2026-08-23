@@ -70,7 +70,7 @@ public class PointerInput : MonoBehaviour
         WasPressedThisFrame = false;
         WasReleasedThisFrame = false;
         WasCanceledThisFrame = false;
-        UpdateExcludedModifierTouches();
+        UpdateExcludedPointerGestureTouches();
         UpdateInputGestures();
 
         if (isTrackingTouch)
@@ -362,12 +362,12 @@ public class PointerInput : MonoBehaviour
         isOverUi = uiRaycastResults.Count > 0;
     }
 
-    void UpdateExcludedModifierTouches()
+    void UpdateExcludedPointerGestureTouches()
     {
         for (int i = 0; i < Input.touchCount; i++)
         {
             Touch touch = Input.GetTouch(i);
-            if (touch.phase == TouchPhase.Began && IsScreenPositionOverEditorModifierButton(touch.position))
+            if (touch.phase == TouchPhase.Began && IsScreenPositionOverPointerGestureExclusion(touch.position))
                 excludedTouchFingerIds.Add(touch.fingerId);
             else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
                 excludedTouchFingerIds.Remove(touch.fingerId);
@@ -426,7 +426,7 @@ public class PointerInput : MonoBehaviour
         return gameplayTouchCount == 2;
     }
 
-    bool IsScreenPositionOverEditorModifierButton(Vector2 screenPosition)
+    bool IsScreenPositionOverPointerGestureExclusion(Vector2 screenPosition)
     {
         if (EventSystem.current == null)
             return false;
@@ -440,7 +440,7 @@ public class PointerInput : MonoBehaviour
         EventSystem.current.RaycastAll(pointerEventData, uiRaycastResults);
         for (int i = 0; i < uiRaycastResults.Count; i++)
         {
-            if (uiRaycastResults[i].gameObject.GetComponentInParent<EditorModifierButton>() != null)
+            if (uiRaycastResults[i].gameObject.GetComponentInParent<PointerGestureExclusion>() != null)
                 return true;
         }
 
