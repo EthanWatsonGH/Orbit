@@ -6,6 +6,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
 {
     [SerializeField] RectTransform controlsRoot;
     [SerializeField] CanvasGroup controlsCanvasGroup;
+    [SerializeField, Min(0f)] float minimumHandleSpacingPixels = 72f;
 
     LevelEditor levelEditor;
     RectTransform overlayRect;
@@ -107,6 +108,14 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
         controlsRoot.anchoredPosition = centerLocalPosition;
         float selectionRotationDegrees = Mathf.Atan2(selectionFrame.right.y, selectionFrame.right.x) * Mathf.Rad2Deg;
         Quaternion selectionRotation = Quaternion.Euler(0f, 0f, selectionRotationDegrees);
+        Vector2 centerScreenPosition2D = centerScreenPosition;
+        Vector2 rightScreenOffset = (Vector2)activeCamera.WorldToScreenPoint(selectionFrame.GetHandlePosition(ScaleFromEdgeHandle.Right)) - centerScreenPosition2D;
+        Vector2 upScreenOffset = (Vector2)activeCamera.WorldToScreenPoint(selectionFrame.GetHandlePosition(ScaleFromEdgeHandle.Up)) - centerScreenPosition2D;
+        Vector2 rightScreenDirection = GetScreenDirection(rightScreenOffset, selectionFrame.right);
+        Vector2 upScreenDirection = GetScreenDirection(upScreenOffset, selectionFrame.up);
+        float displayedHalfWidth = Mathf.Max(rightScreenOffset.magnitude, minimumHandleSpacingPixels);
+        float displayedHalfHeight = Mathf.Max(upScreenOffset.magnitude, minimumHandleSpacingPixels);
+
         foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
         {
             RectTransform handleTransform = FindHandle(handle);
@@ -116,10 +125,47 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
             if (handleBaseRotations.TryGetValue(handle, out Quaternion baseRotation))
                 handleTransform.localRotation = selectionRotation * baseRotation;
 
-            Vector3 handleScreenPosition = activeCamera.WorldToScreenPoint(selectionFrame.GetHandlePosition(handle));
+            Vector2 handleScreenPosition = GetDisplayedHandleScreenPosition(
+                handle,
+                centerScreenPosition2D,
+                rightScreenDirection,
+                upScreenDirection,
+                displayedHalfWidth,
+                displayedHalfHeight);
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(overlayRect, handleScreenPosition, eventCamera, out Vector2 handleLocalPosition))
                 handleTransform.anchoredPosition = handleLocalPosition - centerLocalPosition;
         }
+    }
+
+    static Vector2 GetScreenDirection(Vector2 screenOffset, Vector3 worldFallbackDirection)
+    {
+        if (screenOffset.sqrMagnitude > Mathf.Epsilon)
+            return screenOffset.normalized;
+
+        Vector2 fallbackDirection = new Vector2(worldFallbackDirection.x, worldFallbackDirection.y);
+        return fallbackDirection.sqrMagnitude > Mathf.Epsilon ? fallbackDirection.normalized : Vector2.right;
+    }
+
+    static Vector2 GetDisplayedHandleScreenPosition(
+        ScaleFromEdgeHandle handle,
+        Vector2 centerScreenPosition,
+        Vector2 rightScreenDirection,
+        Vector2 upScreenDirection,
+        float halfWidth,
+        float halfHeight)
+    {
+        return handle switch
+        {
+            ScaleFromEdgeHandle.Left => centerScreenPosition - rightScreenDirection * halfWidth,
+            ScaleFromEdgeHandle.Right => centerScreenPosition + rightScreenDirection * halfWidth,
+            ScaleFromEdgeHandle.Up => centerScreenPosition + upScreenDirection * halfHeight,
+            ScaleFromEdgeHandle.Down => centerScreenPosition - upScreenDirection * halfHeight,
+            ScaleFromEdgeHandle.UpLeft => centerScreenPosition - rightScreenDirection * halfWidth + upScreenDirection * halfHeight,
+            ScaleFromEdgeHandle.UpRight => centerScreenPosition + rightScreenDirection * halfWidth + upScreenDirection * halfHeight,
+            ScaleFromEdgeHandle.DownLeft => centerScreenPosition - rightScreenDirection * halfWidth - upScreenDirection * halfHeight,
+            ScaleFromEdgeHandle.DownRight => centerScreenPosition + rightScreenDirection * halfWidth - upScreenDirection * halfHeight,
+            _ => centerScreenPosition
+        };
     }
 
     void SetHandleVisible(ScaleFromEdgeHandle handle, bool shouldShow)
