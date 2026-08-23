@@ -12,8 +12,6 @@ public class EditorHUD : MonoBehaviour
     public void SetPointerIsOverObjectSelectionBarTrue() => levelEditor?.SetPointerIsOverObjectSelectionBarTrue();
     public void SetPointerIsOverObjectSelectionBarFalse() => levelEditor?.SetPointerIsOverObjectSelectionBarFalse();
     public void CopyLevelCodeToClipboard() => levelEditor?.CopyLevelCodeToClipboard();
-    public void SwitchToWorldTransformMode() => levelEditor?.SwitchToWorldTransformMode();
-    public void SwitchToLocalTransformMode() => levelEditor?.SwitchToLocalTransformMode();
     public void SaveLevel() => levelEditor?.SaveLevel();
     public void SnapSelectedObjectToLastHorizontal() => levelEditor?.SnapSelectedObjectToLastHorizontal();
     public void SnapSelectedObjectToLastVertical() => levelEditor?.SnapSelectedObjectToLastVertical();

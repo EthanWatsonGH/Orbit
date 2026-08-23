@@ -1,5 +1,5 @@
+using System;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class ToggleButton : MonoBehaviour
@@ -9,10 +9,11 @@ public class ToggleButton : MonoBehaviour
     [SerializeField] GameObject onVisual;
     [SerializeField] GameObject offVisual;
 
-    [Header("Events")]
-    [SerializeField] UnityEvent<bool> valueChangeRequested;
+    [Header("State")]
+    [SerializeField] bool isOn;
 
-    bool isOn;
+    public bool IsOn => isOn;
+    public event Action<bool> ValueChanged;
 
     void Awake()
     {
@@ -34,14 +35,20 @@ public class ToggleButton : MonoBehaviour
 
     public void SetIsOn(bool value)
     {
+        if (isOn == value)
+        {
+            ApplyVisualState();
+            return;
+        }
+
         isOn = value;
         ApplyVisualState();
+        ValueChanged?.Invoke(isOn);
     }
 
     void RequestToggle()
     {
-        // The owning setting decides whether to accept this change, then calls SetIsOn to update the visuals.
-        valueChangeRequested?.Invoke(!isOn);
+        SetIsOn(!isOn);
     }
 
     void ApplyVisualState()

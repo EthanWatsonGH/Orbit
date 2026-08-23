@@ -32,12 +32,9 @@ public class Player : MonoBehaviour
     [SerializeField] float pullForce;
     [SerializeField] float launchForce;
     [Header("Quick Play Settings")]
-    [SerializeField] bool quickRetryEnabled;
-    [SerializeField] bool quickLaunchEnabled;
     [SerializeField] ToggleButton quickRetryToggle;
     [SerializeField] ToggleButton quickLaunchToggle;
     [Header("Camera Settings")]
-    [SerializeField] bool followPlayerEnabled = true;
     [SerializeField] ToggleButton followPlayerToggle;
     [SerializeField] CameraPan playerCameraPan;
     [Header("Quick Retry Swipe")]
@@ -67,7 +64,6 @@ public class Player : MonoBehaviour
         HideFinishTrailRenderer();
 
         hasStarted = true;
-        SyncToggleButtons();
         ApplyFollowPlayerSetting();
         EnterAiming(false);
     }
@@ -115,11 +111,11 @@ public class Player : MonoBehaviour
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.AddListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.AddListener(HideInWorldUiElements);
         EventManager.Instance.OnLevelLoadEvent.AddListener(EnterAimingAfterLevelLoad);
+        SubscribeToFollowPlayerToggle();
 
         if (hasStarted)
         {
             EnterAiming(false);
-            SyncToggleButtons();
             ApplyFollowPlayerSetting();
         }
     }
@@ -129,6 +125,7 @@ public class Player : MonoBehaviour
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.RemoveListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
         EventManager.Instance.OnLevelLoadEvent.RemoveListener(EnterAimingAfterLevelLoad);
+        UnsubscribeFromFollowPlayerToggle();
     }
 
     void UpdateAiming()
@@ -284,7 +281,7 @@ public class Player : MonoBehaviour
 
         HideFinishTrailRenderer();
 
-        if (allowQuickLaunch && quickLaunchEnabled)
+        if (allowQuickLaunch && IsQuickLaunchEnabled)
             Launch();
     }
 
@@ -360,7 +357,7 @@ public class Player : MonoBehaviour
         if (state != PlayerState.Playing)
             return;
 
-        if (quickRetryEnabled)
+        if (IsQuickRetryEnabled)
         {
             EnterAiming(true);
             return;
@@ -394,27 +391,28 @@ public class Player : MonoBehaviour
         EnterAiming(true);
     }
 
-    public void SetQuickRetryEnabled(bool isEnabled)
+    bool IsQuickRetryEnabled => quickRetryToggle != null && quickRetryToggle.IsOn;
+    bool IsQuickLaunchEnabled => quickLaunchToggle != null && quickLaunchToggle.IsOn;
+
+    void SubscribeToFollowPlayerToggle()
     {
-        quickRetryEnabled = isEnabled;
-        if (quickRetryToggle != null)
-            quickRetryToggle.SetIsOn(quickRetryEnabled);
+        if (followPlayerToggle == null)
+            return;
+
+        // Remove first so this remains safe if Unity enables the component more than once.
+        followPlayerToggle.ValueChanged -= OnFollowPlayerToggleValueChanged;
+        followPlayerToggle.ValueChanged += OnFollowPlayerToggleValueChanged;
     }
 
-    public void SetQuickLaunchEnabled(bool isEnabled)
+    void UnsubscribeFromFollowPlayerToggle()
     {
-        quickLaunchEnabled = isEnabled;
-        if (quickLaunchToggle != null)
-            quickLaunchToggle.SetIsOn(quickLaunchEnabled);
-    }
-
-    public void SetFollowPlayerEnabled(bool isEnabled)
-    {
-        followPlayerEnabled = isEnabled;
-        ApplyFollowPlayerSetting();
-
         if (followPlayerToggle != null)
-            followPlayerToggle.SetIsOn(followPlayerEnabled);
+            followPlayerToggle.ValueChanged -= OnFollowPlayerToggleValueChanged;
+    }
+
+    void OnFollowPlayerToggleValueChanged(bool _)
+    {
+        ApplyFollowPlayerSetting();
     }
 
     void ApplyFollowPlayerSetting()
@@ -425,16 +423,12 @@ public class Player : MonoBehaviour
             return;
         }
 
-        playerCameraPan.SetFollowTargetEnabled(followPlayerEnabled);
-    }
+        if (followPlayerToggle == null)
+        {
+            Debug.LogError("Player is missing its Follow Player Toggle reference.", this);
+            return;
+        }
 
-    void SyncToggleButtons()
-    {
-        if (quickRetryToggle != null)
-            quickRetryToggle.SetIsOn(quickRetryEnabled);
-        if (quickLaunchToggle != null)
-            quickLaunchToggle.SetIsOn(quickLaunchEnabled);
-        if (followPlayerToggle != null)
-            followPlayerToggle.SetIsOn(followPlayerEnabled);
+        playerCameraPan.SetFollowTargetEnabled(followPlayerToggle.IsOn);
     }
 }

@@ -38,8 +38,6 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
     [SerializeField] GameObject startLocationIcon;
-    [SerializeField] GameObject localTransformButton;
-    [SerializeField] GameObject worldTransformButton;
     [SerializeField] GameObject deselectObjectButton;
     [SerializeField] GameObject snapVerticalButton;
     [SerializeField] GameObject snapHorizontalButton;
@@ -56,6 +54,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject playerStartPoint;
 
     [Header("Screen Space UI")]
+    [SerializeField] ToggleButton worldTransformToggle;
     [SerializeField] SelectionControlsUI selectionControlsUI;
     [SerializeField] ScaleFromEdgeControlsUI scaleFromEdgeControlsUI;
     [SerializeField] RectTransform boxSelectionVisual;
@@ -69,7 +68,7 @@ public class LevelEditor : MonoBehaviour
     // same object preserves the previous snap target, while selecting another object
     // promotes this object to the last selected object.
     GameObject deselectedObjectAwaitingReplacement = null;
-    bool isWorldTransform = true;
+    bool IsWorldTransform => worldTransformToggle == null || worldTransformToggle.IsOn;
 
     // object selection
     const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
@@ -236,6 +235,9 @@ public class LevelEditor : MonoBehaviour
             return;
         }
 
+        if (worldTransformToggle == null)
+            Debug.LogError("LevelEditor is missing its World Transform Toggle reference. World transform mode will be used until it is assigned.", this);
+
         if (selectionControlsUI == null)
         {
             SelectionControlsUI[] availableControls = FindObjectsByType<SelectionControlsUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -289,8 +291,6 @@ public class LevelEditor : MonoBehaviour
 
         // ensure toggleable elements are at proper default show/hide
         deselectObjectButton.SetActive(false);
-        worldTransformButton.SetActive(true);
-        localTransformButton.SetActive(false);
         snapVerticalButton.SetActive(false);
         snapHorizontalButton.SetActive(false);
     }
@@ -1428,7 +1428,7 @@ public class LevelEditor : MonoBehaviour
         wasShiftModeHeldDuringMove = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
-        if (isWorldTransform)
+        if (IsWorldTransform)
         {
             moveIncrementOffset = Vector3.zero;
         }
@@ -1552,8 +1552,8 @@ public class LevelEditor : MonoBehaviour
         wasShiftModeHeldDuringMove = true;
         shiftMoveGuideOrigin = GetMoveIncrementAlignedPosition(selectedObject.transform.position);
 
-        shiftMoveGuideRight = isWorldTransform ? Vector3.right : selectedObject.transform.right;
-        shiftMoveGuideUp = isWorldTransform ? Vector3.up : selectedObject.transform.up;
+        shiftMoveGuideRight = IsWorldTransform ? Vector3.right : selectedObject.transform.right;
+        shiftMoveGuideUp = IsWorldTransform ? Vector3.up : selectedObject.transform.up;
         shiftMoveGuideRight.z = 0f;
         shiftMoveGuideUp.z = 0f;
         shiftMoveGuideRight.Normalize();
@@ -1636,7 +1636,7 @@ public class LevelEditor : MonoBehaviour
         Vector3 direction = pointerWorldPosition - selectedObject.transform.position;
         angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
-        rotationIncrementOffset = isWorldTransform
+        rotationIncrementOffset = IsWorldTransform
             ? 0f
             : selectedObjectRotationAtStartRotate - RoundToIncrement(selectedObjectRotationAtStartRotate, rotateIncrement);
         return true;
@@ -1652,7 +1652,7 @@ public class LevelEditor : MonoBehaviour
         float deltaAngle = currentAngleToPointer - angleToPointerAtStartRotate;
         float newRotation = RoundToIncrement(selectedObjectRotationAtStartRotate + deltaAngle, rotateIncrement);
 
-        if (!isWorldTransform)
+        if (!IsWorldTransform)
             newRotation += rotationIncrementOffset;
 
         selectedObject.transform.localRotation = Quaternion.Euler(0f, 0f, newRotation);
@@ -2110,19 +2110,4 @@ public class LevelEditor : MonoBehaviour
         UnselectObject();
     }
 
-    public void SwitchToLocalTransformMode()
-    {
-        // change to opposite button
-        worldTransformButton.SetActive(false);
-        localTransformButton.SetActive(true);
-        isWorldTransform = false;
-    }
-
-    public void SwitchToWorldTransformMode()
-    {
-        // change to opposite button
-        localTransformButton.SetActive(false);
-        worldTransformButton.SetActive(true);
-        isWorldTransform = true;
-    }
 }

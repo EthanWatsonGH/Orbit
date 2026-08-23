@@ -2371,6 +2371,10 @@ PrefabInstance:
       value: FollowPlayerToggleButton
       objectReference: {fileID: 0}
     - target: {fileID: 7434015931965237634, guid: 319f02970a1b1e74da78541c7ec489e7, type: 3}
+      propertyPath: isOn
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7434015931965237634, guid: 319f02970a1b1e74da78541c7ec489e7, type: 3}
       propertyPath: valueChangeRequested.m_PersistentCalls.m_Calls.Array.size
       value: 1
       objectReference: {fileID: 0}

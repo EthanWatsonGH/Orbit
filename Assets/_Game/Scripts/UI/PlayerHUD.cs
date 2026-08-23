@@ -21,21 +21,6 @@ public class PlayerHUD : MonoBehaviour
         player?.PressedRetry();
     }
 
-    public void SetQuickRetryEnabled(bool isEnabled)
-    {
-        player?.SetQuickRetryEnabled(isEnabled);
-    }
-
-    public void SetQuickLaunchEnabled(bool isEnabled)
-    {
-        player?.SetQuickLaunchEnabled(isEnabled);
-    }
-
-    public void SetFollowPlayerEnabled(bool isEnabled)
-    {
-        player?.SetFollowPlayerEnabled(isEnabled);
-    }
-
     public void SwitchToLevelEditor()
     {
         player?.SwitchToLevelEditor();
