@@ -13,7 +13,6 @@ public class SelectionControlsUI : MonoBehaviour
     Transform selectedTransform;
     RectTransform overlayRect;
     Canvas parentCanvas;
-    bool scaleHandlesFollowSelectionRotation;
     Quaternion scaleBothControlBaseRotation;
 
     void Awake()
@@ -44,11 +43,8 @@ public class SelectionControlsUI : MonoBehaviour
     public void SetControlAvailability(
         bool canDuplicate,
         bool canScaleBoth,
-        bool canRotate,
-        bool shouldRotateScaleHandles)
+        bool canRotate)
     {
-        scaleHandlesFollowSelectionRotation = shouldRotateScaleHandles;
-
         if (duplicateControl != null)
             duplicateControl.SetActive(canDuplicate);
         if (scaleBothControl != null)
@@ -116,9 +112,7 @@ public class SelectionControlsUI : MonoBehaviour
 
     void UpdateScaleHandleRotations()
     {
-        Quaternion selectedRotation = scaleHandlesFollowSelectionRotation
-            ? Quaternion.Euler(0f, 0f, selectedTransform.eulerAngles.z)
-            : Quaternion.identity;
+        Quaternion selectedRotation = Quaternion.Euler(0f, 0f, selectedTransform.eulerAngles.z);
 
         if (scaleBothControl != null)
             scaleBothControl.transform.localRotation = selectedRotation * scaleBothControlBaseRotation;

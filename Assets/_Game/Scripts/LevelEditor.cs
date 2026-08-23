@@ -8,6 +8,32 @@ public class LevelEditor : MonoBehaviour
     public const string TemporarySelectionGroupName = "SelectionGroup";
     public const string DuplicatingSelectionGroupName = "DuplicatingSelectionGroup";
 
+    public static bool IsRotationInvariantCircularObject(GameObject levelObject)
+    {
+        if (levelObject == null)
+            return false;
+
+        string objectName = levelObject.name;
+        return objectName.Contains("KillCircle") ||
+               objectName.Contains("Puller") ||
+               objectName.Contains("Pusher");
+    }
+
+    // These level objects are circular in both appearance and behavior. Their own
+    // rotation carries no information, so keep their serialized transform canonical.
+    // Do not call this while roots are parented under a temporary selection group.
+    public static void NormalizeRotationInvariantCircularObjectRotations(Transform root)
+    {
+        if (root == null)
+            return;
+
+        if (IsRotationInvariantCircularObject(root.gameObject))
+            root.localRotation = Quaternion.identity;
+
+        foreach (Transform child in root)
+            NormalizeRotationInvariantCircularObjectRotations(child);
+    }
+
     // self object references
     [SerializeField] Rigidbody2D rb;
     [SerializeField] GameObject prefabToPlace;
@@ -111,14 +137,11 @@ public class LevelEditor : MonoBehaviour
         public bool canScaleHorizontally;
         public bool canScaleVertically;
         public bool canRotate;
-        public bool scaleHandlesFollowSelectionRotation;
 
         public static SelectionControlAvailability ForObject(GameObject levelObject)
         {
             bool isPlayerStartPoint = levelObject.name == "PlayerStartPoint";
-            bool isPuller = levelObject.name.Contains("Puller");
-            bool isKillCircle = levelObject.name.Contains("KillCircle");
-            bool supportsIndependentScaleAndRotation = !isPlayerStartPoint && !isPuller && !isKillCircle;
+            bool supportsIndependentScaleAndRotation = !isPlayerStartPoint && !IsRotationInvariantCircularObject(levelObject);
 
             return new SelectionControlAvailability
             {
@@ -126,8 +149,7 @@ public class LevelEditor : MonoBehaviour
                 canScaleBoth = !isPlayerStartPoint,
                 canScaleHorizontally = supportsIndependentScaleAndRotation,
                 canScaleVertically = supportsIndependentScaleAndRotation,
-                canRotate = supportsIndependentScaleAndRotation,
-                scaleHandlesFollowSelectionRotation = supportsIndependentScaleAndRotation
+                canRotate = supportsIndependentScaleAndRotation
             };
         }
 
@@ -138,7 +160,6 @@ public class LevelEditor : MonoBehaviour
             canScaleHorizontally &= other.canScaleHorizontally;
             canScaleVertically &= other.canScaleVertically;
             canRotate &= other.canRotate;
-            scaleHandlesFollowSelectionRotation &= other.scaleHandlesFollowSelectionRotation;
         }
     }
 
@@ -232,6 +253,11 @@ public class LevelEditor : MonoBehaviour
 
         if (scaleFromEdgeControlsUI != null)
             scaleFromEdgeControlsUI.Initialize(this);
+
+        // Scene-authored levels do not necessarily pass through LevelManager's load
+        // path, so canonicalize their existing circular roots here as well.
+        if (levelObjectsCollection != null)
+            NormalizeRotationInvariantCircularObjectRotations(levelObjectsCollection.transform);
 
         if (boxSelectionVisual != null)
         {
@@ -921,6 +947,7 @@ public class LevelEditor : MonoBehaviour
                 ? member.originalParent
                 : levelObjectsCollection.transform;
             member.gameObject.transform.SetParent(parentToRestore, true);
+            NormalizeRotationInvariantCircularObjectRotations(member.gameObject.transform);
 
             if (member.originalParent != null)
             {
@@ -1130,8 +1157,7 @@ public class LevelEditor : MonoBehaviour
         selectionControlsUI.SetControlAvailability(
             availability.canDuplicate,
             availability.canScaleBoth,
-            availability.canRotate,
-            availability.scaleHandlesFollowSelectionRotation);
+            availability.canRotate);
 
         if (scaleFromEdgeControlsUI != null)
         {
@@ -1186,7 +1212,6 @@ public class LevelEditor : MonoBehaviour
             availability.canScaleHorizontally = false;
             availability.canScaleVertically = false;
             availability.canRotate = true;
-            availability.scaleHandlesFollowSelectionRotation = true;
         }
 
         return true;
@@ -1424,6 +1449,9 @@ public class LevelEditor : MonoBehaviour
 
         isTryingToMoveSelectedObject = false;
 
+        if (selectedObject != null && selectedObject != selectionGroup)
+            NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
+
         if (selectedObject != null &&
             pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
         {
@@ -1488,6 +1516,9 @@ public class LevelEditor : MonoBehaviour
     {
         rotationLine.gameObject.SetActive(false);
         isTryingToRotateSelectedObject = false;
+
+        if (selectedObject != null && selectedObject != selectionGroup)
+            NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
     }
 
     void BeginScaleSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
@@ -1814,6 +1845,9 @@ public class LevelEditor : MonoBehaviour
         isScalingFromEdge = false;
         horizontalLine.gameObject.SetActive(false);
         verticalLine.gameObject.SetActive(false);
+
+        if (selectedObject != null && selectedObject != selectionGroup)
+            NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
     }
 
     void RefreshSelectionControls()

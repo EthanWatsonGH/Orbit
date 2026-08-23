@@ -526,6 +526,7 @@ public class LevelManager : MonoBehaviour
 
     void FinishLoadingLevel()
     {
+        LevelEditor.NormalizeRotationInvariantCircularObjectRotations(levelObjectsContainer.transform);
         EventManager.Instance.RecenterCamera();
         EventManager.Instance.OnLevelLoad();
         Debug.Log("Loaded level.");
