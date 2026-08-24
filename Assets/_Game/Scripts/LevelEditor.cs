@@ -5,8 +5,6 @@ using UnityEngine.UI;
 
 public class LevelEditor : MonoBehaviour
 {
-    public const string TemporarySelectionGroupName = "SelectionGroup";
-    public const string DuplicatingSelectionGroupName = "DuplicatingSelectionGroup";
 
     public static bool IsRotationInvariantCircularObject(GameObject levelObject)
     {
@@ -21,7 +19,6 @@ public class LevelEditor : MonoBehaviour
 
     // These level objects are circular in both appearance and behavior. Their own
     // rotation carries no information, so keep their serialized transform canonical.
-    // Do not call this while roots are parented under a temporary selection group.
     public static void NormalizeRotationInvariantCircularObjectRotations(Transform root)
     {
         if (root == null)
@@ -71,13 +68,14 @@ public class LevelEditor : MonoBehaviour
     GameObject deselectedObjectAwaitingReplacement = null;
     bool IsWorldTransform => worldTransformToggle == null || worldTransformToggle.IsOn;
     bool IsSelectedPersistentGroup => IsPersistentGroup(selectedObject);
-    bool IsSelectedGroup => selectionGroup != null || IsSelectedPersistentGroup;
+    bool HasMultipleSelection => selectedSelectionRoots.Count > 1;
+    bool IsSelectedGroup => HasMultipleSelection || IsSelectedPersistentGroup;
 
     // object selection
     const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
     bool hasSelectionDragExceededThreshold = false;
-    GameObject selectionGroup;
-    readonly List<TemporarySelectionMember> temporarySelectionMembers = new List<TemporarySelectionMember>();
+    readonly List<Transform> selectedSelectionRoots = new List<Transform>();
+    GameObject selectionPivot;
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
     bool isSelectionSuspendedForSave;
@@ -86,11 +84,12 @@ public class LevelEditor : MonoBehaviour
     Canvas boxSelectionCanvas;
     RectTransform boxSelectionVisualParent;
 
-    struct TemporarySelectionMember
+    struct SelectionTransformState
     {
-        public GameObject gameObject;
-        public Transform originalParent;
-        public int originalSiblingIndex;
+        public Transform transform;
+        public Vector3 worldPosition;
+        public Quaternion worldRotation;
+        public Vector3 localScale;
     }
 
     public struct ScaleFromEdgeFrame
@@ -203,6 +202,7 @@ public class LevelEditor : MonoBehaviour
     Vector3 moveOffset;
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
+    readonly List<SelectionTransformState> activeSelectionTransformStates = new List<SelectionTransformState>();
     float moveIncrement = 0f;
     Vector3 moveIncrementOffset = new Vector3(0f, 0f, 0f);
     bool wasShiftModeHeldDuringMove;
@@ -214,6 +214,8 @@ public class LevelEditor : MonoBehaviour
     // object rotation
     float selectedObjectRotationAtStartRotate;
     float angleToPointerAtStartRotate;
+    Quaternion selectionPivotRotationAtStartRotate;
+    Vector3 selectionPivotPositionAtStartRotate;
     float rotateIncrement = 0f;
     float rotationIncrementOffset = 0f;
 
@@ -379,7 +381,10 @@ public class LevelEditor : MonoBehaviour
     {
         if (selectedObject != null && lastSelectedObject != null && selectedObject != lastSelectedObject)
         {
-            selectedObject.transform.position = new Vector3(lastSelectedObject.transform.position.x, selectedObject.transform.position.y, 0f);
+            Vector3 oldPosition = selectedObject.transform.position;
+            Vector3 newPosition = new Vector3(lastSelectedObject.transform.position.x, oldPosition.y, 0f);
+            selectedObject.transform.position = newPosition;
+            MoveMultipleSelectionRootsBy(newPosition - oldPosition);
         }
     }
 
@@ -387,7 +392,10 @@ public class LevelEditor : MonoBehaviour
     {
         if (selectedObject != null && lastSelectedObject != null && selectedObject != lastSelectedObject)
         {
-            selectedObject.transform.position = new Vector3(selectedObject.transform.position.x, lastSelectedObject.transform.position.y, 0f);
+            Vector3 oldPosition = selectedObject.transform.position;
+            Vector3 newPosition = new Vector3(oldPosition.x, lastSelectedObject.transform.position.y, 0f);
+            selectedObject.transform.position = newPosition;
+            MoveMultipleSelectionRootsBy(newPosition - oldPosition);
         }
     }
 
@@ -516,8 +524,18 @@ public class LevelEditor : MonoBehaviour
 
     void SelectObject(GameObject objectToSelect, bool rememberPreviousSelection = true)
     {
-        if (selectionGroup != null && objectToSelect != selectionGroup)
+        if (objectToSelect == null)
+        {
             UnselectObject();
+            return;
+        }
+
+        if (HasMultipleSelection)
+            UnselectObject();
+
+        ClearSelectedSelectionRoots();
+        DestroySelectionPivot();
+        selectedSelectionRoots.Add(objectToSelect.transform);
 
         SetSelectedObject(objectToSelect, rememberPreviousSelection);
 
@@ -525,8 +543,6 @@ public class LevelEditor : MonoBehaviour
             selectionControlsUI.SetSelectedTransform(selectedObject.transform);
     }
 
-    // Box selection will use this entry point once it can collect its matching objects. A
-    // temporary Group is an editor helper only: it is dissolved before saving or deselecting.
     public void SelectObjects(IEnumerable<GameObject> objectsToSelect)
     {
         List<Transform> selectionRoots = GetSelectionRoots(objectsToSelect);
@@ -543,7 +559,7 @@ public class LevelEditor : MonoBehaviour
             return;
         }
 
-        CreateTemporarySelectionGroup(selectionRoots);
+        SelectMultipleObjects(selectionRoots);
         ConfigureSelectionControlsForSelectedObject();
     }
 
@@ -573,17 +589,10 @@ public class LevelEditor : MonoBehaviour
         }
 
         List<GameObject> combinedSelection = new List<GameObject>();
-        if (selectionGroup != null)
+        foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            foreach (TemporarySelectionMember member in temporarySelectionMembers)
-            {
-                if (member.gameObject != null)
-                    combinedSelection.Add(member.gameObject);
-            }
-        }
-        else if (selectedObject != null)
-        {
-            combinedSelection.Add(selectedObject);
+            if (selectionRoot != null)
+                combinedSelection.Add(selectionRoot.gameObject);
         }
 
         foreach (Transform selectionRoot in rootsToAdd)
@@ -604,26 +613,15 @@ public class LevelEditor : MonoBehaviour
         List<GameObject> remainingSelection = new List<GameObject>();
         bool removedAnObject = false;
 
-        if (selectionGroup != null)
+        foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            foreach (TemporarySelectionMember member in temporarySelectionMembers)
-            {
-                if (member.gameObject == null)
-                    continue;
+            if (selectionRoot == null)
+                continue;
 
-                if (IsSelectionRootIncludedIn(rootsToRemove, member.gameObject.transform))
-                    removedAnObject = true;
-                else
-                    remainingSelection.Add(member.gameObject);
-            }
-        }
-        else if (IsSelectionRootIncludedIn(rootsToRemove, selectedObject.transform))
-        {
-            removedAnObject = true;
-        }
-        else
-        {
-            remainingSelection.Add(selectedObject);
+            if (IsSelectionRootIncludedIn(rootsToRemove, selectionRoot))
+                removedAnObject = true;
+            else
+                remainingSelection.Add(selectionRoot.gameObject);
         }
 
         if (removedAnObject)
@@ -707,27 +705,19 @@ public class LevelEditor : MonoBehaviour
                (levelObjectsCollection != null && candidate.IsChildOf(levelObjectsCollection.transform));
     }
 
-    void CreateTemporarySelectionGroup(List<Transform> selectionRoots)
+    void SelectMultipleObjects(List<Transform> selectionRoots)
     {
-        selectionGroup = new GameObject(TemporarySelectionGroupName);
-        selectionGroup.transform.SetParent(levelObjectsCollection.transform, false);
-        selectionGroup.transform.position = GetSelectionPivot(selectionRoots);
-        selectionGroup.transform.rotation = Quaternion.identity;
-        selectionGroup.transform.localScale = Vector3.one;
-
-        temporarySelectionMembers.Clear();
+        EnsureSelectionPivot();
+        selectedSelectionRoots.Clear();
         foreach (Transform selectionRoot in selectionRoots)
-        {
-            temporarySelectionMembers.Add(new TemporarySelectionMember
-            {
-                gameObject = selectionRoot.gameObject,
-                originalParent = selectionRoot.parent,
-                originalSiblingIndex = selectionRoot.GetSiblingIndex()
-            });
-            selectionRoot.SetParent(selectionGroup.transform, true);
-        }
+            selectedSelectionRoots.Add(selectionRoot);
 
-        SelectObject(selectionGroup, false);
+        selectionPivot.transform.SetPositionAndRotation(GetSelectionPivot(selectionRoots), Quaternion.identity);
+        selectionPivot.transform.localScale = Vector3.one;
+
+        // The pivot is editor-only: it presents the shared controls and transform
+        // origin without becoming part of the level hierarchy.
+        SetSelectedObject(selectionPivot, false);
     }
 
     public void CreatePersistentGroup()
@@ -735,19 +725,55 @@ public class LevelEditor : MonoBehaviour
         if (activeTransform != ActiveTransform.None || !CanCreatePersistentGroup())
             return;
 
-        // The temporary wrapper already owns the selected objects at the correct pivot
-        // and preserves their world transforms, so making it persistent is just a change
-        // of ownership: do not dissolve it or reparent its members.
-        selectionGroup.name = LevelManager.GroupObjectType;
-        selectionGroup = null;
-        temporarySelectionMembers.Clear();
+        // Multi-selection never changes the level hierarchy. Grouping is the one
+        // deliberate hierarchy operation: create a real Group at the selection pivot
+        // and reparent the selected roots while preserving their world transforms.
+        GameObject persistentGroup = new GameObject(LevelManager.GroupObjectType);
+        persistentGroup.transform.SetParent(levelObjectsCollection.transform, false);
+        persistentGroup.transform.SetPositionAndRotation(selectionPivot.transform.position, selectionPivot.transform.rotation);
+        persistentGroup.transform.localScale = selectionPivot.transform.localScale;
+
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot != null)
+                selectionRoot.SetParent(persistentGroup.transform, true);
+        }
+
+        ClearSelectedSelectionRoots();
+        DestroySelectionPivot();
+        selectedSelectionRoots.Add(persistentGroup.transform);
+        SetSelectedObject(persistentGroup, false);
 
         ConfigureSelectionControlsForSelectedObject();
     }
 
     bool CanCreatePersistentGroup()
     {
-        return selectionGroup != null && temporarySelectionMembers.Count > 1;
+        return HasMultipleSelection;
+    }
+
+    void EnsureSelectionPivot()
+    {
+        if (selectionPivot != null)
+            return;
+
+        selectionPivot = new GameObject("EditorSelectionPivot");
+        selectionPivot.hideFlags = HideFlags.HideInHierarchy;
+        selectionPivot.transform.SetParent(transform, false);
+    }
+
+    void DestroySelectionPivot()
+    {
+        if (selectionPivot == null)
+            return;
+
+        Destroy(selectionPivot);
+        selectionPivot = null;
+    }
+
+    void ClearSelectedSelectionRoots()
+    {
+        selectedSelectionRoots.Clear();
     }
 
     static bool IsPersistentGroup(GameObject levelObject)
@@ -909,13 +935,12 @@ public class LevelEditor : MonoBehaviour
     {
         CancelActiveTransform();
 
-        // A save may have temporarily flattened a selection group. Its snapshot belongs
-        // to SuspendSelectionForSave/RestoreSelectionAfterSave, not normal deselection.
-        bool wasTemporarySelectionGroup = selectionGroup != null;
-        if (wasTemporarySelectionGroup)
-            DissolveTemporarySelectionGroup();
-
-        SetSelectedObject(null, !wasTemporarySelectionGroup);
+        // A multi-selection is editor-only data, so deselecting simply discards that
+        // data. It never needs to repair the level hierarchy.
+        bool wasMultipleSelection = HasMultipleSelection;
+        ClearSelectedSelectionRoots();
+        DestroySelectionPivot();
+        SetSelectedObject(null, !wasMultipleSelection);
 
         HideSelectionControls();
     }
@@ -969,47 +994,6 @@ public class LevelEditor : MonoBehaviour
     {
         isSelectionSuspendedForSave = false;
         suspendedSelectionObjects.Clear();
-    }
-
-    void DissolveTemporarySelectionGroup()
-    {
-        temporarySelectionMembers.Sort((first, second) =>
-        {
-            int firstParentId = first.originalParent != null ? first.originalParent.GetInstanceID() : int.MinValue;
-            int secondParentId = second.originalParent != null ? second.originalParent.GetInstanceID() : int.MinValue;
-            int parentComparison = firstParentId.CompareTo(secondParentId);
-            if (parentComparison != 0)
-                return parentComparison;
-
-            return first.originalSiblingIndex.CompareTo(second.originalSiblingIndex);
-        });
-
-        foreach (TemporarySelectionMember member in temporarySelectionMembers)
-        {
-            if (member.gameObject == null)
-                continue;
-
-            Transform parentToRestore = member.originalParent != null
-                ? member.originalParent
-                : levelObjectsCollection.transform;
-            member.gameObject.transform.SetParent(parentToRestore, true);
-            NormalizeRotationInvariantCircularObjectRotations(member.gameObject.transform);
-
-            if (member.originalParent != null)
-            {
-                int siblingIndex = Mathf.Min(member.originalSiblingIndex, parentToRestore.childCount - 1);
-                member.gameObject.transform.SetSiblingIndex(siblingIndex);
-            }
-        }
-
-        temporarySelectionMembers.Clear();
-
-        if (selectionGroup != null)
-        {
-            selectionGroup.transform.SetParent(null);
-            Destroy(selectionGroup);
-            selectionGroup = null;
-        }
     }
 
     bool IsAddSelectionModifierHeld()
@@ -1102,21 +1086,14 @@ public class LevelEditor : MonoBehaviour
             return;
 
         suspendedSelectionObjects.Clear();
-        if (selectionGroup != null)
+        foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            foreach (TemporarySelectionMember member in temporarySelectionMembers)
-            {
-                if (member.gameObject != null)
-                    suspendedSelectionObjects.Add(member.gameObject);
-            }
-
-            DissolveTemporarySelectionGroup();
-        }
-        else if (selectedObject != null)
-        {
-            suspendedSelectionObjects.Add(selectedObject);
+            if (selectionRoot != null)
+                suspendedSelectionObjects.Add(selectionRoot.gameObject);
         }
 
+        ClearSelectedSelectionRoots();
+        DestroySelectionPivot();
         SetSelectedObject(null, false);
         HideSelectionControls();
         isSelectionSuspendedForSave = suspendedSelectionObjects.Count > 0;
@@ -1143,25 +1120,17 @@ public class LevelEditor : MonoBehaviour
         SelectObjects(objectsToRestore);
     }
 
-    // UIManager calls this before it disables the editor. The temporary wrapper itself
-    // is not kept; only its selected roots are remembered, so OnDisable can safely
-    // dissolve the wrapper as usual.
+    // UIManager calls this before it disables the editor. Only real selected roots
+    // are remembered; the editor-only selection pivot is recreated when returning.
     public void RememberStateBeforeLeavingEditor()
     {
         CancelSuspendedSelectionRestore();
         selectionObjectsBeforeLeavingEditor.Clear();
 
-        if (selectionGroup != null)
+        foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            foreach (TemporarySelectionMember member in temporarySelectionMembers)
-            {
-                if (member.gameObject != null)
-                    selectionObjectsBeforeLeavingEditor.Add(member.gameObject);
-            }
-        }
-        else if (selectedObject != null)
-        {
-            selectionObjectsBeforeLeavingEditor.Add(selectedObject);
+            if (selectionRoot != null)
+                selectionObjectsBeforeLeavingEditor.Add(selectionRoot.gameObject);
         }
 
         levelRevisionWhenEditorWasLeft = LevelManager.Instance != null
@@ -1223,14 +1192,14 @@ public class LevelEditor : MonoBehaviour
             return false;
 
         bool hasSelectionMember = false;
-        if (selectionGroup != null)
+        if (HasMultipleSelection)
         {
-            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            foreach (Transform selectionRoot in selectedSelectionRoots)
             {
-                if (member.gameObject == null)
+                if (selectionRoot == null)
                     continue;
 
-                SelectionControlAvailability memberAvailability = SelectionControlAvailability.ForObject(member.gameObject);
+                SelectionControlAvailability memberAvailability = SelectionControlAvailability.ForObject(selectionRoot.gameObject);
                 if (hasSelectionMember)
                     availability.IntersectWith(memberAvailability);
                 else
@@ -1262,10 +1231,10 @@ public class LevelEditor : MonoBehaviour
         if (!hasSelectionMember)
             return false;
 
-        // Rotation here affects the temporary selection wrapper, not one member's
+        // Rotation affects the shared editor-only pivot rather than one member's
         // individual transform. That remains valid for circles and other roots that
         // intentionally hide their individual rotate control.
-        if (selectionGroup != null)
+        if (HasMultipleSelection)
         {
             // Groups scale uniformly from their corners. Independent edge scaling is
             // intentionally limited to one selected object, where the affected axis
@@ -1458,19 +1427,13 @@ public class LevelEditor : MonoBehaviour
 
         if (control == ObjectTransformControl.Duplicate)
         {
-            if (selectedObject == selectionGroup)
-                DuplicateTemporarySelectionGroup();
-            else
-            {
-                SelectObject(Instantiate(selectedObject, levelObjectsCollection.transform));
-                selectedObject.transform.name = selectedObject.transform.name.Replace("(Clone)", "");
-            }
-
+            DuplicateSelectedObjects();
             ConfigureSelectionControlsForSelectedObject();
         }
 
         activeMoveControl = control;
         selectedObjectPositionAtStartMove = selectedObject.transform.position;
+        CaptureSelectionTransformStates();
         wasShiftModeHeldDuringMove = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
@@ -1490,34 +1453,38 @@ public class LevelEditor : MonoBehaviour
         return true;
     }
 
-    void DuplicateTemporarySelectionGroup()
+    void DuplicateSelectedObjects()
     {
-        GameObject originalSelectionGroup = selectionGroup;
-        GameObject duplicatedSelectionGroup = Instantiate(originalSelectionGroup, levelObjectsCollection.transform);
-        duplicatedSelectionGroup.name = DuplicatingSelectionGroupName;
-
-        // The original objects become normal level objects again. The clone takes over
-        // as the temporary selection group that the duplicate drag will move.
-        DissolveTemporarySelectionGroup();
-
-        selectionGroup = duplicatedSelectionGroup;
-        temporarySelectionMembers.Clear();
-
-        int firstSiblingIndex = duplicatedSelectionGroup.transform.GetSiblingIndex();
-        int childIndex = 0;
-        foreach (Transform duplicatedChild in duplicatedSelectionGroup.transform)
+        List<GameObject> duplicates = new List<GameObject>(selectedSelectionRoots.Count);
+        foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            temporarySelectionMembers.Add(new TemporarySelectionMember
-            {
-                gameObject = duplicatedChild.gameObject,
-                originalParent = levelObjectsCollection.transform,
-                originalSiblingIndex = firstSiblingIndex + childIndex
-            });
-            childIndex++;
+            if (selectionRoot == null)
+                continue;
+
+            GameObject duplicate = Instantiate(selectionRoot.gameObject, selectionRoot.parent);
+            duplicate.name = duplicate.name.Replace("(Clone)", "");
+            duplicates.Add(duplicate);
         }
 
-        duplicatedSelectionGroup.name = TemporarySelectionGroupName;
-        SetSelectedObject(duplicatedSelectionGroup, false);
+        SelectObjects(duplicates);
+    }
+
+    void CaptureSelectionTransformStates()
+    {
+        activeSelectionTransformStates.Clear();
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot == null)
+                continue;
+
+            activeSelectionTransformStates.Add(new SelectionTransformState
+            {
+                transform = selectionRoot,
+                worldPosition = selectionRoot.position,
+                worldRotation = selectionRoot.rotation,
+                localScale = selectionRoot.localScale
+            });
+        }
     }
 
     void UpdateMoveSelectedObject(Vector3 pointerWorldPosition, float dragDistancePixels)
@@ -1541,13 +1508,54 @@ public class LevelEditor : MonoBehaviour
 
         UpdateShiftMoveGuides(ref desiredPosition);
         selectedObject.transform.position = desiredPosition;
+        ApplyMoveToSelectedRoots(desiredPosition - selectedObjectPositionAtStartMove);
 
-        bool canDeleteSelectedObject = !selectedObject.name.Equals("PlayerStartPoint");
-        if (pointerIsOverObjectSelectionBar && canDeleteSelectedObject)
-            selectedObject.SetActive(false);
-        else
-            selectedObject.SetActive(true);
+        SetSelectedRootsActive(!pointerIsOverObjectSelectionBar || !CanDeleteSelectedRoots());
 
+    }
+
+    void ApplyMoveToSelectedRoots(Vector3 movement)
+    {
+        if (!HasMultipleSelection)
+            return;
+
+        foreach (SelectionTransformState state in activeSelectionTransformStates)
+        {
+            if (state.transform != null)
+                state.transform.position = state.worldPosition + movement;
+        }
+    }
+
+    void MoveMultipleSelectionRootsBy(Vector3 movement)
+    {
+        if (!HasMultipleSelection)
+            return;
+
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot != null)
+                selectionRoot.position += movement;
+        }
+    }
+
+    bool CanDeleteSelectedRoots()
+    {
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot != null && selectionRoot.name == "PlayerStartPoint")
+                return false;
+        }
+
+        return selectedSelectionRoots.Count > 0;
+    }
+
+    void SetSelectedRootsActive(bool active)
+    {
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot != null)
+                selectionRoot.gameObject.SetActive(active);
+        }
     }
 
     void UpdateShiftMoveGuides(ref Vector3 desiredPosition)
@@ -1636,16 +1644,16 @@ public class LevelEditor : MonoBehaviour
         wasShiftModeHeldDuringMove = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
-        if (selectedObject != null && selectedObject != selectionGroup)
-            NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
+        NormalizeSelectedRootRotations();
 
         if (deleteMovedObject && selectedObject != null &&
-            pointerIsOverObjectSelectionBar && !selectedObject.name.Equals("PlayerStartPoint"))
+            pointerIsOverObjectSelectionBar && CanDeleteSelectedRoots())
         {
-            if (selectedObject == selectionGroup)
-                DeleteTemporarySelectionGroup();
-            else
-                Destroy(selectedObject);
+            foreach (Transform selectionRoot in selectedSelectionRoots)
+            {
+                if (selectionRoot != null)
+                    Destroy(selectionRoot.gameObject);
+            }
 
             UnselectObject();
             deselectObjectButton.gameObject.SetActive(false);
@@ -1654,17 +1662,17 @@ public class LevelEditor : MonoBehaviour
         {
             // A cancelled move must not leave an object hidden merely because the
             // pointer last passed over the delete area.
-            selectedObject.SetActive(true);
+            SetSelectedRootsActive(true);
         }
     }
 
-    void DeleteTemporarySelectionGroup()
+    void NormalizeSelectedRootRotations()
     {
-        temporarySelectionMembers.Clear();
-
-        GameObject temporaryGroupToDelete = selectionGroup;
-        selectionGroup = null;
-        Destroy(temporaryGroupToDelete);
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot != null)
+                NormalizeRotationInvariantCircularObjectRotations(selectionRoot);
+        }
     }
 
     bool TryBeginRotateSelectedObject(Vector2 screenPosition)
@@ -1679,6 +1687,9 @@ public class LevelEditor : MonoBehaviour
         rotationLine.SetPosition(0, selectedObject.transform.position);
 
         selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
+        selectionPivotRotationAtStartRotate = selectedObject.transform.rotation;
+        selectionPivotPositionAtStartRotate = selectedObject.transform.position;
+        CaptureSelectionTransformStates();
         Vector3 direction = pointerWorldPosition - selectedObject.transform.position;
         angleToPointerAtStartRotate = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
@@ -1702,15 +1713,32 @@ public class LevelEditor : MonoBehaviour
             newRotation += rotationIncrementOffset;
 
         selectedObject.transform.localRotation = Quaternion.Euler(0f, 0f, newRotation);
+        ApplyRotationToSelectedRoots();
         rotationLine.SetPosition(1, pointerWorldPosition);
+    }
+
+    void ApplyRotationToSelectedRoots()
+    {
+        if (!HasMultipleSelection)
+            return;
+
+        Quaternion rotationDelta = selectedObject.transform.rotation * Quaternion.Inverse(selectionPivotRotationAtStartRotate);
+        foreach (SelectionTransformState state in activeSelectionTransformStates)
+        {
+            if (state.transform == null)
+                continue;
+
+            state.transform.position = selectionPivotPositionAtStartRotate +
+                                       rotationDelta * (state.worldPosition - selectionPivotPositionAtStartRotate);
+            state.transform.rotation = rotationDelta * state.worldRotation;
+        }
     }
 
     void EndRotateSelectedObject()
     {
         rotationLine.gameObject.SetActive(false);
 
-        if (selectedObject != null && selectedObject != selectionGroup)
-            NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
+        NormalizeSelectedRootRotations();
     }
 
     bool TryBeginScaleFromEdgeSelectedObject(ScaleFromEdgeHandle handle, Vector2 screenPosition)
@@ -1830,6 +1858,34 @@ public class LevelEditor : MonoBehaviour
         }
 
         selectedObject.transform.position = newPosition;
+        ApplyScaleToSelectedRoots(gesture, xFactor, yFactor, newPosition);
+    }
+
+    void ApplyScaleToSelectedRoots(
+        ScaleFromEdgeGesture gesture,
+        float xFactor,
+        float yFactor,
+        Vector3 newSelectionPivotPosition)
+    {
+        if (!HasMultipleSelection)
+            return;
+
+        foreach (SelectionTransformState state in activeSelectionTransformStates)
+        {
+            if (state.transform == null)
+                continue;
+
+            Vector3 offsetFromPivot = state.worldPosition - gesture.selectedWorldPositionAtStart;
+            float x = Vector3.Dot(offsetFromPivot, gesture.frameAtStart.right);
+            float y = Vector3.Dot(offsetFromPivot, gesture.frameAtStart.up);
+            state.transform.position = newSelectionPivotPosition +
+                                       gesture.frameAtStart.right * (x * xFactor) +
+                                       gesture.frameAtStart.up * (y * yFactor);
+            state.transform.localScale = new Vector3(
+                state.localScale.x * xFactor,
+                state.localScale.y * yFactor,
+                state.localScale.z);
+        }
     }
 
     void ConfigureScaleFromEdgeGesture(
@@ -1849,6 +1905,7 @@ public class LevelEditor : MonoBehaviour
             selectedWorldPositionAtStart = selectedObject.transform.position,
             pointerWorldPositionAtStart = pointerWorldPositionAtStart
         };
+        CaptureSelectionTransformStates();
         GetScaleFactorLimits(
             activeScaleFromEdgeGesture.selectedLocalScaleAtStart,
             out activeScaleFromEdgeGesture.minimumXFactor,
@@ -1922,12 +1979,12 @@ public class LevelEditor : MonoBehaviour
 
     IEnumerable<Transform> GetScaleConstraintTransforms()
     {
-        if (selectionGroup != null)
+        if (HasMultipleSelection)
         {
-            foreach (TemporarySelectionMember member in temporarySelectionMembers)
+            foreach (Transform selectionRoot in selectedSelectionRoots)
             {
-                if (member.gameObject != null)
-                    yield return member.gameObject.transform;
+                if (selectionRoot != null)
+                    yield return selectionRoot;
             }
 
             yield break;
@@ -1995,8 +2052,7 @@ public class LevelEditor : MonoBehaviour
 
     void EndScaleSelectedObject()
     {
-        if (selectedObject != null && selectedObject != selectionGroup)
-            NormalizeRotationInvariantCircularObjectRotations(selectedObject.transform);
+        NormalizeSelectedRootRotations();
     }
 
     void RefreshSelectionControls()

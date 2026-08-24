@@ -177,12 +177,6 @@ public class LevelManager : MonoBehaviour
         foreach (Transform childTransform in parentTransform)
         {
             string type = GetLevelObjectType(childTransform);
-            if (IsTemporarySelectionGroupType(type))
-            {
-                Debug.LogError("Level could not be saved because a temporary selection group was still present. Deselect the objects and try again.", childTransform);
-                return false;
-            }
-
             if (!IsSupportedLevelObjectType(type))
             {
                 Debug.LogError("Level could not be saved because '" + childTransform.name + "' is not a recognized level object or Group.", childTransform);
@@ -206,12 +200,6 @@ public class LevelManager : MonoBehaviour
         }
 
         return true;
-    }
-
-    static bool IsTemporarySelectionGroupType(string type)
-    {
-        return type == LevelEditor.TemporarySelectionGroupName ||
-               type == LevelEditor.DuplicatingSelectionGroupName;
     }
 
     static string GetLevelObjectType(Transform levelObjectTransform)
