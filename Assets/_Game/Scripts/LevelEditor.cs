@@ -41,6 +41,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject deselectObjectButton;
     [SerializeField] GameObject snapVerticalButton;
     [SerializeField] GameObject snapHorizontalButton;
+    [SerializeField] GameObject createPersistentGroupButton;
     [SerializeField] LineRenderer verticalLine;
     [SerializeField] LineRenderer horizontalLine;
     [SerializeField] LineRenderer rotationLine;
@@ -69,6 +70,8 @@ public class LevelEditor : MonoBehaviour
     // promotes this object to the last selected object.
     GameObject deselectedObjectAwaitingReplacement = null;
     bool IsWorldTransform => worldTransformToggle == null || worldTransformToggle.IsOn;
+    bool IsSelectedPersistentGroup => IsPersistentGroup(selectedObject);
+    bool IsSelectedGroup => selectionGroup != null || IsSelectedPersistentGroup;
 
     // object selection
     const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
@@ -293,6 +296,8 @@ public class LevelEditor : MonoBehaviour
         deselectObjectButton.SetActive(false);
         snapVerticalButton.SetActive(false);
         snapHorizontalButton.SetActive(false);
+        if (createPersistentGroupButton != null)
+            createPersistentGroupButton.SetActive(false);
     }
 
     void Start()
@@ -725,6 +730,31 @@ public class LevelEditor : MonoBehaviour
         SelectObject(selectionGroup, false);
     }
 
+    public void CreatePersistentGroup()
+    {
+        if (activeTransform != ActiveTransform.None || !CanCreatePersistentGroup())
+            return;
+
+        // The temporary wrapper already owns the selected objects at the correct pivot
+        // and preserves their world transforms, so making it persistent is just a change
+        // of ownership: do not dissolve it or reparent its members.
+        selectionGroup.name = LevelManager.GroupObjectType;
+        selectionGroup = null;
+        temporarySelectionMembers.Clear();
+
+        ConfigureSelectionControlsForSelectedObject();
+    }
+
+    bool CanCreatePersistentGroup()
+    {
+        return selectionGroup != null && temporarySelectionMembers.Count > 1;
+    }
+
+    static bool IsPersistentGroup(GameObject levelObject)
+    {
+        return levelObject != null && levelObject.name == LevelManager.GroupObjectType;
+    }
+
     Vector3 GetSelectionPivot(List<Transform> selectionRoots)
     {
         Vector3 averagePosition = Vector3.zero;
@@ -1061,6 +1091,9 @@ public class LevelEditor : MonoBehaviour
 
         if (scaleFromEdgeControlsUI != null)
             scaleFromEdgeControlsUI.SetVisible(false);
+
+        if (createPersistentGroupButton != null)
+            createPersistentGroupButton.SetActive(false);
     }
 
     void SuspendSelectionForSave()
@@ -1206,6 +1239,19 @@ public class LevelEditor : MonoBehaviour
                     hasSelectionMember = true;
                 }
             }
+        }
+        else if (IsSelectedPersistentGroup)
+        {
+            // Persistent Groups use the same transform rules as a temporary multi-selection.
+            availability = new SelectionControlAvailability
+            {
+                canDuplicate = true,
+                canScaleBoth = true,
+                canScaleHorizontally = false,
+                canScaleVertically = false,
+                canRotate = true
+            };
+            hasSelectionMember = true;
         }
         else
         {
@@ -1887,6 +1933,14 @@ public class LevelEditor : MonoBehaviour
             yield break;
         }
 
+        if (IsSelectedPersistentGroup)
+        {
+            foreach (Transform child in selectedObject.transform)
+                yield return child;
+
+            yield break;
+        }
+
         if (selectedObject != null)
             yield return selectedObject.transform;
     }
@@ -1897,7 +1951,7 @@ public class LevelEditor : MonoBehaviour
             ? scaleConstrainedTransform.localScale.x
             : scaleConstrainedTransform.localScale.y);
 
-        if (selectionGroup != null)
+        if (IsSelectedGroup)
         {
             float groupScale = Mathf.Abs(xAxis
                 ? selectedLocalScaleAtStart.x
@@ -1980,6 +2034,8 @@ public class LevelEditor : MonoBehaviour
         deselectObjectButton.SetActive(show);
         snapVerticalButton.SetActive(show);
         snapHorizontalButton.SetActive(show);
+        if (createPersistentGroupButton != null)
+            createPersistentGroupButton.SetActive(show && CanCreatePersistentGroup());
     }
 
     public void SwitchToPlayMode()

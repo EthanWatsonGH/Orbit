@@ -16,6 +16,7 @@ public class EditorHUD : MonoBehaviour
     public void SnapSelectedObjectToLastHorizontal() => levelEditor?.SnapSelectedObjectToLastHorizontal();
     public void SnapSelectedObjectToLastVertical() => levelEditor?.SnapSelectedObjectToLastVertical();
     public void DeselectObject() => levelEditor?.DeselectObject();
+    public void CreatePersistentGroup() => levelEditor?.CreatePersistentGroup();
     public void LoadLevelFromClipboard() => levelEditor?.LoadLevelFromClipboard();
     public void DeleteAllLevelObjects() => levelEditor?.DeleteAllLevelObjects();
     public void SwitchToPlayMode() => levelEditor?.SwitchToPlayMode();

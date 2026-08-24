@@ -88,7 +88,7 @@ public class LevelManager : MonoBehaviour
     public GameObject SlipperyWallPrefab;
     public GameObject TextPrefab;
 
-    const string GroupObjectType = "Group";
+    public const string GroupObjectType = "Group";
     public const byte LOADER_VERSION = 1;
     public string playerLevelsDirectory { get; private set; }
     LevelStorage levelStorage;
