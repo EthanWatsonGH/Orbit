@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
 [DefaultExecutionOrder(-200)]
 public class PointerInput : MonoBehaviour
@@ -15,10 +14,6 @@ public class PointerInput : MonoBehaviour
     public Vector2 ScreenPosition { get; private set; }
     public Vector2 PressStartScreenPosition { get; private set; }
     public float PressStartUnscaledTime { get; private set; }
-    public bool CurrentGestureStartedOverUi { get; private set; }
-    public bool WasReleasedOverUi { get; private set; }
-    public bool CurrentGestureStartedOverSelectableUi { get; private set; }
-    public bool WasReleasedOverSelectableUi { get; private set; }
     public bool HadMultiplePointersDuringCurrentGesture { get; private set; }
     public bool IsSinglePointerHeld => IsHeld && GetGameplayTouchCount() <= 1;
     public float PointerDurationSeconds => (IsHeld ? Time.unscaledTime : pointerReleaseUnscaledTime) - PressStartUnscaledTime;
@@ -316,10 +311,6 @@ public class PointerInput : MonoBehaviour
         WasPressedThisFrame = true;
         IsHeld = true;
         HadMultiplePointersDuringCurrentGesture = GetGameplayTouchCount() > 1;
-
-        GetUiStateAtScreenPosition(screenPosition, out bool isOverUi, out bool isOverSelectableUi);
-        CurrentGestureStartedOverUi = isOverUi;
-        CurrentGestureStartedOverSelectableUi = isOverSelectableUi;
     }
 
     void EndPointer(Vector2 screenPosition, bool wasCanceled = false)
@@ -331,35 +322,6 @@ public class PointerInput : MonoBehaviour
         IsHeld = false;
         isTrackingTouch = false;
         primaryFingerId = -1;
-
-        GetUiStateAtScreenPosition(screenPosition, out bool isOverUi, out bool isOverSelectableUi);
-        WasReleasedOverUi = isOverUi;
-        WasReleasedOverSelectableUi = isOverSelectableUi;
-    }
-
-    void GetUiStateAtScreenPosition(Vector2 screenPosition, out bool isOverUi, out bool isOverSelectableUi)
-    {
-        isOverUi = false;
-        isOverSelectableUi = false;
-
-        if (EventSystem.current == null)
-            return;
-
-        PointerEventData pointerEventData = new PointerEventData(EventSystem.current)
-        {
-            position = screenPosition
-        };
-
-        uiRaycastResults.Clear();
-        EventSystem.current.RaycastAll(pointerEventData, uiRaycastResults);
-
-        for (int i = 0; i < uiRaycastResults.Count; i++)
-        {
-            if (uiRaycastResults[i].gameObject.GetComponentInParent<Selectable>() != null)
-                isOverSelectableUi = true;
-        }
-
-        isOverUi = uiRaycastResults.Count > 0;
     }
 
     void UpdateExcludedPointerGestureTouches()

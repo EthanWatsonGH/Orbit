@@ -38,14 +38,15 @@ public class Player : MonoBehaviour
     [SerializeField] ToggleButton followPlayerToggle;
     [SerializeField] CameraPan playerCameraPan;
     [Header("Quick Retry Swipe")]
-    [SerializeField, Min(0f)] float quickRetrySwipeMinimumDistancePixels = 150f;
-    [SerializeField, Min(0f)] float quickRetrySwipeMaximumDurationSeconds = 0.35f;
+    [SerializeField, Min(0f)] float quickRetrySwipeMinimumDistancePixels = 50f;
+    [SerializeField, Min(0f)] float quickRetrySwipeMaximumDurationSeconds = 0.25f;
 
     float timeAtLastLaunch;
     PlayerState state = PlayerState.Aiming;
     bool playerPressedLaunch; // TODO: change to events
     bool isInvincible;
     bool isDraggingLaunchDirectionTarget;
+    bool quickSwipeStartedOverUi;
     Vector3 launchTargetDragOffset = Vector3.zero;
     float timeAtLastRetry;
     bool hasStarted;
@@ -70,6 +71,8 @@ public class Player : MonoBehaviour
 
     void Update()
     {
+        UpdateQuickSwipeGestureOrigin();
+
         if (WasQuickSwipeGesturePerformed())
         {
             if (state == PlayerState.Aiming)
@@ -126,6 +129,7 @@ public class Player : MonoBehaviour
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
         EventManager.Instance.OnLevelLoadEvent.RemoveListener(EnterAimingAfterLevelLoad);
         UnsubscribeFromFollowPlayerToggle();
+        quickSwipeStartedOverUi = false;
     }
 
     void UpdateAiming()
@@ -187,10 +191,17 @@ public class Player : MonoBehaviour
         return pointerInput.WasReleasedThisFrame
             && !pointerInput.WasCanceledThisFrame
             && !pointerInput.HadMultiplePointersDuringCurrentGesture
-            && !pointerInput.CurrentGestureStartedOverSelectableUi
-            && !pointerInput.WasReleasedOverSelectableUi
+            && !quickSwipeStartedOverUi
+            && !UiHitTest.IsScreenPositionOverUi(pointerInput.ScreenPosition)
             && pointerInput.PointerDurationSeconds <= quickRetrySwipeMaximumDurationSeconds
             && pointerInput.DragDistancePixels >= quickRetrySwipeMinimumDistancePixels;
+    }
+
+    void UpdateQuickSwipeGestureOrigin()
+    {
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput != null && pointerInput.WasPressedThisFrame)
+            quickSwipeStartedOverUi = UiHitTest.IsScreenPositionOverUi(pointerInput.PressStartScreenPosition);
     }
 
     void Launch()

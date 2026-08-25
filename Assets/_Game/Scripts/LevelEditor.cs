@@ -72,8 +72,24 @@ public class LevelEditor : MonoBehaviour
     bool IsSelectedGroup => HasMultipleSelection || IsSelectedPersistentGroup;
 
     // object selection
-    const float MINIMUM_DRAG_DISTANCE_PIXELS = 15f;
+    const float MINIMUM_DRAG_DISTANCE_PIXELS = 25f;
     bool hasSelectionDragExceededThreshold = false;
+    // The editor owns the interpretation of a world pointer gesture. PointerInput
+    // only reports pointer facts, so UI interactions cannot leak into selection
+    // through a shared global "consumed" flag.
+    enum EditorPointerInteraction
+    {
+        None,
+        WorldSelection,
+        BoxSelection,
+        PlaceObject,
+        Transform
+    }
+
+    EditorPointerInteraction pointerInteraction;
+    Vector3 boxSelectionStartWorldPosition;
+    Vector3 boxSelectionCurrentWorldPosition;
+    bool hasBoxSelectionWorldPositions;
     readonly List<Transform> selectedSelectionRoots = new List<Transform>();
     GameObject selectionPivot;
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
@@ -324,6 +340,7 @@ public class LevelEditor : MonoBehaviour
     void LateUpdate()
     {
         UpdateActiveScreenSpaceTransformControl();
+        RefreshBoxSelectionVisualFromWorld();
     }
 
     private void OnEnable()
@@ -334,6 +351,8 @@ public class LevelEditor : MonoBehaviour
     private void OnDisable()
     {
         CancelActiveTransform();
+        pointerInteraction = EditorPointerInteraction.None;
+        hasBoxSelectionWorldPositions = false;
         isShiftModeButtonHeld = false;
         isCtrlModeButtonHeld = false;
         SetBoxSelectionVisualVisible(false);
@@ -407,35 +426,66 @@ public class LevelEditor : MonoBehaviour
         if (pointerInput.WasPressedThisFrame)
         {
             hasSelectionDragExceededThreshold = false;
+            hasBoxSelectionWorldPositions = false;
             SetBoxSelectionVisualVisible(false);
+
+            if (pointerInteraction == EditorPointerInteraction.None &&
+                activeTransform == ActiveTransform.None &&
+                !isTryingToPlace &&
+                !UiHitTest.IsScreenPositionOverUi(pointerInput.PressStartScreenPosition))
+            {
+                pointerInteraction = EditorPointerInteraction.WorldSelection;
+                // Keep this first corner fixed in the level. The second finger
+                // can then move the camera without dragging the box through space.
+                hasBoxSelectionWorldPositions =
+                    pointerInput.TryGetWorldPositionNoDepth(
+                        pointerInput.PressStartScreenPosition,
+                        out boxSelectionStartWorldPosition);
+                boxSelectionCurrentWorldPosition = boxSelectionStartWorldPosition;
+            }
         }
 
-        if (isTryingToPlace ||
-            pointerInput.CurrentGestureStartedOverUi ||
-            pointerInput.HadMultiplePointersDuringCurrentGesture ||
+        if ((pointerInteraction != EditorPointerInteraction.WorldSelection &&
+             pointerInteraction != EditorPointerInteraction.BoxSelection) ||
+            activeTransform != ActiveTransform.None ||
             !pointerInput.IsHeld ||
-            PointerInput.Instance.WasCanceledThisFrame)
+            pointerInput.WasCanceledThisFrame)
         {
             SetBoxSelectionVisualVisible(false);
             return;
         }
 
-        if (!hasSelectionDragExceededThreshold)
+        // A second touch before the drag becomes a box is a camera gesture, not
+        // an editor selection. Once a box has started, keep it alive so that
+        // same second touch can pan or zoom while selecting.
+        if (pointerInteraction == EditorPointerInteraction.WorldSelection &&
+            pointerInput.HadMultiplePointersDuringCurrentGesture)
+        {
+            pointerInteraction = EditorPointerInteraction.None;
+            hasBoxSelectionWorldPositions = false;
+            SetBoxSelectionVisualVisible(false);
+            return;
+        }
+
+        if (pointerInteraction == EditorPointerInteraction.WorldSelection)
         {
             float dragDistanceInPixels = pointerInput.DragDistancePixels;
             if (dragDistanceInPixels >= MINIMUM_DRAG_DISTANCE_PIXELS)
             {
                 hasSelectionDragExceededThreshold = true;
+                pointerInteraction = EditorPointerInteraction.BoxSelection;
             }
         }
 
         if (hasSelectionDragExceededThreshold)
-            UpdateBoxSelectionVisual(pointerInput.PressStartScreenPosition, pointerInput.ScreenPosition);
+            RefreshBoxSelectionVisualFromWorld();
     }
 
     void HandlePlacePrefab()
     {
-        if (objectCurrentlyTryingToPlace != null && isTryingToPlace)
+        if (objectCurrentlyTryingToPlace != null &&
+            isTryingToPlace &&
+            pointerInteraction == EditorPointerInteraction.PlaceObject)
         {
             // make the object the player is currently trying to place follow the pointer
             if (PointerInput.Instance.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
@@ -470,31 +520,46 @@ public class LevelEditor : MonoBehaviour
     void HandleSelectObject()
     {
         // set the object the player clicks as selected if it's allowed to be selected
-        if (PointerInput.Instance.WasReleasedThisFrame)
+        PointerInput pointerInput = PointerInput.Instance;
+        if (pointerInput.WasReleasedThisFrame)
         {
-            bool shouldDoBoxSelect = hasSelectionDragExceededThreshold;
+            EditorPointerInteraction interactionAtRelease = pointerInteraction;
             hasSelectionDragExceededThreshold = false;
             SetBoxSelectionVisualVisible(false);
 
-            if (PointerInput.Instance.WasCanceledThisFrame)
+            // A transform may be driven by a second touch after the primary
+            // gameplay pointer releases. Keep its ownership until that control
+            // itself has finished, rather than letting a later touch select.
+            if (interactionAtRelease == EditorPointerInteraction.Transform &&
+                activeTransform != ActiveTransform.None)
+            {
+                hasBoxSelectionWorldPositions = false;
                 return;
+            }
 
-            if (PointerInput.Instance.CurrentGestureStartedOverUi)
+            pointerInteraction = EditorPointerInteraction.None;
+
+            if (pointerInput.WasCanceledThisFrame ||
+                interactionAtRelease == EditorPointerInteraction.None ||
+                interactionAtRelease == EditorPointerInteraction.PlaceObject ||
+                interactionAtRelease == EditorPointerInteraction.Transform)
+            {
+                hasBoxSelectionWorldPositions = false;
                 return;
+            }
 
-            // A world-origin gesture stays owned by the editor even when its release
-            // position overlaps UI, such as a box selection ending over a HUD control.
             bool shouldRemoveFromSelection = IsRemoveSelectionModifierHeld();
             bool shouldAddToSelection = !shouldRemoveFromSelection && IsAddSelectionModifierHeld();
-            if (shouldDoBoxSelect && !PointerInput.Instance.HadMultiplePointersDuringCurrentGesture)
+            if (interactionAtRelease == EditorPointerInteraction.BoxSelection)
             {
+                // The first finger owns this box. A second finger may pan or pinch
+                // the camera without changing the box-selection interaction.
                 SelectObjectsInsideBox(shouldAddToSelection, shouldRemoveFromSelection);
             }
-            // A box selection owns its whole drag even if it ends over UI. A normal click
-            // released over an interactive UI control belongs to that control, not the world.
-            else if (!PointerInput.Instance.WasReleasedOverSelectableUi)
+            else if (interactionAtRelease == EditorPointerInteraction.WorldSelection &&
+                     !pointerInput.HadMultiplePointersDuringCurrentGesture)
             {
-                Ray ray = Camera.main.ScreenPointToRay(PointerInput.Instance.ScreenPosition);
+                Ray ray = Camera.main.ScreenPointToRay(pointerInput.ScreenPosition);
                 RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction);
 
                 if (hit.collider != null) // object hit
@@ -519,6 +584,8 @@ public class LevelEditor : MonoBehaviour
                     UnselectObject();
                 }
             }
+
+            hasBoxSelectionWorldPositions = false;
         }
     }
 
@@ -1008,15 +1075,15 @@ public class LevelEditor : MonoBehaviour
 
     void SelectObjectsInsideBox(bool addToCurrentSelection, bool removeFromCurrentSelection)
     {
-        PointerInput pointerInput = PointerInput.Instance;
-        if (!pointerInput.TryGetWorldPositionNoDepth(pointerInput.PressStartScreenPosition, out Vector3 pressStartWorldPosition) ||
-            !pointerInput.TryGetWorldPositionNoDepth(pointerInput.ScreenPosition, out Vector3 releaseWorldPosition))
+        if (!hasBoxSelectionWorldPositions)
         {
-            Debug.LogError("LevelEditor could not box-select objects because the pointer positions could not be converted to world positions.", this);
+            Debug.LogError("LevelEditor could not box-select objects because its world-space box coordinates are unavailable.", this);
             return;
         }
 
-        Collider2D[] collidersInBox = Physics2D.OverlapAreaAll(pressStartWorldPosition, releaseWorldPosition);
+        Collider2D[] collidersInBox = Physics2D.OverlapAreaAll(
+            boxSelectionStartWorldPosition,
+            boxSelectionCurrentWorldPosition);
         List<GameObject> objectsToSelect = new List<GameObject>(collidersInBox.Length);
         foreach (Collider2D collider in collidersInBox)
             objectsToSelect.Add(collider.gameObject);
@@ -1027,6 +1094,34 @@ public class LevelEditor : MonoBehaviour
             AddObjectsToSelection(objectsToSelect);
         else
             SelectObjects(objectsToSelect);
+    }
+
+    void RefreshBoxSelectionVisualFromWorld()
+    {
+        if (!hasSelectionDragExceededThreshold ||
+            !hasBoxSelectionWorldPositions ||
+            pointerInteraction != EditorPointerInteraction.BoxSelection ||
+            PointerInput.Instance == null ||
+            !PointerInput.Instance.IsHeld)
+        {
+            return;
+        }
+
+        if (!PointerInput.Instance.TryGetWorldPositionNoDepth(
+                PointerInput.Instance.ScreenPosition,
+                out boxSelectionCurrentWorldPosition) ||
+            CameraViewManager.Instance == null ||
+            !CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeWorldCamera))
+        {
+            SetBoxSelectionVisualVisible(false);
+            return;
+        }
+
+        Vector3 startScreenPosition = activeWorldCamera.WorldToScreenPoint(boxSelectionStartWorldPosition);
+        Vector3 currentScreenPosition = activeWorldCamera.WorldToScreenPoint(boxSelectionCurrentWorldPosition);
+        UpdateBoxSelectionVisual(
+            new Vector2(startScreenPosition.x, startScreenPosition.y),
+            new Vector2(currentScreenPosition.x, currentScreenPosition.y));
     }
 
     void UpdateBoxSelectionVisual(Vector2 pressStartScreenPosition, Vector2 currentScreenPosition)
@@ -1378,6 +1473,11 @@ public class LevelEditor : MonoBehaviour
 
     void BeginActiveTransform(ActiveTransform transform, int pointerId, Vector2 screenPosition)
     {
+        // A transform owns its complete press-to-release interaction, even when its
+        // active transform data ends before LevelEditor handles that release.
+        hasSelectionDragExceededThreshold = false;
+        SetBoxSelectionVisualVisible(false);
+        pointerInteraction = EditorPointerInteraction.Transform;
         activeTransform = transform;
         activeTransformPointerId = pointerId;
         activeTransformPressScreenPosition = screenPosition;
@@ -1415,6 +1515,12 @@ public class LevelEditor : MonoBehaviour
                 EndScaleSelectedObject();
                 break;
         }
+
+        // For a transform finger that is not the primary gameplay pointer, the
+        // primary pointer may still be held. It retains transform ownership until
+        // it releases; otherwise this transform has fully finished its gesture.
+        if (PointerInput.Instance == null || !PointerInput.Instance.IsHeld)
+            pointerInteraction = EditorPointerInteraction.None;
     }
 
     bool TryBeginMoveSelectedObject(ObjectTransformControl control, Vector2 screenPosition)
@@ -2110,6 +2216,7 @@ public class LevelEditor : MonoBehaviour
         }
 
         isTryingToPlace = true;
+        pointerInteraction = EditorPointerInteraction.PlaceObject;
         objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerWorldPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
     public void PlaceBooster()

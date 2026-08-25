@@ -23,12 +23,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
 
     void Awake()
     {
-        if (controlsRoot == null)
-            controlsRoot = transform as RectTransform;
-        if (controlsCanvasGroup == null)
-            controlsCanvasGroup = GetComponent<CanvasGroup>();
-        if (controlsCanvasGroup == null)
-            controlsCanvasGroup = gameObject.AddComponent<CanvasGroup>();
+        EnsureReferences();
 
         CacheHandleViews();
 
@@ -69,9 +64,22 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
 
     public void SetControlsVisible(bool shouldShow)
     {
+        // LevelEditor can call this while this prefab is inactive. In that case its
+        // Awake has not run yet, so resolve the optional CanvasGroup lazily here too.
+        EnsureReferences();
         controlsCanvasGroup.alpha = shouldShow ? 1f : 0f;
         controlsCanvasGroup.interactable = shouldShow;
         controlsCanvasGroup.blocksRaycasts = shouldShow;
+    }
+
+    void EnsureReferences()
+    {
+        if (controlsRoot == null)
+            controlsRoot = transform as RectTransform;
+        if (controlsCanvasGroup == null)
+            controlsCanvasGroup = GetComponent<CanvasGroup>();
+        if (controlsCanvasGroup == null)
+            controlsCanvasGroup = gameObject.AddComponent<CanvasGroup>();
     }
 
     public void BeginControl(ScaleFromEdgeHandle handle, int pointerId, Vector2 screenPosition)
