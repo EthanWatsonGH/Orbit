@@ -7,16 +7,13 @@ public class RecenterCameraButton : MonoBehaviour
     [SerializeField] RectTransform icon;
     [SerializeField] float iconFacingAngleOffset = -90f;
 
-    Button button;
     RectTransform buttonRect;
     Canvas canvas;
 
     void Awake()
     {
-        button = GetComponent<Button>();
         buttonRect = (RectTransform)transform;
         canvas = GetComponentInParent<Canvas>();
-        button.onClick.AddListener(RecenterCamera);
     }
 
     void LateUpdate()
@@ -24,13 +21,7 @@ public class RecenterCameraButton : MonoBehaviour
         UpdateIconRotation();
     }
 
-    void OnDestroy()
-    {
-        if (button != null)
-            button.onClick.RemoveListener(RecenterCamera);
-    }
-
-    void RecenterCamera()
+    public void RecenterCamera()
     {
         if (EventManager.Instance != null)
             EventManager.Instance.RecenterCamera();

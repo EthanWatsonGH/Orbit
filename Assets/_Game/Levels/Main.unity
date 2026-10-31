@@ -975,6 +975,11 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3607148603252490781, guid: 4824b21244823934e83d45f884726f52, type: 3}
   m_PrefabInstance: {fileID: 128809842}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &542136131 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7801265024250568191, guid: 4824b21244823934e83d45f884726f52, type: 3}
+  m_PrefabInstance: {fileID: 128809842}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &677869738 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2910641633473500746, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
@@ -1991,6 +1996,10 @@ PrefabInstance:
       propertyPath: createPersistentGroupButton
       value: 
       objectReference: {fileID: 483281474}
+    - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+      propertyPath: ungroupPersistentGroupButton
+      value: 
+      objectReference: {fileID: 542136131}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

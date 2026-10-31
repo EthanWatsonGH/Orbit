@@ -39,6 +39,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject snapVerticalButton;
     [SerializeField] GameObject snapHorizontalButton;
     [SerializeField] GameObject createPersistentGroupButton;
+    [SerializeField] GameObject ungroupPersistentGroupButton;
     [SerializeField] LineRenderer verticalLine;
     [SerializeField] LineRenderer horizontalLine;
     [SerializeField] LineRenderer rotationLine;
@@ -316,6 +317,8 @@ public class LevelEditor : MonoBehaviour
         snapHorizontalButton.SetActive(false);
         if (createPersistentGroupButton != null)
             createPersistentGroupButton.SetActive(false);
+        if (ungroupPersistentGroupButton != null)
+            ungroupPersistentGroupButton.SetActive(false);
     }
 
     void Start()
@@ -792,19 +795,27 @@ public class LevelEditor : MonoBehaviour
         if (activeTransform != ActiveTransform.None || !CanCreatePersistentGroup())
             return;
 
+        List<Transform> groupingMembers = GetGroupingMembers();
+        if (groupingMembers.Count < 2)
+            return;
+
         // Multi-selection never changes the level hierarchy. Grouping is the one
         // deliberate hierarchy operation: create a real Group at the selection pivot
-        // and reparent the selected roots while preserving their world transforms.
+        // and reparent level-object roots while preserving their world transforms.
+        // Existing selected Groups contribute their children, never the Group itself,
+        // so this action cannot create nested Groups.
         GameObject persistentGroup = new GameObject(LevelManager.GroupObjectType);
         persistentGroup.transform.SetParent(levelObjectsCollection.transform, false);
         persistentGroup.transform.SetPositionAndRotation(selectionPivot.transform.position, selectionPivot.transform.rotation);
         persistentGroup.transform.localScale = selectionPivot.transform.localScale;
 
-        foreach (Transform selectionRoot in selectedSelectionRoots)
+        foreach (Transform groupingMember in groupingMembers)
         {
-            if (selectionRoot != null)
-                selectionRoot.SetParent(persistentGroup.transform, true);
+            if (groupingMember != null)
+                groupingMember.SetParent(persistentGroup.transform, true);
         }
+
+        NormalizePersistentGroups();
 
         ClearSelectedSelectionRoots();
         DestroySelectionPivot();
@@ -816,7 +827,64 @@ public class LevelEditor : MonoBehaviour
 
     bool CanCreatePersistentGroup()
     {
-        return HasMultipleSelection;
+        return HasMultipleSelection && GetGroupingMembers().Count >= 2;
+    }
+
+    List<Transform> GetGroupingMembers()
+    {
+        List<Transform> groupingMembers = new List<Transform>();
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot == null)
+                continue;
+
+            if (IsPersistentGroup(selectionRoot.gameObject))
+            {
+                // Persistent Groups are never moved into another Group. Their
+                // direct level-object children become members of the new Group.
+                foreach (Transform child in selectionRoot)
+                {
+                    if (child != null &&
+                        !IsPersistentGroup(child.gameObject) &&
+                        !groupingMembers.Contains(child))
+                    {
+                        groupingMembers.Add(child);
+                    }
+                }
+            }
+            else if (!groupingMembers.Contains(selectionRoot))
+            {
+                groupingMembers.Add(selectionRoot);
+            }
+        }
+
+        return groupingMembers;
+    }
+
+    public void UngroupSelectedPersistentGroup()
+    {
+        if (activeTransform != ActiveTransform.None || !IsSelectedPersistentGroup ||
+            levelObjectsCollection == null)
+        {
+            return;
+        }
+
+        Transform groupTransform = selectedObject.transform;
+        List<GameObject> formerMembers = new List<GameObject>(groupTransform.childCount);
+        foreach (Transform child in groupTransform)
+        {
+            if (child == null || IsPersistentGroup(child.gameObject))
+                continue;
+
+            formerMembers.Add(child.gameObject);
+        }
+
+        foreach (GameObject formerMember in formerMembers)
+            formerMember.transform.SetParent(levelObjectsCollection.transform, true);
+
+        DestroyPersistentGroup(groupTransform);
+        NormalizePersistentGroups();
+        SelectObjects(formerMembers);
     }
 
     void EnsureSelectionPivot()
@@ -846,6 +914,52 @@ public class LevelEditor : MonoBehaviour
     static bool IsPersistentGroup(GameObject levelObject)
     {
         return levelObject != null && levelObject.name == LevelManager.GroupObjectType;
+    }
+
+    // Persistent groups have one purpose: contain two or more direct level-object
+    // roots. This is called only after a hierarchy-changing editor action, not per frame.
+    void NormalizePersistentGroups()
+    {
+        if (levelObjectsCollection == null)
+            return;
+
+        Transform levelObjectsRoot = levelObjectsCollection.transform;
+        List<Transform> persistentGroups = new List<Transform>();
+        foreach (Transform child in levelObjectsRoot)
+        {
+            if (IsPersistentGroup(child.gameObject))
+                persistentGroups.Add(child);
+        }
+
+        foreach (Transform persistentGroup in persistentGroups)
+        {
+            if (persistentGroup == null)
+                continue;
+
+            if (persistentGroup.childCount == 0)
+            {
+                DestroyPersistentGroup(persistentGroup);
+                continue;
+            }
+
+            if (persistentGroup.childCount == 1)
+            {
+                Transform onlyMember = persistentGroup.GetChild(0);
+                onlyMember.SetParent(levelObjectsRoot, true);
+                DestroyPersistentGroup(persistentGroup);
+            }
+        }
+    }
+
+    static void DestroyPersistentGroup(Transform persistentGroup)
+    {
+        if (persistentGroup == null)
+            return;
+
+        // Remove it from the level hierarchy immediately; Destroy itself completes
+        // at frame end, which would otherwise leave an empty Group visible to save.
+        persistentGroup.SetParent(null, true);
+        Destroy(persistentGroup.gameObject);
     }
 
     Vector3 GetSelectionPivot(List<Transform> selectionRoots)
@@ -1173,6 +1287,8 @@ public class LevelEditor : MonoBehaviour
 
         if (createPersistentGroupButton != null)
             createPersistentGroupButton.SetActive(false);
+        if (ungroupPersistentGroupButton != null)
+            ungroupPersistentGroupButton.SetActive(false);
     }
 
     void SuspendSelectionForSave()
@@ -1755,13 +1871,7 @@ public class LevelEditor : MonoBehaviour
         if (deleteMovedObject && selectedObject != null &&
             pointerIsOverObjectSelectionBar && CanDeleteSelectedRoots())
         {
-            foreach (Transform selectionRoot in selectedSelectionRoots)
-            {
-                if (selectionRoot != null)
-                    Destroy(selectionRoot.gameObject);
-            }
-
-            UnselectObject();
+            DeleteSelectedRoots();
             deselectObjectButton.gameObject.SetActive(false);
         }
         else if (selectedObject != null)
@@ -1770,6 +1880,23 @@ public class LevelEditor : MonoBehaviour
             // pointer last passed over the delete area.
             SetSelectedRootsActive(true);
         }
+    }
+
+    void DeleteSelectedRoots()
+    {
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot == null)
+                continue;
+
+            // Detaching first makes a parent Group's child count accurate now,
+            // rather than waiting until Destroy runs at the end of the frame.
+            selectionRoot.SetParent(null, true);
+            Destroy(selectionRoot.gameObject);
+        }
+
+        NormalizePersistentGroups();
+        UnselectObject();
     }
 
     void NormalizeSelectedRootRotations()
@@ -2198,6 +2325,8 @@ public class LevelEditor : MonoBehaviour
         snapHorizontalButton.SetActive(show);
         if (createPersistentGroupButton != null)
             createPersistentGroupButton.SetActive(show && CanCreatePersistentGroup());
+        if (ungroupPersistentGroupButton != null)
+            ungroupPersistentGroupButton.SetActive(show && IsSelectedPersistentGroup);
     }
 
     public void SwitchToPlayMode()
