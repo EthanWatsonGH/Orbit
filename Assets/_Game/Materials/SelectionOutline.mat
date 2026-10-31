@@ -19,14 +19,15 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties:
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _WidthPixels: 8
+    - _WidthPixels: 6
     m_Colors:
-    - _InnerColor: {r: 1, g: 1, b: 1, a: 1}
-    - _OuterColor: {r: 0, g: 0.4, b: 1, a: 0}
+    - _InnerColor: {r: 1, g: 1, b: 1, a: 0.5882353}
+    - _OuterColor: {r: 0, g: 0.39215687, b: 1, a: 0}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1

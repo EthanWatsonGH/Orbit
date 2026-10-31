@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Boost
-  m_Shader: {fileID: 4800000, guid: b1ffcd94dda6fcc4f89e93cc3dcb15e2, type: 3}
+  m_Shader: {fileID: 4800000, guid: a97d7630926f403793fb4064e4f7611d, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []

@@ -11,6 +11,8 @@ public enum PlayerState
 
 public class Player : MonoBehaviour
 {
+    static readonly int LevelInteractionHeldShaderId = Shader.PropertyToID("_LevelInteractionHeld");
+
     // self component references
     [SerializeField] Rigidbody2D rb;
     [SerializeField] TrailRenderer tr;
@@ -52,6 +54,10 @@ public class Player : MonoBehaviour
     bool hasStarted;
 
     public PlayerState State => state;
+    public bool IsLevelInteractionHeld => isActiveAndEnabled &&
+                                          state == PlayerState.Playing &&
+                                          PointerInput.Instance != null &&
+                                          PointerInput.Instance.IsSinglePointerHeld;
 
     void SetState(PlayerState newState)
     {
@@ -100,6 +106,10 @@ public class Player : MonoBehaviour
 
     void LateUpdate()
     {
+        // Future effect shaders should use this as a global uniform, not a material
+        // property, so individual objects need no copies of the input or material.
+        Shader.SetGlobalFloat(LevelInteractionHeldShaderId, IsLevelInteractionHeld ? 1f : 0f);
+
         if (!isDraggingLaunchDirectionTarget)
             return;
 
@@ -125,6 +135,7 @@ public class Player : MonoBehaviour
 
     private void OnDisable()
     {
+        Shader.SetGlobalFloat(LevelInteractionHeldShaderId, 0f);
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.RemoveListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
         EventManager.Instance.OnLevelLoadEvent.RemoveListener(EnterAimingAfterLevelLoad);
@@ -323,14 +334,10 @@ public class Player : MonoBehaviour
     void OnTriggerStay2D(Collider2D collision)
     {
         // pull area
-        PointerInput pointerInput = PointerInput.Instance;
-        if (pointerInput != null && pointerInput.IsSinglePointerHeld && state == PlayerState.Playing)
+        if (IsLevelInteractionHeld && collision.gameObject.CompareTag("Pull"))
         {
-            if (collision.gameObject.CompareTag("Pull"))
-            {
-                Vector2 pullDirection = collision.transform.position - rb.transform.position;
-                rb.AddForce(pullDirection.normalized * pullForce, ForceMode2D.Force);
-            }
+            Vector2 pullDirection = collision.transform.position - rb.transform.position;
+            rb.AddForce(pullDirection.normalized * pullForce, ForceMode2D.Force);
         }
     }
 
