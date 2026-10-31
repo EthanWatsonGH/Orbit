@@ -1,6 +1,3 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [DefaultExecutionOrder(-100)]
@@ -38,9 +35,6 @@ public class GameManager : MonoBehaviour
     public float KeyboardPanSpeed = 10f;
     public int FramerateLimit = 60;
 
-    // TODO: move this stuff to be handled in UI manager
-    public bool TouchPointIsOverButton = false;
-
     void Start()
     {
         Application.targetFrameRate = FramerateLimit;
@@ -50,17 +44,5 @@ public class GameManager : MonoBehaviour
     {
         // TODO: this is just for testing. move this to only be updated on an event when the player changes the setting
         Application.targetFrameRate = FramerateLimit;
-    }
-
-    // buttons will use these to say if the touch point is over any button
-    public void SetTouchPointIsOverButtonTrue()
-    {
-        TouchPointIsOverButton = true;
-        //Debug.Log("yes");
-    }
-    public void SetTouchPointIsOverButtonFalse()
-    {
-        TouchPointIsOverButton = false;
-        //Debug.Log("no");
     }
 }

@@ -51,4 +51,3 @@ MonoBehaviour:
   ScrollZoomIncrement: 10
   KeyboardPanSpeed: 10
   FramerateLimit: 60
-  TouchPointIsOverButton: 0

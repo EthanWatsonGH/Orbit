@@ -25,14 +25,4 @@ public class PlayerHUD : MonoBehaviour
     {
         player?.SwitchToLevelEditor();
     }
-
-    public void SetTouchPointIsOverButtonTrue()
-    {
-        GameManager.Instance.SetTouchPointIsOverButtonTrue();
-    }
-
-    public void SetTouchPointIsOverButtonFalse()
-    {
-        GameManager.Instance.SetTouchPointIsOverButtonFalse();
-    }
 }
