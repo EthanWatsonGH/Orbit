@@ -557,7 +557,7 @@ public class LevelEditor : MonoBehaviour
             {
                 // The first finger owns this box. A second finger may pan or pinch
                 // the camera without changing the box-selection interaction.
-                SelectObjectsInsideBox(shouldAddToSelection, shouldRemoveFromSelection);
+                SelectObjectsInsideBox(shouldAddToSelection, shouldRemoveFromSelection, IsIndividualSelectionModifierHeld());
             }
             else if (interactionAtRelease == EditorPointerInteraction.WorldSelection &&
                      !pointerInput.HadMultiplePointersDuringCurrentGesture)
@@ -567,19 +567,11 @@ public class LevelEditor : MonoBehaviour
 
                 if (hit.collider != null) // object hit
                 {
-                    if (shouldRemoveFromSelection)
-                    {
-                        RemoveObjectsFromSelection(new[] { hit.collider.gameObject });
-                    }
-                    else if (shouldAddToSelection)
-                    {
-                        AddObjectsToSelection(new[] { hit.collider.gameObject });
-                    }
-                    else
-                    {
-                        SelectObject(hit.collider.gameObject);
-                        ConfigureSelectionControlsForSelectedObject();
-                    }
+                    ApplySelectionHits(
+                        new[] { hit.collider.gameObject },
+                        shouldAddToSelection,
+                        shouldRemoveFromSelection,
+                        IsIndividualSelectionModifierHeld());
                 }
                 else if (!shouldAddToSelection && !shouldRemoveFromSelection) // no object hit
                 {
@@ -690,6 +682,24 @@ public class LevelEditor : MonoBehaviour
 
             if (IsSelectionRootIncludedIn(rootsToRemove, selectionRoot))
                 removedAnObject = true;
+            else if (IsPersistentGroup(selectionRoot.gameObject))
+            {
+                // A group can be selected as one root while Alt targets just one
+                // of its members. Expand the selection, not the level hierarchy.
+                bool removesGroupMember = rootsToRemove.Exists(root => root.IsChildOf(selectionRoot));
+                if (!removesGroupMember)
+                {
+                    remainingSelection.Add(selectionRoot.gameObject);
+                    continue;
+                }
+
+                removedAnObject = true;
+                foreach (Transform member in selectionRoot)
+                {
+                    if (!IsSelectionRootIncludedIn(rootsToRemove, member))
+                        remainingSelection.Add(member.gameObject);
+                }
+            }
             else
                 remainingSelection.Add(selectionRoot.gameObject);
         }
@@ -702,9 +712,7 @@ public class LevelEditor : MonoBehaviour
     {
         foreach (Transform selectionRoot in selectionRoots)
         {
-            if (candidate == selectionRoot ||
-                candidate.IsChildOf(selectionRoot) ||
-                selectionRoot.IsChildOf(candidate))
+            if (candidate == selectionRoot || candidate.IsChildOf(selectionRoot))
                 return true;
         }
 
@@ -1187,7 +1195,65 @@ public class LevelEditor : MonoBehaviour
         return IsCtrlModeHeld;
     }
 
-    void SelectObjectsInsideBox(bool addToCurrentSelection, bool removeFromCurrentSelection)
+    bool IsIndividualSelectionModifierHeld()
+    {
+        return Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+    }
+
+    // All pointer selection goes through the same target resolution, whether it
+    // comes from a click or a box. Stored/restored selections already contain
+    // explicit roots and must not be promoted to groups again.
+    void ApplySelectionHits(IEnumerable<GameObject> hits, bool addToCurrentSelection, bool removeFromCurrentSelection, bool selectIndividuals)
+    {
+        List<GameObject> targets = new List<GameObject>();
+        foreach (GameObject hit in hits)
+        {
+            Transform target = GetSelectionTarget(hit != null ? hit.transform : null, selectIndividuals);
+            if (target != null && !targets.Contains(target.gameObject))
+                targets.Add(target.gameObject);
+        }
+
+        if (removeFromCurrentSelection)
+            RemoveObjectsFromSelection(targets);
+        else if (addToCurrentSelection)
+            AddObjectsToSelection(targets);
+        else if (targets.Count == 1)
+        {
+            SelectObject(targets[0]);
+            ConfigureSelectionControlsForSelectedObject();
+        }
+        else
+            SelectObjects(targets);
+    }
+
+    Transform GetSelectionTarget(Transform hit, bool selectIndividuals)
+    {
+        if (hit == null)
+            return null;
+
+        if (playerStartPoint != null && hit.IsChildOf(playerStartPoint.transform))
+            return playerStartPoint.transform;
+
+        if (levelObjectsCollection == null)
+            return null;
+
+        Transform levelRoot = levelObjectsCollection.transform;
+        if (hit == levelRoot || !hit.IsChildOf(levelRoot))
+            return null;
+
+        // Colliders can live below an object's root. Stop at the direct member
+        // of a Group, or at the standalone object directly under the level root.
+        Transform target = hit;
+        while (target.parent != levelRoot && !IsPersistentGroup(target.parent.gameObject))
+            target = target.parent;
+
+        if (!selectIndividuals && IsPersistentGroup(target.parent.gameObject))
+            target = target.parent;
+
+        return target;
+    }
+
+    void SelectObjectsInsideBox(bool addToCurrentSelection, bool removeFromCurrentSelection, bool selectIndividuals)
     {
         if (!hasBoxSelectionWorldPositions)
         {
@@ -1202,12 +1268,7 @@ public class LevelEditor : MonoBehaviour
         foreach (Collider2D collider in collidersInBox)
             objectsToSelect.Add(collider.gameObject);
 
-        if (removeFromCurrentSelection)
-            RemoveObjectsFromSelection(objectsToSelect);
-        else if (addToCurrentSelection)
-            AddObjectsToSelection(objectsToSelect);
-        else
-            SelectObjects(objectsToSelect);
+        ApplySelectionHits(objectsToSelect, addToCurrentSelection, removeFromCurrentSelection, selectIndividuals);
     }
 
     void RefreshBoxSelectionVisualFromWorld()
@@ -1993,7 +2054,7 @@ public class LevelEditor : MonoBehaviour
             frameAtStart,
             pointerWorldPositionAtStart,
             IsScaleFromEdgeBothSidesModeHeld(),
-            IsIndependentCornerScaleModeHeld(handle));
+            ShouldScaleCornerIndependently(handle));
         return true;
     }
 
@@ -2001,7 +2062,7 @@ public class LevelEditor : MonoBehaviour
     {
         ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
         bool shouldScaleFromBothSides = IsScaleFromEdgeBothSidesModeHeld();
-        bool shouldScaleIndependently = IsIndependentCornerScaleModeHeld(gesture.handle);
+        bool shouldScaleIndependently = ShouldScaleCornerIndependently(gesture.handle);
         if (gesture.scalesFromBothSides != shouldScaleFromBothSides ||
             gesture.scalesIndependently != shouldScaleIndependently)
         {
@@ -2152,9 +2213,9 @@ public class LevelEditor : MonoBehaviour
         return IsShiftModeHeld;
     }
 
-    bool IsIndependentCornerScaleModeHeld(ScaleFromEdgeHandle handle)
+    bool ShouldScaleCornerIndependently(ScaleFromEdgeHandle handle)
     {
-        return IsCtrlModeHeld &&
+        return !IsCtrlModeHeld &&
                DoesScaleFromEdgeHandleScaleX(handle) &&
                DoesScaleFromEdgeHandleScaleY(handle) &&
                TryGetSelectionControlAvailability(out SelectionControlAvailability availability) &&
