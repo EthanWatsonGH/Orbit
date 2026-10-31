@@ -95,6 +95,7 @@ MonoBehaviour:
   selectionControlsUI: {fileID: 0}
   scaleFromEdgeControlsUI: {fileID: 0}
   boxSelectionVisual: {fileID: 0}
+  selectionOutlineMaterial: {fileID: 2100000, guid: d4f1d525af48414fbf1406ba279f1192, type: 2}
 --- !u!1 &4909395341240096876
 GameObject:
   m_ObjectHideFlags: 0

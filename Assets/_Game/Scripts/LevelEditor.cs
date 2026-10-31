@@ -57,6 +57,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] SelectionControlsUI selectionControlsUI;
     [SerializeField] ScaleFromEdgeControlsUI scaleFromEdgeControlsUI;
     [SerializeField] RectTransform boxSelectionVisual;
+    [SerializeField] Material selectionOutlineMaterial;
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
@@ -92,6 +93,7 @@ public class LevelEditor : MonoBehaviour
     Vector3 boxSelectionCurrentWorldPosition;
     bool hasBoxSelectionWorldPositions;
     readonly List<Transform> selectedSelectionRoots = new List<Transform>();
+    SelectionOutlineRenderer selectionOutline;
     GameObject selectionPivot;
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
@@ -290,6 +292,11 @@ public class LevelEditor : MonoBehaviour
         if (scaleFromEdgeControlsUI != null)
             scaleFromEdgeControlsUI.Initialize(this);
 
+        if (selectionOutlineMaterial != null && LayerMask.NameToLayer("EditorGuides") >= 0)
+            selectionOutline = new SelectionOutlineRenderer(selectionOutlineMaterial);
+        else
+            Debug.LogError("LevelEditor requires a selection outline material and the EditorGuides layer.", this);
+
         // Scene-authored levels do not necessarily pass through LevelManager's load
         // path, so canonicalize their existing circular roots here as well.
         if (levelObjectsCollection != null)
@@ -344,6 +351,14 @@ public class LevelEditor : MonoBehaviour
     {
         UpdateActiveScreenSpaceTransformControl();
         RefreshBoxSelectionVisualFromWorld();
+        if (selectionOutline != null && CameraViewManager.Instance != null &&
+            CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
+            selectionOutline.Draw(activeCamera);
+    }
+
+    void OnDestroy()
+    {
+        selectionOutline?.Dispose();
     }
 
     private void OnEnable()
@@ -1337,6 +1352,7 @@ public class LevelEditor : MonoBehaviour
 
     void HideSelectionControls()
     {
+        selectionOutline?.Clear();
         if (selectionControlsUI != null)
         {
             selectionControlsUI.SetSelectedTransform(null);
@@ -1441,6 +1457,7 @@ public class LevelEditor : MonoBehaviour
 
     void ConfigureSelectionControlsForSelectedObject()
     {
+        selectionOutline?.SetSelection(selectedSelectionRoots);
         if (!TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
             return;
 
