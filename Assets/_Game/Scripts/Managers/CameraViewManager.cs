@@ -9,6 +9,7 @@ public class CameraViewManager : MonoBehaviour
     [SerializeField] Camera menuCamera;
     [SerializeField] Camera playerCamera;
     [SerializeField] Camera levelEditorCamera;
+    [SerializeField] Camera levelPreviewCamera;
 
     Camera activeWorldCamera;
 
@@ -78,6 +79,24 @@ public class CameraViewManager : MonoBehaviour
     {
         activeCamera = activeWorldCamera;
         return activeCamera != null && activeCamera.enabled;
+    }
+
+    public bool TryGetLevelPreviewCameras(out Camera worldCamera, out Camera previewCamera)
+    {
+        previewCamera = levelPreviewCamera;
+        if (!TryGetActiveWorldCamera(out worldCamera))
+        {
+            Debug.LogError("CameraViewManager cannot capture a level preview without an active world camera.", this);
+            return false;
+        }
+
+        if (previewCamera == null || previewCamera == worldCamera || !previewCamera.gameObject.activeInHierarchy)
+        {
+            Debug.LogError("CameraViewManager requires a separate, active Level Preview Camera object.", this);
+            return false;
+        }
+
+        return true;
     }
 
     bool ActivateWorldCamera(Camera targetCamera, string cameraName)

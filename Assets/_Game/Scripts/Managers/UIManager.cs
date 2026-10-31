@@ -51,9 +51,6 @@ public class UIManager : MonoBehaviour
     [SerializeField] GameObject playerModeRoot;
     [SerializeField] GameObject levelEditorModeRoot;
 
-    [Header("Persistent UI")]
-    [SerializeField] GameObject uiRoot;
-
     [Header("World HUD")]
     [SerializeField] GameObject levelEditorHUD;
     [SerializeField] GameObject playerHUD;
@@ -67,8 +64,6 @@ public class UIManager : MonoBehaviour
     LevelEditor levelEditor;
     WorldMode menuReturnMode;
     int levelRevisionWhenMenuOpened = -1;
-    bool isUiHiddenForPreviewCapture;
-    bool uiRootWasActive;
 
     public void ShowLastActiveUiBeforeOpeningMainMenu()
     {
@@ -122,30 +117,6 @@ public class UIManager : MonoBehaviour
         HideWorldHud();
         EventManager.Instance.UnselectObject();
         EventManager.Instance.HidePlayerInWorldUiElements();
-    }
-
-    public void HideUiForPreviewCapture()
-    {
-        if (isUiHiddenForPreviewCapture)
-            return;
-
-        isUiHiddenForPreviewCapture = true;
-        uiRootWasActive = uiRoot != null && uiRoot.activeSelf;
-
-        // All screen UI, including both HUDs and modal menus, now lives below UIRoot.
-        if (uiRoot != null)
-            uiRoot.SetActive(false);
-    }
-
-    public void RestoreUiAfterPreviewCapture()
-    {
-        if (!isUiHiddenForPreviewCapture)
-            return;
-
-        if (uiRoot != null)
-            uiRoot.SetActive(uiRootWasActive);
-
-        isUiHiddenForPreviewCapture = false;
     }
 
     void ShowLevelSelectionMenu(LevelSource source)

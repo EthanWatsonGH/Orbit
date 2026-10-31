@@ -235,19 +235,77 @@ public class LevelManager : MonoBehaviour
 
     IEnumerator CaptureLevelPreview(Action<byte[]> onComplete)
     {
-        UIManager.Instance.HideUiForPreviewCapture();
-
-        // wait until the end of the frame before taking the screenshot since the UI is actually hidden at the end of the frame
+        // Wait for the current editor camera position to settle for this frame.
         yield return new WaitForEndOfFrame();
 
-        Texture2D screenshot = ScreenCapture.CaptureScreenshotAsTexture();
-        byte[] previewImageBytes = screenshot.EncodeToPNG();
-        Destroy(screenshot);
+        if (CameraViewManager.Instance == null ||
+            !CameraViewManager.Instance.TryGetLevelPreviewCameras(out Camera worldCamera, out Camera previewCamera))
+        {
+            Debug.LogError("Level preview could not be captured because its cameras are unavailable.", this);
+            onComplete?.Invoke(null);
+            yield break;
+        }
 
-        UIManager.Instance.RestoreUiAfterPreviewCapture();
+        int width = worldCamera.pixelWidth;
+        int height = worldCamera.pixelHeight;
+        if (width <= 0 || height <= 0)
+        {
+            Debug.LogError("Level preview could not be captured because the active camera has no renderable area.", this);
+            onComplete?.Invoke(null);
+            yield break;
+        }
 
-        onComplete?.Invoke(previewImageBytes);
+        onComplete?.Invoke(RenderLevelPreview(worldCamera, previewCamera, width, height));
     }
+
+    static byte[] RenderLevelPreview(Camera worldCamera, Camera previewCamera, int width, int height)
+    {
+        // This camera has its own culling mask and never renders the screen-space UI.
+        // Match the visible world view while keeping the preview background opaque.
+        previewCamera.enabled = false;
+        previewCamera.transform.SetPositionAndRotation(worldCamera.transform.position, worldCamera.transform.rotation);
+        previewCamera.orthographic = worldCamera.orthographic;
+        previewCamera.orthographicSize = worldCamera.orthographicSize;
+        previewCamera.fieldOfView = worldCamera.fieldOfView;
+        previewCamera.nearClipPlane = worldCamera.nearClipPlane;
+        previewCamera.farClipPlane = worldCamera.farClipPlane;
+        previewCamera.aspect = worldCamera.aspect;
+        previewCamera.clearFlags = CameraClearFlags.SolidColor;
+        Color background = worldCamera.backgroundColor;
+        background.a = 1f;
+        previewCamera.backgroundColor = background;
+
+        RenderTexture previousActive = RenderTexture.active;
+        RenderTexture previousTarget = previewCamera.targetTexture;
+        RenderTexture renderTarget = null;
+        Texture2D image = null;
+        try
+        {
+            renderTarget = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+            previewCamera.targetTexture = renderTarget;
+            previewCamera.Render();
+            RenderTexture.active = renderTarget;
+            // RGB24 makes the PNG opaque without altering the already-composited colors.
+            image = new Texture2D(width, height, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            image.Apply();
+            return image.EncodeToPNG();
+        }
+        finally
+        {
+            previewCamera.targetTexture = previousTarget;
+            RenderTexture.active = previousActive;
+            if (renderTarget != null)
+                RenderTexture.ReleaseTemporary(renderTarget);
+            if (image != null)
+                Destroy(image);
+        }
+
+    }
+
+    // TODO(prefab-previews): Render isolated prefab copies on demand with a transparent
+    // background, then cache the results. Review LevelObjectIconCamera for built-in icons
+    // and handle translucent objects correctly in transparent PNGs.
 
     // Saving the JSON is synchronous; only preview capture and disk I/O need the coroutine.
     // Callers that temporarily alter editor-only state may safely restore it once this method
