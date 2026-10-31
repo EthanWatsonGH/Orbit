@@ -43,8 +43,8 @@ public class LevelManager : MonoBehaviour
         public byte loaderVersion;
     }
 
-    // Version 1 stores objects in parent-first order. parentIndex is the only
-    // hierarchy data needed: -1 means the level root, otherwise it points to an earlier object.
+    // Version 1 stores objects in parent-first order. p is the only hierarchy data needed
+    // -1 means the level root, otherwise it points to an earlier object.
     [System.Serializable]
     struct LevelV1
     {
@@ -53,21 +53,20 @@ public class LevelManager : MonoBehaviour
         public string levelName;
         public string levelAuthor;
         public long savedAtUtcTicks;
-        public float playerStartPointXPosition;
-        public float playerStartPointYPosition;
+        public float startX;
+        public float startY;
         public List<LevelObjectV1> levelObjects;
 
         [System.Serializable]
         public struct LevelObjectV1
         {
-            // "Group" is reserved for an empty hierarchy object. Other values are prefab names.
-            public string type;
-            public int parentIndex;
-            public float xPosition;
-            public float yPosition;
-            public float xScale;
-            public float yScale;
-            public float rotation;
+            public string t; // Prefab name or "Group".
+            public int p; // Parent index.
+            public float x; // Local X position.
+            public float y; // Local Y position.
+            public float sx; // Local X scale.
+            public float sy; // Local Y scale.
+            public float r; // Local Z rotation.
         }
     }
     #endregion
@@ -160,8 +159,8 @@ public class LevelManager : MonoBehaviour
         level.levelAuthor = "TODO";
         level.loaderVersion = LOADER_VERSION;
         level.savedAtUtcTicks = DateTime.UtcNow.Ticks;
-        level.playerStartPointXPosition = playerStartPoint.transform.position.x;
-        level.playerStartPointYPosition = playerStartPoint.transform.position.y;
+        level.startX = playerStartPoint.transform.position.x;
+        level.startY = playerStartPoint.transform.position.y;
 
         if (!AppendLevelObjects(levelObjectsContainer.transform, -1, level.levelObjects))
         {
@@ -186,13 +185,13 @@ public class LevelManager : MonoBehaviour
             int childIndex = serializedObjects.Count;
             serializedObjects.Add(new LevelV1.LevelObjectV1
             {
-                type = type,
-                parentIndex = parentIndex,
-                xPosition = childTransform.localPosition.x,
-                yPosition = childTransform.localPosition.y,
-                xScale = childTransform.localScale.x,
-                yScale = childTransform.localScale.y,
-                rotation = childTransform.localEulerAngles.z
+                t = type,
+                p = parentIndex,
+                x = childTransform.localPosition.x,
+                y = childTransform.localPosition.y,
+                sx = childTransform.localScale.x,
+                sy = childTransform.localScale.y,
+                r = childTransform.localEulerAngles.z
             });
 
             if (!AppendLevelObjects(childTransform, childIndex, serializedObjects))
@@ -291,7 +290,7 @@ public class LevelManager : MonoBehaviour
     {
         try
         {
-            string json = JsonUtility.ToJson(level, true);
+            string json = JsonUtility.ToJson(level, false);
 
             string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
             string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
@@ -415,40 +414,40 @@ public class LevelManager : MonoBehaviour
 
     void LoadLevelVersionOne(LevelV1 loadedLevel)
     {
-        BeginLoadingLevel(loadedLevel.playerStartPointXPosition, loadedLevel.playerStartPointYPosition);
+        BeginLoadingLevel(loadedLevel.startX, loadedLevel.startY);
 
         List<Transform> loadedTransforms = new List<Transform>();
         foreach (LevelV1.LevelObjectV1 levelObject in loadedLevel.levelObjects ?? new List<LevelV1.LevelObjectV1>())
         {
             Transform parentTransform = levelObjectsContainer.transform;
-            if (levelObject.parentIndex != -1)
+            if (levelObject.p != -1)
             {
-                if (levelObject.parentIndex < 0 || levelObject.parentIndex >= loadedTransforms.Count)
+                if (levelObject.p < 0 || levelObject.p >= loadedTransforms.Count)
                 {
-                    Debug.LogError("Version 1 level object '" + levelObject.type + "' has an invalid parent index.");
+                    Debug.LogError("Version 1 level object '" + levelObject.t + "' has an invalid parent index.");
                     loadedTransforms.Add(null);
                     continue;
                 }
 
-                parentTransform = loadedTransforms[levelObject.parentIndex];
+                parentTransform = loadedTransforms[levelObject.p];
                 if (parentTransform == null)
                 {
-                    Debug.LogError("Version 1 level object '" + levelObject.type + "' cannot load because its parent could not be created.");
+                    Debug.LogError("Version 1 level object '" + levelObject.t + "' cannot load because its parent could not be created.");
                     loadedTransforms.Add(null);
                     continue;
                 }
             }
 
-            GameObject loadedObject = CreateLevelObject(levelObject.type, parentTransform);
+            GameObject loadedObject = CreateLevelObject(levelObject.t, parentTransform);
             if (loadedObject == null)
             {
                 loadedTransforms.Add(null);
                 continue;
             }
 
-            loadedObject.transform.localPosition = new Vector3(levelObject.xPosition, levelObject.yPosition, 0f);
-            loadedObject.transform.localRotation = Quaternion.Euler(0f, 0f, levelObject.rotation);
-            loadedObject.transform.localScale = new Vector3(levelObject.xScale, levelObject.yScale, 1f);
+            loadedObject.transform.localPosition = new Vector3(levelObject.x, levelObject.y, 0f);
+            loadedObject.transform.localRotation = Quaternion.Euler(0f, 0f, levelObject.r);
+            loadedObject.transform.localScale = new Vector3(levelObject.sx, levelObject.sy, 1f);
             loadedTransforms.Add(loadedObject.transform);
         }
 

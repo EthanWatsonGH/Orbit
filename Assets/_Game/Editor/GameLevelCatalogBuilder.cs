@@ -79,7 +79,7 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
         }
 
         string catalogPath = GameLevelsDirectory + "/" + CatalogFileName;
-        string catalogJson = JsonUtility.ToJson(catalog, true);
+        string catalogJson = JsonUtility.ToJson(catalog, false);
         if (File.Exists(catalogPath) && File.ReadAllText(catalogPath) == catalogJson)
             return;
 

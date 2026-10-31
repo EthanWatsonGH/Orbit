@@ -187,12 +187,14 @@ public sealed class LevelStorage
         try
         {
             EnsureLocalContentDirectory(source);
+            // Initialize or migrate the catalog before creating the new payload,
+            // so a first save cannot be discovered as a second legacy level.
+            LevelCatalog catalog = LoadLocalCatalog(source);
             File.WriteAllText(GetLocalContentPath(source, record.payloadFileName), levelJson);
 
             if (!string.IsNullOrEmpty(record.previewFileName))
                 File.WriteAllBytes(GetLocalContentPath(source, record.previewFileName), previewImageBytes);
 
-            LevelCatalog catalog = LoadLocalCatalog(source);
             catalog.levels.RemoveAll(existingRecord => existingRecord.id == record.id);
             catalog.levels.Add(record);
             return SaveLocalCatalog(source, catalog);
@@ -292,7 +294,7 @@ public sealed class LevelStorage
         try
         {
             EnsureLocalContentDirectory(source);
-            File.WriteAllText(GetLocalContentPath(source, CatalogFileName), JsonUtility.ToJson(catalog, true));
+            File.WriteAllText(GetLocalContentPath(source, CatalogFileName), JsonUtility.ToJson(catalog, false));
             return true;
         }
         catch (Exception exception)
