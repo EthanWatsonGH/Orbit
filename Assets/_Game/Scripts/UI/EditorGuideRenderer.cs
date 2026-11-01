@@ -88,8 +88,7 @@ public sealed class EditorGuideRenderer
         rect.yMax += padding;
         float min = infinite ? float.NegativeInfinity : 0f;
         float max = infinite ? float.PositiveInfinity : 1f;
-        if (!ClipAxis(origin.x, direction.x, rect.xMin, rect.xMax, ref min, ref max) ||
-            !ClipAxis(origin.y, direction.y, rect.yMin, rect.yMax, ref min, ref max))
+        if (!EditorScreenLineClipper.Clip(origin, direction, rect, ref min, ref max))
             return;
 
         Vector2 clippedStart = origin + direction * min;
@@ -113,18 +112,6 @@ public sealed class EditorGuideRenderer
         matrix.SetColumn(2, camera.transform.forward);
         matrix.SetColumn(3, new Vector4(worldCenter.x, worldCenter.y, worldCenter.z, 1f));
         Graphics.DrawMesh(quad, matrix, material, layer, camera, 0, null, false, false);
-    }
-
-    static bool ClipAxis(float origin, float direction, float lower, float upper, ref float min, ref float max)
-    {
-        if (Mathf.Abs(direction) < 0.00001f)
-            return origin >= lower && origin <= upper;
-
-        float first = (lower - origin) / direction;
-        float second = (upper - origin) / direction;
-        min = Mathf.Max(min, Mathf.Min(first, second));
-        max = Mathf.Min(max, Mathf.Max(first, second));
-        return min <= max;
     }
 
     public void Dispose()

@@ -81,7 +81,6 @@ MonoBehaviour:
   deselectObjectButton: {fileID: 0}
   snapVerticalButton: {fileID: 0}
   snapHorizontalButton: {fileID: 0}
-  scaleIncrementDropdown: {fileID: 0}
   rotateIncrementDropdown: {fileID: 0}
   moveIncrementDropdown: {fileID: 0}
   levelObjectsCollection: {fileID: 0}
@@ -91,6 +90,8 @@ MonoBehaviour:
   boxSelectionVisual: {fileID: 0}
   selectionOutlineMaterial: {fileID: 2100000, guid: d4f1d525af48414fbf1406ba279f1192, type: 2}
   editorGuideMaterial: {fileID: 2100000, guid: ee02e47a0c864188837d2ab283a3ff39, type: 2}
+  editorGridMaterial: {fileID: 2100000, guid: c5cfda435ae24f6aac1b0c016732b621, type: 2}
+  scaleSnapHighlightMaterial: {fileID: 2100000, guid: 68b14465ea574026ac1fb44a4c3c5c99, type: 2}
 --- !u!1 &8416907593556687488
 GameObject:
   m_ObjectHideFlags: 0

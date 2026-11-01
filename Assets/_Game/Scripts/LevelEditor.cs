@@ -40,7 +40,6 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject snapHorizontalButton;
     [SerializeField] GameObject createPersistentGroupButton;
     [SerializeField] GameObject ungroupPersistentGroupButton;
-    [SerializeField] TMP_Dropdown scaleIncrementDropdown;
     [SerializeField] TMP_Dropdown rotateIncrementDropdown;
     [SerializeField] TMP_Dropdown moveIncrementDropdown;
 
@@ -57,6 +56,8 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] RectTransform boxSelectionVisual;
     [SerializeField] Material selectionOutlineMaterial;
     [SerializeField] Material editorGuideMaterial;
+    [SerializeField] Material editorGridMaterial;
+    [SerializeField] Material scaleSnapHighlightMaterial;
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
@@ -95,6 +96,8 @@ public class LevelEditor : MonoBehaviour
     readonly List<Transform> selectedSelectionRoots = new List<Transform>();
     SelectionOutlineRenderer selectionOutline;
     EditorGuideRenderer editorGuides;
+    EditorGridRenderer editorGrid;
+    ScaleSnapHighlightRenderer scaleSnapHighlights;
     GameObject selectionPivot;
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
@@ -189,6 +192,8 @@ public class LevelEditor : MonoBehaviour
         public ScaleFromEdgeHandle handle;
         public bool scalesFromBothSides;
         public bool scalesIndependently;
+        public bool snapToWorld;
+        public float distanceIncrement;
         public ScaleFromEdgeFrame frameAtStart;
         public Vector3 selectedLocalScaleAtStart;
         public Vector3 selectedWorldPositionAtStart;
@@ -197,6 +202,15 @@ public class LevelEditor : MonoBehaviour
         public float maximumXFactor;
         public float minimumYFactor;
         public float maximumYFactor;
+    }
+
+    struct WorldScalePath
+    {
+        public Vector3 origin;
+        public Vector3 direction;
+        public float minimum;
+        public float maximum;
+        public float distancePerFactor;
     }
 
     // object movement
@@ -222,7 +236,7 @@ public class LevelEditor : MonoBehaviour
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
     readonly List<SelectionTransformState> activeSelectionTransformStates = new List<SelectionTransformState>();
-    float moveIncrement = 0f;
+    float distanceIncrement = 0f;
     Vector3 moveIncrementOffset = new Vector3(0f, 0f, 0f);
     bool wasShiftModeHeldDuringMove;
     Vector3 shiftMoveGuideOrigin;
@@ -240,8 +254,8 @@ public class LevelEditor : MonoBehaviour
 
     // object scaling
     float maximumScale = 999999f;
-    float scaleIncrement = 0f;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
+    bool hasScaleGridFrame;
     bool isShiftModeButtonHeld;
     bool isCtrlModeButtonHeld;
 
@@ -305,6 +319,16 @@ public class LevelEditor : MonoBehaviour
         else
             Debug.LogError("LevelEditor requires an editor guide material and the EditorGuides layer.", this);
 
+        if (editorGridMaterial != null && LayerMask.NameToLayer("EditorGuides") >= 0)
+            editorGrid = new EditorGridRenderer(editorGridMaterial);
+        else
+            Debug.LogError("LevelEditor requires an editor grid material and the EditorGuides layer.", this);
+
+        if (scaleSnapHighlightMaterial != null && LayerMask.NameToLayer("EditorGuides") >= 0)
+            scaleSnapHighlights = new ScaleSnapHighlightRenderer(scaleSnapHighlightMaterial);
+        else
+            Debug.LogError("LevelEditor requires a scale snap highlight material and the EditorGuides layer.", this);
+
         // Scene-authored levels do not necessarily pass through LevelManager's load
         // path, so canonicalize their existing circular roots here as well.
         if (levelObjectsCollection != null)
@@ -344,7 +368,7 @@ public class LevelEditor : MonoBehaviour
         // setup increment dropdown listeners
         moveIncrementDropdown.onValueChanged.AddListener(OnMoveIncrementDropdownChanged);
         rotateIncrementDropdown.onValueChanged.AddListener(OnRotateIncrementDropdownChanged);
-        scaleIncrementDropdown.onValueChanged.AddListener(OnScaleIncrementDropdownChanged);
+        OnMoveIncrementDropdownChanged(moveIncrementDropdown.value);
     }
 
     void Update()
@@ -362,8 +386,10 @@ public class LevelEditor : MonoBehaviour
         if (CameraViewManager.Instance != null &&
             CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
         {
+            DrawIncrementGrid(activeCamera);
             selectionOutline?.Draw(activeCamera);
             editorGuides?.Draw(activeCamera);
+            DrawScaleSnapHighlights(activeCamera);
         }
     }
 
@@ -371,6 +397,66 @@ public class LevelEditor : MonoBehaviour
     {
         selectionOutline?.Dispose();
         editorGuides?.Dispose();
+        editorGrid?.Dispose();
+        scaleSnapHighlights?.Dispose();
+    }
+
+    void DrawScaleSnapHighlights(Camera camera)
+    {
+        if (scaleSnapHighlights == null || activeTransform != ActiveTransform.ScaleFromEdge ||
+            !activeScaleFromEdgeGesture.snapToWorld || activeScaleFromEdgeGesture.distanceIncrement <= 0f ||
+            !TryGetWorldScalePath(activeScaleFromEdgeGesture, out WorldScalePath path) ||
+            !TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame currentFrame))
+            return;
+
+        scaleSnapHighlights.Draw(camera, path.origin, path.direction, path.minimum, path.maximum,
+            activeScaleFromEdgeGesture.distanceIncrement, currentFrame.GetHandlePosition(activeScaleFromEdgeGesture.handle));
+    }
+
+    void DrawIncrementGrid(Camera camera)
+    {
+        if (!IsScaleMode || IsWorldTransform || selectedObject == null)
+            hasScaleGridFrame = false;
+
+        if (editorGrid == null || distanceIncrement <= 0f)
+            return;
+
+        Vector3 origin = Vector3.zero;
+        Vector3 right = Vector3.right;
+        Vector3 up = Vector3.up;
+        if (!IsWorldTransform && selectedObject != null)
+        {
+            if (activeTransform == ActiveTransform.ScaleFromEdge || (IsScaleMode && hasScaleGridFrame))
+            {
+                ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
+                origin = gesture.frameAtStart.GetHandlePosition(gesture.handle);
+                right = gesture.frameAtStart.right;
+                up = gesture.frameAtStart.up;
+                if (DoesScaleFromEdgeHandleScaleX(gesture.handle) &&
+                    DoesScaleFromEdgeHandleScaleY(gesture.handle) && !gesture.scalesIndependently)
+                {
+                    right = (GetScaleFromEdgeHandleXSign(gesture.handle) * right * gesture.frameAtStart.Width +
+                             GetScaleFromEdgeHandleYSign(gesture.handle) * up * gesture.frameAtStart.Height).normalized;
+                    up = new Vector3(-right.y, right.x, 0f);
+                }
+            }
+            else if (activeTransform == ActiveTransform.Move)
+                origin = moveIncrementOffset;
+            else if (IsScaleMode)
+            {
+                origin = selectedObject.transform.position;
+                right = selectedObject.transform.right;
+                up = selectedObject.transform.up;
+            }
+            else
+            {
+                Vector3 position = selectedObject.transform.position;
+                origin = new Vector3(position.x - RoundToIncrement(position.x, distanceIncrement),
+                    position.y - RoundToIncrement(position.y, distanceIncrement), 0f);
+            }
+        }
+
+        editorGrid.Draw(camera, distanceIncrement, origin, right, up);
     }
 
     private void OnEnable()
@@ -407,19 +493,13 @@ public class LevelEditor : MonoBehaviour
     void OnMoveIncrementDropdownChanged(int index)
     {
         string selected = SanitizeSelectedValue(moveIncrementDropdown.options[index].text);
-        moveIncrement = float.Parse(selected);
+        distanceIncrement = float.Parse(selected);
     }
 
     void OnRotateIncrementDropdownChanged(int index)
     {
         string selected = SanitizeSelectedValue(rotateIncrementDropdown.options[index].text);
         rotateIncrement = float.Parse(selected);
-    }
-
-    void OnScaleIncrementDropdownChanged(int index)
-    {
-        string selected = SanitizeSelectedValue(scaleIncrementDropdown.options[index].text);
-        scaleIncrement = float.Parse(selected);
     }
 
     #endregion
@@ -1169,6 +1249,8 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject == nextSelectedObject)
             return;
 
+        hasScaleGridFrame = false;
+
         if (!updateSelectionHistory)
         {
             selectedObject = nextSelectedObject;
@@ -1756,8 +1838,8 @@ public class LevelEditor : MonoBehaviour
         else
         {
             moveIncrementOffset = new Vector3(
-                selectedObjectPositionAtStartMove.x - RoundToIncrement(selectedObjectPositionAtStartMove.x, moveIncrement),
-                selectedObjectPositionAtStartMove.y - RoundToIncrement(selectedObjectPositionAtStartMove.y, moveIncrement),
+                selectedObjectPositionAtStartMove.x - RoundToIncrement(selectedObjectPositionAtStartMove.x, distanceIncrement),
+                selectedObjectPositionAtStartMove.y - RoundToIncrement(selectedObjectPositionAtStartMove.y, distanceIncrement),
                 0f);
         }
 
@@ -1813,8 +1895,8 @@ public class LevelEditor : MonoBehaviour
         }
         else
         {
-            float newX = RoundToIncrement(pointerWorldPosition.x + moveOffset.x, moveIncrement) + moveIncrementOffset.x;
-            float newY = RoundToIncrement(pointerWorldPosition.y + moveOffset.y, moveIncrement) + moveIncrementOffset.y;
+            float newX = RoundToIncrement(pointerWorldPosition.x + moveOffset.x - moveIncrementOffset.x, distanceIncrement) + moveIncrementOffset.x;
+            float newY = RoundToIncrement(pointerWorldPosition.y + moveOffset.y - moveIncrementOffset.y, distanceIncrement) + moveIncrementOffset.y;
             desiredPosition = new Vector3(newX, newY, 0f);
         }
 
@@ -1935,8 +2017,8 @@ public class LevelEditor : MonoBehaviour
         // In local mode, moveIncrementOffset preserves the object's initial offset
         // from the world grid, so the guide remains on that same effective lattice.
         return new Vector3(
-            RoundToIncrement(position.x - moveIncrementOffset.x, moveIncrement) + moveIncrementOffset.x,
-            RoundToIncrement(position.y - moveIncrementOffset.y, moveIncrement) + moveIncrementOffset.y,
+            RoundToIncrement(position.x - moveIncrementOffset.x, distanceIncrement) + moveIncrementOffset.x,
+            RoundToIncrement(position.y - moveIncrementOffset.y, distanceIncrement) + moveIncrementOffset.y,
             0f);
     }
 
@@ -2076,16 +2158,64 @@ public class LevelEditor : MonoBehaviour
         return true;
     }
 
+    // Shared by snapping and its visual highlights so both use the same path
+    // and the same size limits, including an off-center Shift scaling pivot.
+    static bool TryGetWorldScalePath(ScaleFromEdgeGesture gesture, out WorldScalePath path)
+    {
+        path = default;
+        bool scalesX = DoesScaleFromEdgeHandleScaleX(gesture.handle);
+        bool scalesY = DoesScaleFromEdgeHandleScaleY(gesture.handle);
+        if (scalesX && scalesY && gesture.scalesIndependently)
+            return false;
+
+        ScaleFromEdgeFrame frame = gesture.frameAtStart;
+        path.origin = frame.GetHandlePosition(gesture.handle);
+        float first;
+        float last;
+        if (scalesX && scalesY)
+        {
+            Vector3 factorDirection = gesture.scalesFromBothSides
+                ? path.origin - frame.pivot
+                : GetScaleFromEdgeHandleXSign(gesture.handle) * frame.right * frame.Width +
+                  GetScaleFromEdgeHandleYSign(gesture.handle) * frame.up * frame.Height;
+            path.distancePerFactor = factorDirection.magnitude;
+            if (path.distancePerFactor <= Mathf.Epsilon)
+                return false;
+            path.direction = factorDirection / path.distancePerFactor;
+            float minimumFactor = Mathf.Max(gesture.minimumXFactor, gesture.minimumYFactor);
+            float maximumFactor = Mathf.Max(minimumFactor, Mathf.Min(gesture.maximumXFactor, gesture.maximumYFactor));
+            first = (minimumFactor - 1f) * path.distancePerFactor;
+            last = (maximumFactor - 1f) * path.distancePerFactor;
+        }
+        else
+        {
+            float sign = scalesX ? GetScaleFromEdgeHandleXSign(gesture.handle) : GetScaleFromEdgeHandleYSign(gesture.handle);
+            path.direction = sign * (scalesX ? frame.right : frame.up);
+            float edge = scalesX ? (sign > 0f ? frame.maxX : frame.minX) : (sign > 0f ? frame.maxY : frame.minY);
+            path.distancePerFactor = gesture.scalesFromBothSides ? sign * edge : (scalesX ? frame.Width : frame.Height);
+            float minimumFactor = scalesX ? gesture.minimumXFactor : gesture.minimumYFactor;
+            float maximumFactor = scalesX ? gesture.maximumXFactor : gesture.maximumYFactor;
+            first = (minimumFactor - 1f) * path.distancePerFactor;
+            last = (Mathf.Max(minimumFactor, maximumFactor) - 1f) * path.distancePerFactor;
+        }
+
+        path.minimum = Mathf.Min(first, last);
+        path.maximum = Mathf.Max(first, last);
+        return true;
+    }
+
     void UpdateScaleFromEdgeSelectedObject(Vector3 pointerWorldPosition)
     {
         ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
         bool shouldScaleFromBothSides = IsScaleFromEdgeBothSidesModeHeld();
         bool shouldScaleIndependently = ShouldScaleCornerIndependently(gesture.handle);
+        bool snapToWorld = IsWorldTransform;
         if (gesture.scalesFromBothSides != shouldScaleFromBothSides ||
-            gesture.scalesIndependently != shouldScaleIndependently)
+            gesture.scalesIndependently != shouldScaleIndependently ||
+            gesture.distanceIncrement != distanceIncrement || gesture.snapToWorld != snapToWorld)
         {
-            // Begin a fresh gesture at the current size and pointer location when
-            // a modifier changes. This changes the anchor without a visual jump.
+            // Rebase at the current size and pointer when the anchor or snapping
+            // mode changes. World snapping can then align the handle to the grid.
             if (!TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame currentFrame))
                 return;
 
@@ -2102,6 +2232,8 @@ public class LevelEditor : MonoBehaviour
         bool scalesX = DoesScaleFromEdgeHandleScaleX(gesture.handle);
         bool scalesY = DoesScaleFromEdgeHandleScaleY(gesture.handle);
         bool scalesUniformly = scalesX && scalesY;
+        bool snapWorld = gesture.snapToWorld && gesture.distanceIncrement > 0f;
+        Vector3 startHandle = gesture.frameAtStart.GetHandlePosition(gesture.handle);
 
         float xFactor = 1f;
         float yFactor = 1f;
@@ -2113,37 +2245,90 @@ public class LevelEditor : MonoBehaviour
             float diagonalExtent = Mathf.Sqrt(
                 gesture.frameAtStart.Width * gesture.frameAtStart.Width +
                 gesture.frameAtStart.Height * gesture.frameAtStart.Height);
-            float uniformFactor = GetScaleFromEdgeGestureFactor(
-                gesture.scalesFromBothSides,
-                diagonalExtent,
-                Vector3.Dot(pointerDelta, movingCornerDirection),
-                Mathf.Max(gesture.minimumXFactor, gesture.minimumYFactor),
-                Mathf.Min(gesture.maximumXFactor, gesture.maximumYFactor));
-            xFactor = uniformFactor;
-            yFactor = uniformFactor;
+            float minimumFactor = Mathf.Max(gesture.minimumXFactor, gesture.minimumYFactor);
+            float maximumFactor = Mathf.Max(minimumFactor, Mathf.Min(gesture.maximumXFactor, gesture.maximumYFactor));
+            float outwardDistance = Vector3.Dot(pointerDelta, movingCornerDirection);
+            if (snapWorld)
+            {
+                if (!TryGetWorldScalePath(gesture, out WorldScalePath path))
+                    return;
+                outwardDistance = Vector3.Dot(pointerDelta, path.direction);
+                if (!WorldScaleSnapping.TrySnapAlongLine(path.origin, path.direction, outwardDistance,
+                    path.minimum, path.maximum, gesture.distanceIncrement, out outwardDistance))
+                    return;
+                xFactor = yFactor = Mathf.Clamp(1f + outwardDistance / path.distancePerFactor, minimumFactor, maximumFactor);
+            }
+            else
+            {
+                outwardDistance = RoundToIncrement(outwardDistance, gesture.distanceIncrement);
+                xFactor = yFactor = GetScaleFromEdgeGestureFactor(
+                    gesture.scalesFromBothSides, diagonalExtent, outwardDistance, minimumFactor, maximumFactor);
+            }
         }
         else
         {
+            Vector3 xDirection = GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right;
+            Vector3 yDirection = GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up;
+            float xDistance = Vector3.Dot(pointerDelta, xDirection);
+            float yDistance = Vector3.Dot(pointerDelta, yDirection);
+            float xSign = GetScaleFromEdgeHandleXSign(gesture.handle);
+            float ySign = GetScaleFromEdgeHandleYSign(gesture.handle);
+            float xPerFactor = gesture.scalesFromBothSides
+                ? xSign * (xSign > 0f ? gesture.frameAtStart.maxX : gesture.frameAtStart.minX)
+                : gesture.frameAtStart.Width;
+            float yPerFactor = gesture.scalesFromBothSides
+                ? ySign * (ySign > 0f ? gesture.frameAtStart.maxY : gesture.frameAtStart.minY)
+                : gesture.frameAtStart.Height;
+            float xFirst = (gesture.minimumXFactor - 1f) * xPerFactor;
+            float xLast = (Mathf.Max(gesture.minimumXFactor, gesture.maximumXFactor) - 1f) * xPerFactor;
+            float yFirst = (gesture.minimumYFactor - 1f) * yPerFactor;
+            float yLast = (Mathf.Max(gesture.minimumYFactor, gesture.maximumYFactor) - 1f) * yPerFactor;
+            Vector2 minimumDistance = new Vector2(
+                Mathf.Min(xFirst, xLast), Mathf.Min(yFirst, yLast));
+            Vector2 maximumDistance = new Vector2(
+                Mathf.Max(xFirst, xLast), Mathf.Max(yFirst, yLast));
+
+            if (snapWorld && scalesX && scalesY)
+            {
+                if (!WorldScaleSnapping.TrySnapCorner(startHandle, xDirection, yDirection,
+                    new Vector2(xDistance, yDistance), minimumDistance, maximumDistance,
+                    gesture.distanceIncrement, out Vector2 snappedDistance))
+                    return;
+                xDistance = snappedDistance.x;
+                yDistance = snappedDistance.y;
+            }
+            else if (snapWorld && scalesX)
+            {
+                if (!TryGetWorldScalePath(gesture, out WorldScalePath path) ||
+                    !WorldScaleSnapping.TrySnapAlongLine(path.origin, path.direction, xDistance,
+                        path.minimum, path.maximum, gesture.distanceIncrement, out xDistance))
+                    return;
+            }
+            else if (snapWorld && scalesY)
+            {
+                if (!TryGetWorldScalePath(gesture, out WorldScalePath path) ||
+                    !WorldScaleSnapping.TrySnapAlongLine(path.origin, path.direction, yDistance,
+                        path.minimum, path.maximum, gesture.distanceIncrement, out yDistance))
+                    return;
+            }
+            else
+            {
+                xDistance = RoundToIncrement(xDistance, gesture.distanceIncrement);
+                yDistance = RoundToIncrement(yDistance, gesture.distanceIncrement);
+            }
+
             if (scalesX)
             {
-                Vector3 outwardDirection = GetScaleFromEdgeHandleXSign(gesture.handle) * gesture.frameAtStart.right;
-                xFactor = GetScaleFromEdgeGestureFactor(
-                    gesture.scalesFromBothSides,
-                    gesture.frameAtStart.Width,
-                    Vector3.Dot(pointerDelta, outwardDirection),
-                    gesture.minimumXFactor,
-                    gesture.maximumXFactor);
+                xFactor = snapWorld
+                    ? GetWorldSnappedScaleFactor(xDistance, xPerFactor, gesture.minimumXFactor, gesture.maximumXFactor)
+                    : GetScaleFromEdgeGestureFactor(gesture.scalesFromBothSides, gesture.frameAtStart.Width, xDistance, gesture.minimumXFactor, gesture.maximumXFactor);
             }
 
             if (scalesY)
             {
-                Vector3 outwardDirection = GetScaleFromEdgeHandleYSign(gesture.handle) * gesture.frameAtStart.up;
-                yFactor = GetScaleFromEdgeGestureFactor(
-                    gesture.scalesFromBothSides,
-                    gesture.frameAtStart.Height,
-                    Vector3.Dot(pointerDelta, outwardDirection),
-                    gesture.minimumYFactor,
-                    gesture.maximumYFactor);
+                yFactor = snapWorld
+                    ? GetWorldSnappedScaleFactor(yDistance, yPerFactor, gesture.minimumYFactor, gesture.maximumYFactor)
+                    : GetScaleFromEdgeGestureFactor(gesture.scalesFromBothSides, gesture.frameAtStart.Height, yDistance, gesture.minimumYFactor, gesture.maximumYFactor);
             }
         }
 
@@ -2207,11 +2392,14 @@ public class LevelEditor : MonoBehaviour
         bool scalesFromBothSides,
         bool scalesIndependently)
     {
+        hasScaleGridFrame = !IsWorldTransform;
         activeScaleFromEdgeGesture = new ScaleFromEdgeGesture
         {
             handle = handle,
             scalesFromBothSides = scalesFromBothSides,
             scalesIndependently = scalesIndependently,
+            snapToWorld = IsWorldTransform,
+            distanceIncrement = distanceIncrement,
             frameAtStart = frameAtStart,
             selectedLocalScaleAtStart = selectedObject.transform.localScale,
             selectedWorldPositionAtStart = selectedObject.transform.position,
@@ -2341,6 +2529,13 @@ public class LevelEditor : MonoBehaviour
         float desiredFactor = 1f + (2f * outwardPointerDistance / startExtent);
         maximumFactor = Mathf.Max(minimumFactor, maximumFactor);
         return Mathf.Clamp(desiredFactor, minimumFactor, maximumFactor);
+    }
+
+    static float GetWorldSnappedScaleFactor(float distance, float distancePerFactor, float minimumFactor, float maximumFactor)
+    {
+        if (Mathf.Abs(distancePerFactor) <= Mathf.Epsilon)
+            return 1f;
+        return Mathf.Clamp(1f + distance / distancePerFactor, minimumFactor, Mathf.Max(minimumFactor, maximumFactor));
     }
 
     static float GetEdgeScaleFactor(float startExtent, float outwardPointerDistance, float minimumFactor, float maximumFactor)
