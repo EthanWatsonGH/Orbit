@@ -3,19 +3,50 @@ using UnityEngine;
 public class EditorHUD : MonoBehaviour
 {
     [SerializeField] LevelEditor levelEditor;
+    [SerializeField] GameObject deleteSelectedObjectsButton;
+    [SerializeField] RectTransform objectSelectionBar;
+
+    void Awake()
+    {
+        RefreshDeleteSelectedObjectsButton();
+    }
+
+    void OnEnable()
+    {
+        if (levelEditor != null)
+            levelEditor.SetObjectSelectionBar(objectSelectionBar);
+        RefreshDeleteSelectedObjectsButton();
+    }
+
+    void Update()
+    {
+        RefreshDeleteSelectedObjectsButton();
+    }
+
+    void RefreshDeleteSelectedObjectsButton()
+    {
+        if (deleteSelectedObjectsButton == null)
+            return;
+
+        bool show = levelEditor != null && levelEditor.CanDeleteSelectedObjects;
+        if (deleteSelectedObjectsButton.activeSelf != show)
+            deleteSelectedObjectsButton.SetActive(show);
+    }
 
     public void Bind(LevelEditor targetLevelEditor)
     {
         levelEditor = targetLevelEditor;
+        if (levelEditor != null && isActiveAndEnabled)
+            levelEditor.SetObjectSelectionBar(objectSelectionBar);
+        RefreshDeleteSelectedObjectsButton();
     }
 
-    public void SetPointerIsOverObjectSelectionBarTrue() => levelEditor?.SetPointerIsOverObjectSelectionBarTrue();
-    public void SetPointerIsOverObjectSelectionBarFalse() => levelEditor?.SetPointerIsOverObjectSelectionBarFalse();
     public void CopyLevelCodeToClipboard() => levelEditor?.CopyLevelCodeToClipboard();
     public void SaveLevel() => levelEditor?.SaveLevel();
     public void SnapSelectedObjectToLastHorizontal() => levelEditor?.SnapSelectedObjectToLastHorizontal();
     public void SnapSelectedObjectToLastVertical() => levelEditor?.SnapSelectedObjectToLastVertical();
     public void DeselectObject() => levelEditor?.DeselectObject();
+    public void DeleteSelectedObjects() => levelEditor?.DeleteSelectedObjects();
     public void CreatePersistentGroup() => levelEditor?.CreatePersistentGroup();
     public void UngroupSelectedPersistentGroup() => levelEditor?.UngroupSelectedPersistentGroup();
     public void LoadLevelFromClipboard() => levelEditor?.LoadLevelFromClipboard();

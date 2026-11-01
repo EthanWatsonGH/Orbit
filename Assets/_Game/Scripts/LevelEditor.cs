@@ -59,7 +59,7 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
-    bool pointerIsOverObjectSelectionBar = false;
+    RectTransform objectSelectionBar;
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
     // A deselection is not a new selection yet. Keep it briefly so reselecting the
@@ -507,6 +507,7 @@ public class LevelEditor : MonoBehaviour
 
     private void OnDisable()
     {
+        CancelPlacement();
         scaleSnapHighlights?.Clear();
         CancelActiveTransform();
         pointerInteraction = EditorPointerInteraction.None;
@@ -635,38 +636,46 @@ public class LevelEditor : MonoBehaviour
 
     void HandlePlacePrefab()
     {
-        if (objectCurrentlyTryingToPlace != null &&
-            isTryingToPlace &&
-            pointerInteraction == EditorPointerInteraction.PlaceObject)
+        if (!isTryingToPlace || pointerInteraction != EditorPointerInteraction.PlaceObject)
+            return;
+
+        PointerInput pointer = PointerInput.Instance;
+        if (pointer.WasCanceledThisFrame)
         {
-            // make the object the player is currently trying to place follow the pointer
-            if (PointerInput.Instance.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
-                objectCurrentlyTryingToPlace.transform.position = pointerWorldPosition;
-
-            // dont show object that is currently trying to be placed when over object selection bar
-            if (pointerIsOverObjectSelectionBar)
-                objectCurrentlyTryingToPlace.SetActive(false);
-            else
-                objectCurrentlyTryingToPlace.SetActive(true);
-
-            // stop following pointer and finish placing object
-            if (PointerInput.Instance.WasReleasedThisFrame && isTryingToPlace)
-            {
-                isTryingToPlace = false;
-
-                if (pointerIsOverObjectSelectionBar) // if player tries to place object over object selection bar, delete the object to cancel placement
-                {
-                    Destroy(objectCurrentlyTryingToPlace);
-                }
-                else // place object
-                {
-                    SelectObject(objectCurrentlyTryingToPlace);
-                    ConfigureSelectionControlsForSelectedObject();
-                }
-
-                objectCurrentlyTryingToPlace = null;
-            }
+            CancelPlacement();
+            return;
         }
+
+        // Wait until the drag first reaches the world before creating anything.
+        // Once created, the object stays visible even if the pointer returns to the bar.
+        if (objectCurrentlyTryingToPlace == null && (pointer.IsHeld || pointer.WasReleasedThisFrame) &&
+            !IsOverObjectSelectionBar(pointer.ScreenPosition) && !UiHitTest.IsScreenPositionOverUi(pointer.ScreenPosition) &&
+            pointer.TryGetWorldPositionNoDepth(pointer.ScreenPosition, out Vector3 initialPosition))
+        {
+            objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, initialPosition, Quaternion.identity, levelObjectsCollection.transform);
+        }
+
+        if (objectCurrentlyTryingToPlace != null && pointer.TryGetWorldPositionNoDepth(pointer.ScreenPosition, out Vector3 pointerWorldPosition))
+            objectCurrentlyTryingToPlace.transform.position = pointerWorldPosition;
+
+        if (pointer.WasReleasedThisFrame)
+        {
+            isTryingToPlace = false;
+            if (objectCurrentlyTryingToPlace != null)
+            {
+                SelectObject(objectCurrentlyTryingToPlace);
+                ConfigureSelectionControlsForSelectedObject();
+            }
+            objectCurrentlyTryingToPlace = null;
+        }
+    }
+
+    void CancelPlacement()
+    {
+        if (objectCurrentlyTryingToPlace != null)
+            Destroy(objectCurrentlyTryingToPlace);
+        objectCurrentlyTryingToPlace = null;
+        isTryingToPlace = false;
     }
 
     void HandleSelectObject()
@@ -1826,15 +1835,15 @@ public class LevelEditor : MonoBehaviour
 
     void CompleteActiveTransform()
     {
-        EndActiveTransform(deleteMovedObject: true);
+        EndActiveTransform();
     }
 
     void CancelActiveTransform()
     {
-        EndActiveTransform(deleteMovedObject: false);
+        EndActiveTransform();
     }
 
-    void EndActiveTransform(bool deleteMovedObject)
+    void EndActiveTransform()
     {
         ActiveTransform transformToEnd = activeTransform;
         if (transformToEnd == ActiveTransform.None)
@@ -1847,7 +1856,7 @@ public class LevelEditor : MonoBehaviour
         switch (transformToEnd)
         {
             case ActiveTransform.Move:
-                EndMoveSelectedObject(deleteMovedObject);
+                EndMoveSelectedObject();
                 break;
             case ActiveTransform.Rotate:
                 EndRotateSelectedObject();
@@ -1963,9 +1972,6 @@ public class LevelEditor : MonoBehaviour
 
         selectedObject.transform.position = desiredPosition;
         ApplyMoveToSelectedRoots(desiredPosition - selectedObjectPositionAtStartMove);
-
-        SetSelectedRootsActive(!pointerIsOverObjectSelectionBar || !CanDeleteSelectedRoots());
-
     }
 
     void ApplyMoveToSelectedRoots(Vector3 movement)
@@ -1994,22 +2000,16 @@ public class LevelEditor : MonoBehaviour
 
     bool CanDeleteSelectedRoots()
     {
+        bool hasRoot = false;
         foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            if (selectionRoot != null && selectionRoot.name == "PlayerStartPoint")
+            if (selectionRoot == null)
+                continue;
+            if (playerStartPoint != null && selectionRoot == playerStartPoint.transform)
                 return false;
+            hasRoot = true;
         }
-
-        return selectedSelectionRoots.Count > 0;
-    }
-
-    void SetSelectedRootsActive(bool active)
-    {
-        foreach (Transform selectionRoot in selectedSelectionRoots)
-        {
-            if (selectionRoot != null)
-                selectionRoot.gameObject.SetActive(active);
-        }
+        return hasRoot;
     }
 
     Vector3 GetShiftConstrainedMovePosition(Vector3 intendedPosition)
@@ -2099,7 +2099,7 @@ public class LevelEditor : MonoBehaviour
             0f);
     }
 
-    void EndMoveSelectedObject(bool deleteMovedObject)
+    void EndMoveSelectedObject()
     {
         editorGuides?.HideMoveGuides();
         wasShiftModeHeldDuringMove = false;
@@ -2107,19 +2107,16 @@ public class LevelEditor : MonoBehaviour
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
         NormalizeSelectedRootRotations();
+    }
 
-        if (deleteMovedObject && selectedObject != null &&
-            pointerIsOverObjectSelectionBar && CanDeleteSelectedRoots())
-        {
+    public bool CanDeleteSelectedObjects => selectedObject != null && activeTransform == ActiveTransform.None &&
+        !isTryingToPlace && !(hasSelectionDragExceededThreshold && PointerInput.Instance != null && PointerInput.Instance.IsHeld) &&
+        CanDeleteSelectedRoots();
+
+    public void DeleteSelectedObjects()
+    {
+        if (CanDeleteSelectedObjects)
             DeleteSelectedRoots();
-            deselectObjectButton.gameObject.SetActive(false);
-        }
-        else if (selectedObject != null)
-        {
-            // A cancelled move must not leave an object hidden merely because the
-            // pointer last passed over the delete area.
-            SetSelectedRootsActive(true);
-        }
     }
 
     void DeleteSelectedRoots()
@@ -2679,15 +2676,11 @@ public class LevelEditor : MonoBehaviour
     #region Object Place Functions
     void StartTryingToPlaceObject()
     {
-        if (!PointerInput.Instance.TryGetCurrentWorldPosition(out Vector3 pointerWorldPosition))
-        {
-            Debug.LogError("LevelEditor could not begin placing an object because a valid pointer world position is unavailable.", this);
+        if (isTryingToPlace || activeTransform != ActiveTransform.None)
             return;
-        }
 
         isTryingToPlace = true;
         pointerInteraction = EditorPointerInteraction.PlaceObject;
-        objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, pointerWorldPosition, Quaternion.identity, levelObjectsCollection.transform);
     }
     public void PlaceBooster()
     {
@@ -2751,14 +2744,19 @@ public class LevelEditor : MonoBehaviour
     }
     #endregion
 
-    // UI events use these to update value of pointerIsOverObjectSelectionBar on pointer enter and exit
-    public void SetPointerIsOverObjectSelectionBarTrue()
+    public void SetObjectSelectionBar(RectTransform bar)
     {
-        pointerIsOverObjectSelectionBar = true;
+        objectSelectionBar = bar;
     }
-    public void SetPointerIsOverObjectSelectionBarFalse()
+
+    bool IsOverObjectSelectionBar(Vector2 screenPosition)
     {
-        pointerIsOverObjectSelectionBar = false;
+        if (objectSelectionBar == null)
+            return false;
+
+        Canvas canvas = objectSelectionBar.GetComponentInParent<Canvas>();
+        Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        return RectTransformUtility.RectangleContainsScreenPoint(objectSelectionBar, screenPosition, eventCamera);
     }
 
     // TODO: move these to ButtonEventCaller
