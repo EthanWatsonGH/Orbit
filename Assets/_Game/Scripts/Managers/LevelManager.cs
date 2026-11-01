@@ -56,18 +56,6 @@ public class LevelManager : MonoBehaviour
         public float startX;
         public float startY;
         public List<LevelObjectV1> levelObjects;
-
-        [System.Serializable]
-        public struct LevelObjectV1
-        {
-            public string t; // Prefab name or "Group".
-            public int p; // Parent index.
-            public float x; // Local X position.
-            public float y; // Local Y position.
-            public float sx; // Local X scale.
-            public float sy; // Local Y scale.
-            public float r; // Local Z rotation.
-        }
     }
     #endregion
 
@@ -146,7 +134,6 @@ public class LevelManager : MonoBehaviour
     bool TryGenerateLevelObject(out LevelV1 level)
     {
         level = new LevelV1();
-        level.levelObjects = new List<LevelV1.LevelObjectV1>();
 
         // get level name input, or just create one if nothing was input
         string levelName = "Custom Level " + DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
@@ -162,54 +149,13 @@ public class LevelManager : MonoBehaviour
         level.startX = playerStartPoint.transform.position.x;
         level.startY = playerStartPoint.transform.position.y;
 
-        if (!AppendLevelObjects(levelObjectsContainer.transform, -1, level.levelObjects))
+        if (!LevelObjectSerialization.TryCaptureChildren(levelObjectsContainer.transform, IsSupportedLevelObjectType, out level.levelObjects))
         {
             level = default;
             return false;
         }
 
         return true;
-    }
-
-    bool AppendLevelObjects(Transform parentTransform, int parentIndex, List<LevelV1.LevelObjectV1> serializedObjects)
-    {
-        foreach (Transform childTransform in parentTransform)
-        {
-            string type = GetLevelObjectType(childTransform);
-            if (!IsSupportedLevelObjectType(type))
-            {
-                Debug.LogError("Level could not be saved because '" + childTransform.name + "' is not a recognized level object or Group.", childTransform);
-                return false;
-            }
-
-            int childIndex = serializedObjects.Count;
-            serializedObjects.Add(new LevelV1.LevelObjectV1
-            {
-                t = type,
-                p = parentIndex,
-                x = childTransform.localPosition.x,
-                y = childTransform.localPosition.y,
-                sx = childTransform.localScale.x,
-                sy = childTransform.localScale.y,
-                r = childTransform.localEulerAngles.z
-            });
-
-            if (!AppendLevelObjects(childTransform, childIndex, serializedObjects))
-                return false;
-        }
-
-        return true;
-    }
-
-    static string GetLevelObjectType(Transform levelObjectTransform)
-    {
-        const string cloneSuffix = "(Clone)";
-        string type = levelObjectTransform.name.Trim();
-
-        if (type.EndsWith(cloneSuffix, StringComparison.Ordinal))
-            type = type.Substring(0, type.Length - cloneSuffix.Length).TrimEnd();
-
-        return type;
     }
 
     #region Copy Level To Clipboard
@@ -453,16 +399,8 @@ public class LevelManager : MonoBehaviour
 
         try
         {
-            LevelHeader header = JsonUtility.FromJson<LevelHeader>(levelLoadJson);
-            switch (header.loaderVersion)
-            {
-                case 1:
-                    LoadLevelVersionOne(JsonUtility.FromJson<LevelV1>(levelLoadJson));
-                    break;
-                default:
-                    Debug.LogError("Level could not be loaded because loader version " + header.loaderVersion + " is not supported.");
-                    break;
-            }
+            if (TryParseLevel(levelLoadJson, out LevelV1 level))
+                LoadLevelVersionOne(level);
         }
         catch (Exception exception)
         {
@@ -470,44 +408,26 @@ public class LevelManager : MonoBehaviour
         }
     }
 
+    static bool TryParseLevel(string json, out LevelV1 level)
+    {
+        LevelHeader header = JsonUtility.FromJson<LevelHeader>(json);
+        switch (header.loaderVersion)
+        {
+            case 1:
+                level = JsonUtility.FromJson<LevelV1>(json);
+                return true;
+            default:
+                Debug.LogError("Level could not be loaded because loader version " + header.loaderVersion + " is not supported.");
+                level = default;
+                return false;
+        }
+    }
+
     void LoadLevelVersionOne(LevelV1 loadedLevel)
     {
         BeginLoadingLevel(loadedLevel.startX, loadedLevel.startY);
 
-        List<Transform> loadedTransforms = new List<Transform>();
-        foreach (LevelV1.LevelObjectV1 levelObject in loadedLevel.levelObjects ?? new List<LevelV1.LevelObjectV1>())
-        {
-            Transform parentTransform = levelObjectsContainer.transform;
-            if (levelObject.p != -1)
-            {
-                if (levelObject.p < 0 || levelObject.p >= loadedTransforms.Count)
-                {
-                    Debug.LogError("Version 1 level object '" + levelObject.t + "' has an invalid parent index.");
-                    loadedTransforms.Add(null);
-                    continue;
-                }
-
-                parentTransform = loadedTransforms[levelObject.p];
-                if (parentTransform == null)
-                {
-                    Debug.LogError("Version 1 level object '" + levelObject.t + "' cannot load because its parent could not be created.");
-                    loadedTransforms.Add(null);
-                    continue;
-                }
-            }
-
-            GameObject loadedObject = CreateLevelObject(levelObject.t, parentTransform);
-            if (loadedObject == null)
-            {
-                loadedTransforms.Add(null);
-                continue;
-            }
-
-            loadedObject.transform.localPosition = new Vector3(levelObject.x, levelObject.y, 0f);
-            loadedObject.transform.localRotation = Quaternion.Euler(0f, 0f, levelObject.r);
-            loadedObject.transform.localScale = new Vector3(levelObject.sx, levelObject.sy, 1f);
-            loadedTransforms.Add(loadedObject.transform);
-        }
+        LevelObjectSerialization.InstantiateObjects(loadedLevel.levelObjects, levelObjectsContainer.transform, CreateLevelObject);
 
         FinishLoadingLevel();
     }
