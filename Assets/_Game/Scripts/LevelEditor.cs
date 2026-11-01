@@ -1030,28 +1030,56 @@ public class LevelEditor : MonoBehaviour
 
     public void UngroupSelectedPersistentGroup()
     {
-        if (activeTransform != ActiveTransform.None || !IsSelectedPersistentGroup ||
-            levelObjectsCollection == null)
-        {
+        if (activeTransform != ActiveTransform.None || !CanUngroupSelectedObjects())
             return;
-        }
 
-        Transform groupTransform = selectedObject.transform;
-        List<GameObject> formerMembers = new List<GameObject>(groupTransform.childCount);
-        foreach (Transform child in groupTransform)
+        List<Transform> membersToUngroup = new List<Transform>();
+        List<GameObject> selectionAfterUngrouping = new List<GameObject>();
+        foreach (Transform selectionRoot in selectedSelectionRoots)
         {
-            if (child == null || IsPersistentGroup(child.gameObject))
+            if (selectionRoot == null)
                 continue;
 
-            formerMembers.Add(child.gameObject);
+            if (IsPersistentGroup(selectionRoot.gameObject))
+            {
+                // Selecting a whole group still ungroups and selects all its members.
+                foreach (Transform child in selectionRoot)
+                {
+                    if (child == null || IsPersistentGroup(child.gameObject))
+                        continue;
+                    membersToUngroup.Add(child);
+                    selectionAfterUngrouping.Add(child.gameObject);
+                }
+            }
+            else
+            {
+                selectionAfterUngrouping.Add(selectionRoot.gameObject);
+                if (selectionRoot.parent != null && IsPersistentGroup(selectionRoot.parent.gameObject))
+                    membersToUngroup.Add(selectionRoot);
+            }
         }
 
-        foreach (GameObject formerMember in formerMembers)
-            formerMember.transform.SetParent(levelObjectsCollection.transform, true);
+        foreach (Transform member in membersToUngroup)
+            member.SetParent(levelObjectsCollection.transform, true);
 
-        DestroyPersistentGroup(groupTransform);
         NormalizePersistentGroups();
-        SelectObjects(formerMembers);
+        SelectObjects(selectionAfterUngrouping);
+    }
+
+    bool CanUngroupSelectedObjects()
+    {
+        if (levelObjectsCollection == null)
+            return false;
+
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot != null &&
+                (IsPersistentGroup(selectionRoot.gameObject) ||
+                 (selectionRoot.parent != null && IsPersistentGroup(selectionRoot.parent.gameObject))))
+                return true;
+        }
+
+        return false;
     }
 
     void EnsureSelectionPivot()
@@ -2716,7 +2744,7 @@ public class LevelEditor : MonoBehaviour
         if (createPersistentGroupButton != null)
             createPersistentGroupButton.SetActive(show && CanCreatePersistentGroup());
         if (ungroupPersistentGroupButton != null)
-            ungroupPersistentGroupButton.SetActive(show && IsSelectedPersistentGroup);
+            ungroupPersistentGroupButton.SetActive(show && CanUngroupSelectedObjects());
     }
 
     public void SwitchToPlayMode()
