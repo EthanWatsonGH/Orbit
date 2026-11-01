@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1000"
+   height="1000"
+   viewBox="0 0 1000 1000"
+   version="1.1"
+   id="svg2"
+   sodipodi:docname="Undo.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="namedview2"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="1.193"
+     inkscape:cx="500"
+     inkscape:cy="500"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <title
+     id="title1">Undo</title>
+  <g
+     fill="none"
+     id="g2">
+    <circle
+       cx="500"
+       cy="500"
+       r="450"
+       stroke="#000000"
+       stroke-width="100"
+       id="circle1" />
+    <circle
+       cx="500"
+       cy="500"
+       r="450"
+       stroke="#ffffff"
+       stroke-width="50"
+       id="circle2" />
+  </g>
+  <path
+     d="m 201.83864,378.74426 185,-115 v 77.5 h 220 a 202.5,202.5 0 0 1 0,405 h -220 v -75 h 220 a 127.5,127.5 0 0 0 0,-255 h -220 v 77.5 z"
+     fill="#ffffff"
+     stroke="#000000"
+     stroke-width="25"
+     stroke-linejoin="miter"
+     id="path2" />
+</svg>
