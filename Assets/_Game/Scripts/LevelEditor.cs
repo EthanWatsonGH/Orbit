@@ -239,6 +239,10 @@ public class LevelEditor : MonoBehaviour
     float distanceIncrement = 0f;
     Vector3 moveIncrementOffset = new Vector3(0f, 0f, 0f);
     bool wasShiftModeHeldDuringMove;
+    bool shiftMoveUsesWorldTransform;
+    bool shiftMoveHasSnapped;
+    bool preserveWorldMoveOrigin;
+    Vector3 worldMoveOrigin;
     Vector3 shiftMoveGuideOrigin;
     Vector3 shiftMoveGuideRight;
     Vector3 shiftMoveGuideUp;
@@ -256,6 +260,9 @@ public class LevelEditor : MonoBehaviour
     float maximumScale = 999999f;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
     bool hasScaleGridFrame;
+    bool selectionContainsCircularObject;
+    bool hasCurrentScaleFrame;
+    ScaleFromEdgeFrame currentScaleFrame;
     bool isShiftModeButtonHeld;
     bool isCtrlModeButtonHeld;
 
@@ -429,24 +436,35 @@ public class LevelEditor : MonoBehaviour
             if (activeTransform == ActiveTransform.ScaleFromEdge || (IsScaleMode && hasScaleGridFrame))
             {
                 ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
-                origin = gesture.frameAtStart.GetHandlePosition(gesture.handle);
-                right = gesture.frameAtStart.right;
-                up = gesture.frameAtStart.up;
-                if (DoesScaleFromEdgeHandleScaleX(gesture.handle) &&
-                    DoesScaleFromEdgeHandleScaleY(gesture.handle) && !gesture.scalesIndependently)
-                {
-                    right = (GetScaleFromEdgeHandleXSign(gesture.handle) * right * gesture.frameAtStart.Width +
-                             GetScaleFromEdgeHandleYSign(gesture.handle) * up * gesture.frameAtStart.Height).normalized;
-                    up = new Vector3(-right.y, right.x, 0f);
-                }
+                GetLocalScaleGridFrame(gesture.frameAtStart, gesture.handle, gesture.scalesIndependently,
+                    out origin, out right, out up);
             }
             else if (activeTransform == ActiveTransform.Move)
-                origin = moveIncrementOffset;
+            {
+                if (wasShiftModeHeldDuringMove)
+                {
+                    origin = shiftMoveGuideOrigin;
+                    right = shiftMoveGuideRight;
+                    up = shiftMoveGuideUp;
+                }
+                else
+                    origin = moveIncrementOffset;
+            }
             else if (IsScaleMode)
             {
-                origin = selectedObject.transform.position;
-                right = selectedObject.transform.right;
-                up = selectedObject.transform.up;
+                if (selectionContainsCircularObject && hasCurrentScaleFrame)
+                {
+                    // Use a corner's uniform-scale path before the first drag.
+                    // The active handle takes over once the player chooses one.
+                    GetLocalScaleGridFrame(currentScaleFrame, ScaleFromEdgeHandle.UpRight, false,
+                        out origin, out right, out up);
+                }
+                else
+                {
+                    origin = selectedObject.transform.position;
+                    right = selectedObject.transform.right;
+                    up = selectedObject.transform.up;
+                }
             }
             else
             {
@@ -457,6 +475,20 @@ public class LevelEditor : MonoBehaviour
         }
 
         editorGrid.Draw(camera, distanceIncrement, origin, right, up);
+    }
+
+    static void GetLocalScaleGridFrame(ScaleFromEdgeFrame frame, ScaleFromEdgeHandle handle, bool scalesIndependently,
+        out Vector3 origin, out Vector3 right, out Vector3 up)
+    {
+        origin = frame.GetHandlePosition(handle);
+        right = frame.right;
+        up = frame.up;
+        if (DoesScaleFromEdgeHandleScaleX(handle) && DoesScaleFromEdgeHandleScaleY(handle) && !scalesIndependently)
+        {
+            right = (GetScaleFromEdgeHandleXSign(handle) * right * frame.Width +
+                     GetScaleFromEdgeHandleYSign(handle) * up * frame.Height).normalized;
+            up = new Vector3(-right.y, right.x, 0f);
+        }
     }
 
     private void OnEnable()
@@ -1552,6 +1584,15 @@ public class LevelEditor : MonoBehaviour
     void ConfigureSelectionControlsForSelectedObject()
     {
         selectionOutline?.SetSelection(selectedSelectionRoots);
+        selectionContainsCircularObject = false;
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (ContainsRotationInvariantCircle(selectionRoot))
+            {
+                selectionContainsCircularObject = true;
+                break;
+            }
+        }
         if (!TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
             return;
 
@@ -1566,6 +1607,20 @@ public class LevelEditor : MonoBehaviour
                 availability.canScaleVertically,
                 availability.canScaleBoth);
         }
+    }
+
+    static bool ContainsRotationInvariantCircle(Transform root)
+    {
+        if (root == null)
+            return false;
+        if (IsRotationInvariantCircularObject(root.gameObject))
+            return true;
+        foreach (Transform child in root)
+        {
+            if (ContainsRotationInvariantCircle(child))
+                return true;
+        }
+        return false;
     }
 
     bool TryGetSelectionControlAvailability(out SelectionControlAvailability availability)
@@ -1829,19 +1884,10 @@ public class LevelEditor : MonoBehaviour
         selectedObjectPositionAtStartMove = selectedObject.transform.position;
         CaptureSelectionTransformStates();
         wasShiftModeHeldDuringMove = false;
+        preserveWorldMoveOrigin = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
-        if (IsWorldTransform)
-        {
-            moveIncrementOffset = Vector3.zero;
-        }
-        else
-        {
-            moveIncrementOffset = new Vector3(
-                selectedObjectPositionAtStartMove.x - RoundToIncrement(selectedObjectPositionAtStartMove.x, distanceIncrement),
-                selectedObjectPositionAtStartMove.y - RoundToIncrement(selectedObjectPositionAtStartMove.y, distanceIncrement),
-                0f);
-        }
+        moveIncrementOffset = GetMoveIncrementOffset(selectedObjectPositionAtStartMove);
 
         moveOffset = selectedObject.transform.position - pointerPositionAtStartMove;
         return true;
@@ -1886,6 +1932,13 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject == null)
             return;
 
+        bool shouldConstrainMove = IsShiftModeHeld &&
+            activeMoveControl is ObjectTransformControl.MoveBoth or ObjectTransformControl.Duplicate;
+        if (shouldConstrainMove && (!wasShiftModeHeldDuringMove || shiftMoveUsesWorldTransform != IsWorldTransform))
+            BeginShiftMoveGuides(pointerWorldPosition);
+        else if (!shouldConstrainMove && wasShiftModeHeldDuringMove)
+            EndShiftMoveGuides(pointerWorldPosition);
+
         // A quick click duplicates in place. It starts moving only after the same threshold the
         // legacy world-space control used, so the two control systems feel the same.
         Vector3 desiredPosition;
@@ -1893,14 +1946,23 @@ public class LevelEditor : MonoBehaviour
         {
             desiredPosition = selectedObjectPositionAtStartMove;
         }
+        else if (shouldConstrainMove)
+            desiredPosition = GetShiftConstrainedMovePosition(pointerWorldPosition + moveOffset);
         else
         {
             float newX = RoundToIncrement(pointerWorldPosition.x + moveOffset.x - moveIncrementOffset.x, distanceIncrement) + moveIncrementOffset.x;
             float newY = RoundToIncrement(pointerWorldPosition.y + moveOffset.y - moveIncrementOffset.y, distanceIncrement) + moveIncrementOffset.y;
             desiredPosition = new Vector3(newX, newY, 0f);
+            if (preserveWorldMoveOrigin)
+            {
+                Vector3 intendedPosition = pointerWorldPosition + moveOffset;
+                if ((intendedPosition - worldMoveOrigin).sqrMagnitude <= (intendedPosition - desiredPosition).sqrMagnitude)
+                    desiredPosition = worldMoveOrigin;
+                else
+                    preserveWorldMoveOrigin = false;
+            }
         }
 
-        UpdateShiftMoveGuides(ref desiredPosition);
         selectedObject.transform.position = desiredPosition;
         ApplyMoveToSelectedRoots(desiredPosition - selectedObjectPositionAtStartMove);
 
@@ -1952,27 +2014,11 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    void UpdateShiftMoveGuides(ref Vector3 desiredPosition)
+    Vector3 GetShiftConstrainedMovePosition(Vector3 intendedPosition)
     {
-        bool canUseShiftMoveGuides = activeMoveControl is ObjectTransformControl.MoveBoth or ObjectTransformControl.Duplicate;
-        bool shouldShowGuides = canUseShiftMoveGuides && IsShiftModeHeld;
-        if (!shouldShowGuides)
-        {
-            if (wasShiftModeHeldDuringMove)
-                editorGuides?.HideMoveGuides();
-
-            wasShiftModeHeldDuringMove = false;
-            activeShiftMoveConstraint = ShiftMoveConstraint.None;
-            return;
-        }
-
-        if (!wasShiftModeHeldDuringMove)
-            BeginShiftMoveGuides();
-
-        // Decide using the same candidate position the object would have without
-        // guides. That includes the grab offset and move increment, so the visual
-        // object and the guide-selection point stay aligned.
-        Vector3 candidateOffsetFromGuideOrigin = desiredPosition - shiftMoveGuideOrigin;
+        // Use the grab-adjusted position before snapping so grid steps cannot
+        // influence which axis the pointer is trying to follow.
+        Vector3 candidateOffsetFromGuideOrigin = intendedPosition - shiftMoveGuideOrigin;
         float distanceToRightGuide = Mathf.Abs(Vector3.Dot(candidateOffsetFromGuideOrigin, shiftMoveGuideUp));
         float distanceToUpGuide = Mathf.Abs(Vector3.Dot(candidateOffsetFromGuideOrigin, shiftMoveGuideRight));
 
@@ -1983,22 +2029,39 @@ public class LevelEditor : MonoBehaviour
         else if (distanceToUpGuide < distanceToRightGuide)
             activeShiftMoveConstraint = ShiftMoveConstraint.AlongUp;
 
-        if (activeShiftMoveConstraint == ShiftMoveConstraint.AlongRight)
+        Vector3 direction = activeShiftMoveConstraint == ShiftMoveConstraint.AlongRight
+            ? shiftMoveGuideRight : shiftMoveGuideUp;
+        float distance = Vector3.Dot(candidateOffsetFromGuideOrigin, direction);
+        if (shiftMoveUsesWorldTransform && distanceIncrement > 0f)
         {
-            float movementAlongRight = Vector3.Dot(desiredPosition - shiftMoveGuideOrigin, shiftMoveGuideRight);
-            desiredPosition = shiftMoveGuideOrigin + shiftMoveGuideRight * movementAlongRight;
+            if (WorldScaleSnapping.TrySnapAlongLine(shiftMoveGuideOrigin, direction, distance,
+                float.NegativeInfinity, float.PositiveInfinity, distanceIncrement, out float snappedDistance))
+            {
+                // An off-grid starting point remains still until the pointer is
+                // closer to a grid crossing, rather than jumping when Shift is pressed.
+                if (!shiftMoveHasSnapped && Mathf.Abs(distance) < Mathf.Abs(snappedDistance - distance))
+                    distance = 0f;
+                else
+                {
+                    distance = snappedDistance;
+                    shiftMoveHasSnapped = true;
+                }
+            }
         }
-        else if (activeShiftMoveConstraint == ShiftMoveConstraint.AlongUp)
-        {
-            float movementAlongUp = Vector3.Dot(desiredPosition - shiftMoveGuideOrigin, shiftMoveGuideUp);
-            desiredPosition = shiftMoveGuideOrigin + shiftMoveGuideUp * movementAlongUp;
-        }
+        else
+            distance = RoundToIncrement(distance, distanceIncrement);
+
+        return shiftMoveGuideOrigin + direction * distance;
     }
 
-    void BeginShiftMoveGuides()
+    void BeginShiftMoveGuides(Vector3 pointerWorldPosition)
     {
         wasShiftModeHeldDuringMove = true;
-        shiftMoveGuideOrigin = GetMoveIncrementAlignedPosition(selectedObject.transform.position);
+        shiftMoveUsesWorldTransform = IsWorldTransform;
+        shiftMoveHasSnapped = false;
+        preserveWorldMoveOrigin = false;
+        shiftMoveGuideOrigin = selectedObject.transform.position;
+        moveOffset = shiftMoveGuideOrigin - pointerWorldPosition;
 
         shiftMoveGuideRight = IsWorldTransform ? Vector3.right : selectedObject.transform.right;
         shiftMoveGuideUp = IsWorldTransform ? Vector3.up : selectedObject.transform.up;
@@ -2011,14 +2074,30 @@ public class LevelEditor : MonoBehaviour
         editorGuides?.ShowMoveGuides(shiftMoveGuideOrigin, shiftMoveGuideRight, shiftMoveGuideUp);
     }
 
-    Vector3 GetMoveIncrementAlignedPosition(Vector3 position)
+    void EndShiftMoveGuides(Vector3 pointerWorldPosition)
     {
-        // This is the same grid used by the unconstrained move candidate above.
-        // In local mode, moveIncrementOffset preserves the object's initial offset
-        // from the world grid, so the guide remains on that same effective lattice.
+        wasShiftModeHeldDuringMove = false;
+        activeShiftMoveConstraint = ShiftMoveConstraint.None;
+        editorGuides?.HideMoveGuides();
+        Vector3 position = selectedObject.transform.position;
+        moveOffset = position - pointerWorldPosition;
+        moveIncrementOffset = GetMoveIncrementOffset(position);
+        worldMoveOrigin = position;
+        Vector3 worldGridPosition = new Vector3(
+            RoundToIncrement(position.x, distanceIncrement),
+            RoundToIncrement(position.y, distanceIncrement), position.z);
+        float tolerance = 0.00001f * Mathf.Max(1f, distanceIncrement);
+        preserveWorldMoveOrigin = IsWorldTransform && distanceIncrement > 0f &&
+            (position - worldGridPosition).sqrMagnitude > tolerance * tolerance;
+    }
+
+    Vector3 GetMoveIncrementOffset(Vector3 position)
+    {
+        if (IsWorldTransform)
+            return Vector3.zero;
         return new Vector3(
-            RoundToIncrement(position.x - moveIncrementOffset.x, distanceIncrement) + moveIncrementOffset.x,
-            RoundToIncrement(position.y - moveIncrementOffset.y, distanceIncrement) + moveIncrementOffset.y,
+            position.x - RoundToIncrement(position.x, distanceIncrement),
+            position.y - RoundToIncrement(position.y, distanceIncrement),
             0f);
     }
 
@@ -2026,6 +2105,7 @@ public class LevelEditor : MonoBehaviour
     {
         editorGuides?.HideMoveGuides();
         wasShiftModeHeldDuringMove = false;
+        preserveWorldMoveOrigin = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
         NormalizeSelectedRootRotations();
@@ -2587,11 +2667,11 @@ public class LevelEditor : MonoBehaviour
                     availability.canScaleBoth);
             }
 
-            ScaleFromEdgeFrame scaleFromEdgeFrame = default;
-            bool hasScaleFromEdgeFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out scaleFromEdgeFrame);
-            scaleFromEdgeControlsUI.SetSelectionFrame(hasScaleFromEdgeFrame, scaleFromEdgeFrame);
+            currentScaleFrame = default;
+            hasCurrentScaleFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out currentScaleFrame);
+            scaleFromEdgeControlsUI.SetSelectionFrame(hasCurrentScaleFrame, currentScaleFrame);
             scaleFromEdgeControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
-            scaleFromEdgeControlsUI.SetControlsVisible(show && IsScaleMode && hasScaleFromEdgeFrame);
+            scaleFromEdgeControlsUI.SetControlsVisible(show && IsScaleMode && hasCurrentScaleFrame);
         }
 
         deselectObjectButton.SetActive(show);
