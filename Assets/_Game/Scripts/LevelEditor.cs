@@ -199,6 +199,7 @@ public class LevelEditor : MonoBehaviour
         public float maximumXFactor;
         public float minimumYFactor;
         public float maximumYFactor;
+        public bool preserveBelowMinimumStart;
     }
 
     struct WorldScalePath
@@ -2328,9 +2329,11 @@ public class LevelEditor : MonoBehaviour
                 if (!TryGetWorldScalePath(gesture, out WorldScalePath path))
                     return;
                 outwardDistance = Vector3.Dot(pointerDelta, path.direction);
+                float requestedDistance = outwardDistance;
                 if (!WorldScaleSnapping.TrySnapAlongLine(path.origin, path.direction, outwardDistance,
                     path.minimum, path.maximum, gesture.distanceIncrement, out outwardDistance))
                     return;
+                outwardDistance = PreserveBelowMinimumStart(requestedDistance, outwardDistance);
                 xFactor = yFactor = Mathf.Clamp(1f + outwardDistance / path.distancePerFactor, minimumFactor, maximumFactor);
             }
             else
@@ -2365,26 +2368,32 @@ public class LevelEditor : MonoBehaviour
 
             if (snapWorld && scalesX && scalesY)
             {
+                Vector2 requestedDistance = new Vector2(xDistance, yDistance);
                 if (!WorldScaleSnapping.TrySnapCorner(startHandle, xDirection, yDirection,
-                    new Vector2(xDistance, yDistance), minimumDistance, maximumDistance,
+                    requestedDistance, minimumDistance, maximumDistance,
                     gesture.distanceIncrement, out Vector2 snappedDistance))
                     return;
+                snappedDistance = PreserveBelowMinimumStart(requestedDistance, snappedDistance);
                 xDistance = snappedDistance.x;
                 yDistance = snappedDistance.y;
             }
             else if (snapWorld && scalesX)
             {
+                float requestedDistance = xDistance;
                 if (!TryGetWorldScalePath(gesture, out WorldScalePath path) ||
                     !WorldScaleSnapping.TrySnapAlongLine(path.origin, path.direction, xDistance,
                         path.minimum, path.maximum, gesture.distanceIncrement, out xDistance))
                     return;
+                xDistance = PreserveBelowMinimumStart(requestedDistance, xDistance);
             }
             else if (snapWorld && scalesY)
             {
+                float requestedDistance = yDistance;
                 if (!TryGetWorldScalePath(gesture, out WorldScalePath path) ||
                     !WorldScaleSnapping.TrySnapAlongLine(path.origin, path.direction, yDistance,
                         path.minimum, path.maximum, gesture.distanceIncrement, out yDistance))
                     return;
+                yDistance = PreserveBelowMinimumStart(requestedDistance, yDistance);
             }
             else
             {
@@ -2431,6 +2440,25 @@ public class LevelEditor : MonoBehaviour
 
         selectedObject.transform.position = newPosition;
         ApplyScaleToSelectedRoots(gesture, xFactor, yFactor, newPosition);
+    }
+
+    float PreserveBelowMinimumStart(float requestedDistance, float snappedDistance)
+    {
+        return PreserveBelowMinimumStart(new Vector2(requestedDistance, 0f), new Vector2(snappedDistance, 0f)).x;
+    }
+
+    Vector2 PreserveBelowMinimumStart(Vector2 requestedDistance, Vector2 snappedDistance)
+    {
+        if (!activeScaleFromEdgeGesture.preserveBelowMinimumStart)
+            return snappedDistance;
+
+        // Keep a pre-existing undersized object still until the pointer is closer
+        // to a valid grid point than to its original, possibly off-grid position.
+        if (requestedDistance.sqrMagnitude <= (snappedDistance - requestedDistance).sqrMagnitude)
+            return Vector2.zero;
+
+        activeScaleFromEdgeGesture.preserveBelowMinimumStart = false;
+        return snappedDistance;
     }
 
     void ApplyScaleToSelectedRoots(
@@ -2481,11 +2509,11 @@ public class LevelEditor : MonoBehaviour
         };
         CaptureSelectionTransformStates();
         GetScaleFactorLimits(
-            activeScaleFromEdgeGesture.selectedLocalScaleAtStart,
             out activeScaleFromEdgeGesture.minimumXFactor,
             out activeScaleFromEdgeGesture.maximumXFactor,
             out activeScaleFromEdgeGesture.minimumYFactor,
-            out activeScaleFromEdgeGesture.maximumYFactor);
+            out activeScaleFromEdgeGesture.maximumYFactor,
+            out activeScaleFromEdgeGesture.preserveBelowMinimumStart);
     }
 
     bool IsScaleFromEdgeBothSidesModeHeld()
@@ -2524,30 +2552,53 @@ public class LevelEditor : MonoBehaviour
     }
 
     void GetScaleFactorLimits(
-        Vector3 selectedLocalScaleAtStart,
         out float minimumXFactor,
         out float maximumXFactor,
         out float minimumYFactor,
-        out float maximumYFactor)
+        out float maximumYFactor,
+        out bool hasObjectBelowMinimum)
     {
         minimumXFactor = 0f;
         minimumYFactor = 0f;
         maximumXFactor = float.PositiveInfinity;
         maximumYFactor = float.PositiveInfinity;
+        hasObjectBelowMinimum = false;
 
-        foreach (Transform scaleConstrainedTransform in GetScaleConstraintTransforms())
+        foreach (Transform scaleConstrainedTransform in GetScaleLimitedObjects())
         {
             if (scaleConstrainedTransform == null)
                 continue;
 
-            float minimumObjectScale = GetMinimumObjectScale(scaleConstrainedTransform.gameObject);
-            float startingXScale = GetStartingEffectiveScale(scaleConstrainedTransform, true, selectedLocalScaleAtStart);
-            float startingYScale = GetStartingEffectiveScale(scaleConstrainedTransform, false, selectedLocalScaleAtStart);
+            float minimumSize = GetMinimumObjectSize(scaleConstrainedTransform.gameObject);
+            Vector2 size = GetWorldObjectSize(scaleConstrainedTransform);
+            float startingXSize = Mathf.Max(size.x, Mathf.Epsilon);
+            float startingYSize = Mathf.Max(size.y, Mathf.Epsilon);
+            float tolerance = minimumSize * 0.00001f;
+            hasObjectBelowMinimum |= startingXSize < minimumSize - tolerance || startingYSize < minimumSize - tolerance;
 
-            minimumXFactor = Mathf.Max(minimumXFactor, minimumObjectScale / startingXScale);
-            maximumXFactor = Mathf.Min(maximumXFactor, maximumScale / startingXScale);
-            minimumYFactor = Mathf.Max(minimumYFactor, minimumObjectScale / startingYScale);
-            maximumYFactor = Mathf.Min(maximumYFactor, maximumScale / startingYScale);
+            // An object already outside a limit may move back toward it without
+            // jumping to the limit as soon as a new drag starts.
+            minimumXFactor = Mathf.Max(minimumXFactor, Mathf.Min(1f, minimumSize / startingXSize));
+            maximumXFactor = Mathf.Min(maximumXFactor, Mathf.Max(1f, maximumScale / startingXSize));
+            minimumYFactor = Mathf.Max(minimumYFactor, Mathf.Min(1f, minimumSize / startingYSize));
+            maximumYFactor = Mathf.Min(maximumYFactor, Mathf.Max(1f, maximumScale / startingYSize));
+        }
+    }
+
+    IEnumerable<Transform> GetScaleLimitedObjects()
+    {
+        foreach (Transform selectionRoot in selectedSelectionRoots)
+        {
+            if (selectionRoot == null)
+                continue;
+
+            if (IsPersistentGroup(selectionRoot.gameObject))
+            {
+                foreach (Transform child in selectionRoot)
+                    yield return child;
+            }
+            else
+                yield return selectionRoot;
         }
     }
 
@@ -2576,28 +2627,27 @@ public class LevelEditor : MonoBehaviour
             yield return selectedObject.transform;
     }
 
-    float GetStartingEffectiveScale(Transform scaleConstrainedTransform, bool xAxis, Vector3 selectedLocalScaleAtStart)
+    static Vector2 GetWorldObjectSize(Transform target)
     {
-        float memberScale = Mathf.Abs(xAxis
-            ? scaleConstrainedTransform.localScale.x
-            : scaleConstrainedTransform.localScale.y);
+        Vector2 localSize = Vector2.one;
+        if (target.TryGetComponent(out BoxCollider2D box))
+            localSize = box.size;
+        else if (target.TryGetComponent(out CircleCollider2D circle))
+            localSize = Vector2.one * (circle.radius * 2f);
+        else if (target.TryGetComponent(out Renderer objectRenderer))
+            localSize = objectRenderer.localBounds.size;
 
-        // Only persistent groups actually parent their members. A multi-selection's
-        // pivot is separate, so its scale is already baked into each selected root.
-        if (IsSelectedPersistentGroup)
-        {
-            float groupScale = Mathf.Abs(xAxis
-                ? selectedLocalScaleAtStart.x
-                : selectedLocalScaleAtStart.y);
-            memberScale *= groupScale;
-        }
-
-        return Mathf.Max(memberScale, Mathf.Epsilon);
+        // Measure the object's own axes through the complete parent transform.
+        // Unlike an axis-aligned world bounding box, these lengths do not grow
+        // merely because the object is rotated.
+        return new Vector2(
+            target.TransformVector(new Vector3(localSize.x, 0f, 0f)).magnitude,
+            target.TransformVector(new Vector3(0f, localSize.y, 0f)).magnitude);
     }
 
-    static float GetMinimumObjectScale(GameObject levelObject)
+    static float GetMinimumObjectSize(GameObject levelObject)
     {
-        return levelObject.name.Contains("Puller") ? 3f : 0.2f;
+        return levelObject.name.Contains("Puller") || levelObject.name.Contains("Pusher") ? 3f : 0.2f;
     }
 
     static float GetCenteredScaleFactor(float startExtent, float outwardPointerDistance, float minimumFactor, float maximumFactor)
