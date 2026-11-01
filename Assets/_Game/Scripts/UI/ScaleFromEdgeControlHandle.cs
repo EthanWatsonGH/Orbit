@@ -2,15 +2,15 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class ScaleFromEdgeControlHandle : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+public class ScaleFromEdgeControlHandle : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, ICanvasRaycastFilter
 {
     ScaleFromEdgeHandle handle;
-    ScaleFromEdgeControlsUI controls;
+    SelectionControlsUI controls;
     int activePointerId = int.MinValue;
 
     void Awake()
     {
-        controls = GetComponentInParent<ScaleFromEdgeControlsUI>();
+        controls = GetComponentInParent<SelectionControlsUI>();
 
         // The prefab's direct child names are the source of truth for their handles,
         // so it remains setup-free when a visual is replaced.
@@ -19,6 +19,24 @@ public class ScaleFromEdgeControlHandle : MonoBehaviour, IPointerDownHandler, IP
             Debug.LogError($"Scale From Edge control '{gameObject.name}' must use one of the ScaleFromEdgeHandle names.", this);
             enabled = false;
         }
+    }
+
+    public bool IsRaycastLocationValid(Vector2 screenPosition, Camera eventCamera)
+    {
+        if (!(transform is RectTransform rectTransform) ||
+            !RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPosition, eventCamera, out Vector2 local))
+            return false;
+
+        Rect rect = rectTransform.rect;
+        if (rect.width <= 0f || rect.height <= 0f)
+            return false;
+
+        // Match the circular icon so the corners of rotated UI rectangles cannot
+        // intercept touches intended for a neighboring control.
+        Vector2 offset = local - rect.center;
+        float x = offset.x / (rect.width * 0.5f);
+        float y = offset.y / (rect.height * 0.5f);
+        return x * x + y * y <= 1f;
     }
 
     public void OnPointerDown(PointerEventData eventData)

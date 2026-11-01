@@ -50,9 +50,7 @@ public class LevelEditor : MonoBehaviour
 
     [Header("Screen Space UI")]
     [SerializeField] ToggleButton worldTransformToggle;
-    [SerializeField] ToggleButton scaleModeToggle;
     [SerializeField] SelectionControlsUI selectionControlsUI;
-    [SerializeField] ScaleFromEdgeControlsUI scaleFromEdgeControlsUI;
     [SerializeField] RectTransform boxSelectionVisual;
     [SerializeField] Material selectionOutlineMaterial;
     [SerializeField] Material editorGuideMaterial;
@@ -69,7 +67,6 @@ public class LevelEditor : MonoBehaviour
     // promotes this object to the last selected object.
     GameObject deselectedObjectAwaitingReplacement = null;
     bool IsWorldTransform => worldTransformToggle == null || worldTransformToggle.IsOn;
-    bool IsScaleMode => scaleModeToggle != null && scaleModeToggle.IsOn;
     bool IsSelectedPersistentGroup => IsPersistentGroup(selectedObject);
     bool HasMultipleSelection => selectedSelectionRoots.Count > 1;
     bool IsSelectedGroup => HasMultipleSelection || IsSelectedPersistentGroup;
@@ -259,7 +256,10 @@ public class LevelEditor : MonoBehaviour
     // object scaling
     float maximumScale = 999999f;
     ScaleFromEdgeGesture activeScaleFromEdgeGesture;
-    bool hasScaleGridFrame;
+    bool hasGestureGridFrame;
+    Vector3 gestureGridOrigin;
+    Vector3 gestureGridRight;
+    Vector3 gestureGridUp;
     bool selectionContainsCircularObject;
     bool hasCurrentScaleFrame;
     ScaleFromEdgeFrame currentScaleFrame;
@@ -283,9 +283,6 @@ public class LevelEditor : MonoBehaviour
         if (worldTransformToggle == null)
             Debug.LogError("LevelEditor is missing its World Transform Toggle reference. World transform mode will be used until it is assigned.", this);
 
-        if (scaleModeToggle == null)
-            Debug.LogError("LevelEditor is missing its Scale Mode Toggle reference. Assign it to access the scale controls.", this);
-
         if (selectionControlsUI == null)
         {
             SelectionControlsUI[] availableControls = FindObjectsByType<SelectionControlsUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -303,18 +300,6 @@ public class LevelEditor : MonoBehaviour
         }
 
         selectionControlsUI.Initialize(this);
-
-        if (scaleFromEdgeControlsUI == null)
-        {
-            ScaleFromEdgeControlsUI[] availableControls = FindObjectsByType<ScaleFromEdgeControlsUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            if (availableControls.Length == 1)
-                scaleFromEdgeControlsUI = availableControls[0];
-            else if (availableControls.Length > 1)
-                Debug.LogError("LevelEditor found more than one ScaleFromEdgeControlsUI. Assign the intended controls in the inspector.", this);
-        }
-
-        if (scaleFromEdgeControlsUI != null)
-            scaleFromEdgeControlsUI.Initialize(this);
 
         if (selectionOutlineMaterial != null && LayerMask.NameToLayer("EditorGuides") >= 0)
             selectionOutline = new SelectionOutlineRenderer(selectionOutlineMaterial);
@@ -393,11 +378,14 @@ public class LevelEditor : MonoBehaviour
         if (CameraViewManager.Instance != null &&
             CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
         {
+            scaleSnapHighlights?.BeginFrame(activeCamera);
             DrawIncrementGrid(activeCamera);
             selectionOutline?.Draw(activeCamera);
             editorGuides?.Draw(activeCamera);
-            DrawScaleSnapHighlights(activeCamera);
+            DrawTransformHighlights(activeCamera);
         }
+        else
+            scaleSnapHighlights?.Clear();
     }
 
     void OnDestroy()
@@ -408,22 +396,37 @@ public class LevelEditor : MonoBehaviour
         scaleSnapHighlights?.Dispose();
     }
 
-    void DrawScaleSnapHighlights(Camera camera)
+    void DrawTransformHighlights(Camera camera)
     {
-        if (scaleSnapHighlights == null || activeTransform != ActiveTransform.ScaleFromEdge ||
-            !activeScaleFromEdgeGesture.snapToWorld || activeScaleFromEdgeGesture.distanceIncrement <= 0f ||
-            !TryGetWorldScalePath(activeScaleFromEdgeGesture, out WorldScalePath path) ||
-            !TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame currentFrame))
+        if (scaleSnapHighlights == null || selectedObject == null || activeTransform == ActiveTransform.None)
             return;
 
-        scaleSnapHighlights.Draw(camera, path.origin, path.direction, path.minimum, path.maximum,
-            activeScaleFromEdgeGesture.distanceIncrement, currentFrame.GetHandlePosition(activeScaleFromEdgeGesture.handle));
+        if (activeTransform != ActiveTransform.ScaleFromEdge)
+        {
+            scaleSnapHighlights.DrawPoint(camera, selectedObject.transform.position);
+            return;
+        }
+
+        if (!TryGetScaleFromEdgeFrame(out ScaleFromEdgeFrame currentFrame))
+            return;
+
+        Vector3 currentHandle = currentFrame.GetHandlePosition(activeScaleFromEdgeGesture.handle);
+        if (activeScaleFromEdgeGesture.snapToWorld && activeScaleFromEdgeGesture.distanceIncrement > 0f &&
+            TryGetWorldScalePath(activeScaleFromEdgeGesture, out WorldScalePath path))
+        {
+            scaleSnapHighlights.Draw(camera, path.origin, path.direction, path.minimum, path.maximum,
+                activeScaleFromEdgeGesture.distanceIncrement, currentHandle);
+        }
+        else
+        {
+            scaleSnapHighlights.DrawPoint(camera, currentHandle);
+        }
     }
 
     void DrawIncrementGrid(Camera camera)
     {
-        if (!IsScaleMode || IsWorldTransform || selectedObject == null)
-            hasScaleGridFrame = false;
+        if (IsWorldTransform || selectedObject == null)
+            hasGestureGridFrame = false;
 
         if (editorGrid == null || distanceIncrement <= 0f)
             return;
@@ -433,11 +436,12 @@ public class LevelEditor : MonoBehaviour
         Vector3 up = Vector3.up;
         if (!IsWorldTransform && selectedObject != null)
         {
-            if (activeTransform == ActiveTransform.ScaleFromEdge || (IsScaleMode && hasScaleGridFrame))
+            if (activeTransform == ActiveTransform.ScaleFromEdge)
             {
                 ScaleFromEdgeGesture gesture = activeScaleFromEdgeGesture;
                 GetLocalScaleGridFrame(gesture.frameAtStart, gesture.handle, gesture.scalesIndependently,
                     out origin, out right, out up);
+                RememberGestureGridFrame(origin, right, up);
             }
             else if (activeTransform == ActiveTransform.Move)
             {
@@ -449,22 +453,19 @@ public class LevelEditor : MonoBehaviour
                 }
                 else
                     origin = moveIncrementOffset;
+                RememberGestureGridFrame(origin, right, up);
             }
-            else if (IsScaleMode)
+            else if (hasGestureGridFrame)
             {
-                if (selectionContainsCircularObject && hasCurrentScaleFrame)
-                {
-                    // Use a corner's uniform-scale path before the first drag.
-                    // The active handle takes over once the player chooses one.
-                    GetLocalScaleGridFrame(currentScaleFrame, ScaleFromEdgeHandle.UpRight, false,
-                        out origin, out right, out up);
-                }
-                else
-                {
-                    origin = selectedObject.transform.position;
-                    right = selectedObject.transform.right;
-                    up = selectedObject.transform.up;
-                }
+                origin = gestureGridOrigin;
+                right = gestureGridRight;
+                up = gestureGridUp;
+            }
+            else if (selectionContainsCircularObject && hasCurrentScaleFrame)
+            {
+                // Before the first transform, show a uniform-scale corner path.
+                GetLocalScaleGridFrame(currentScaleFrame, ScaleFromEdgeHandle.UpRight, false,
+                    out origin, out right, out up);
             }
             else
             {
@@ -475,6 +476,14 @@ public class LevelEditor : MonoBehaviour
         }
 
         editorGrid.Draw(camera, distanceIncrement, origin, right, up);
+    }
+
+    void RememberGestureGridFrame(Vector3 origin, Vector3 right, Vector3 up)
+    {
+        hasGestureGridFrame = true;
+        gestureGridOrigin = origin;
+        gestureGridRight = right;
+        gestureGridUp = up;
     }
 
     static void GetLocalScaleGridFrame(ScaleFromEdgeFrame frame, ScaleFromEdgeHandle handle, bool scalesIndependently,
@@ -498,6 +507,7 @@ public class LevelEditor : MonoBehaviour
 
     private void OnDisable()
     {
+        scaleSnapHighlights?.Clear();
         CancelActiveTransform();
         pointerInteraction = EditorPointerInteraction.None;
         hasBoxSelectionWorldPositions = false;
@@ -1281,7 +1291,7 @@ public class LevelEditor : MonoBehaviour
         if (selectedObject == nextSelectedObject)
             return;
 
-        hasScaleGridFrame = false;
+        hasGestureGridFrame = false;
 
         if (!updateSelectionHistory)
         {
@@ -1485,9 +1495,6 @@ public class LevelEditor : MonoBehaviour
             selectionControlsUI.SetVisible(false);
         }
 
-        if (scaleFromEdgeControlsUI != null)
-            scaleFromEdgeControlsUI.SetVisible(false);
-
         if (createPersistentGroupButton != null)
             createPersistentGroupButton.SetActive(false);
         if (ungroupPersistentGroupButton != null)
@@ -1596,17 +1603,8 @@ public class LevelEditor : MonoBehaviour
         if (!TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
             return;
 
-        selectionControlsUI.SetControlAvailability(
-            availability.canDuplicate,
-            availability.canRotate);
-
-        if (scaleFromEdgeControlsUI != null)
-        {
-            scaleFromEdgeControlsUI.SetControlAvailability(
-                availability.canScaleHorizontally,
-                availability.canScaleVertically,
-                availability.canScaleBoth);
-        }
+        selectionControlsUI.SetControlAvailability(availability.canDuplicate, availability.canRotate,
+            availability.canScaleHorizontally, availability.canScaleVertically, availability.canScaleBoth);
     }
 
     static bool ContainsRotationInvariantCircle(Transform root)
@@ -1699,7 +1697,7 @@ public class LevelEditor : MonoBehaviour
     // means both the controls and the editor continue to have one owner for object edits.
     public void BeginObjectTransformControl(ObjectTransformControl control, int pointerId, Vector2 screenPosition)
     {
-        if (IsScaleMode || selectedObject == null || activeTransform != ActiveTransform.None)
+        if (selectedObject == null || activeTransform != ActiveTransform.None)
             return;
 
         switch (control)
@@ -1729,7 +1727,7 @@ public class LevelEditor : MonoBehaviour
 
     public void BeginScaleFromEdgeControl(ScaleFromEdgeHandle handle, int pointerId, Vector2 screenPosition)
     {
-        if (!IsScaleMode || selectedObject == null || activeTransform != ActiveTransform.None ||
+        if (selectedObject == null || activeTransform != ActiveTransform.None ||
             !TryGetSelectionControlAvailability(out SelectionControlAvailability availability) ||
             !IsScaleFromEdgeHandleAvailable(handle, availability))
             return;
@@ -2472,7 +2470,6 @@ public class LevelEditor : MonoBehaviour
         bool scalesFromBothSides,
         bool scalesIndependently)
     {
-        hasScaleGridFrame = !IsWorldTransform;
         activeScaleFromEdgeGesture = new ScaleFromEdgeGesture
         {
             handle = handle,
@@ -2651,27 +2648,17 @@ public class LevelEditor : MonoBehaviour
         // Keep the object active while a UI drag is running, but hide its CanvasGroup. That
         // lets its pointer handler still receive the matching drag and release events.
         selectionControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
-        selectionControlsUI.SetControlsVisible(show && !IsScaleMode);
+        selectionControlsUI.SetControlsVisible(show);
 
-        if (scaleFromEdgeControlsUI != null)
+        currentScaleFrame = default;
+        hasCurrentScaleFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out currentScaleFrame);
+        selectionControlsUI.SetSelectionFrame(hasCurrentScaleFrame, currentScaleFrame);
+        if (TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
         {
-            if (TryGetSelectionControlAvailability(out SelectionControlAvailability availability))
-            {
-                // Reapply this during the regular refresh as well as at selection
-                // time. The edge-controls prefab can become active after its first
-                // selection was configured, so this prevents its default handle
-                // visibility from leaking into that first selection.
-                scaleFromEdgeControlsUI.SetControlAvailability(
-                    availability.canScaleHorizontally,
-                    availability.canScaleVertically,
-                    availability.canScaleBoth);
-            }
-
-            currentScaleFrame = default;
-            hasCurrentScaleFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out currentScaleFrame);
-            scaleFromEdgeControlsUI.SetSelectionFrame(hasCurrentScaleFrame, currentScaleFrame);
-            scaleFromEdgeControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
-            scaleFromEdgeControlsUI.SetControlsVisible(show && IsScaleMode && hasCurrentScaleFrame);
+            selectionControlsUI.SetControlAvailability(availability.canDuplicate, availability.canRotate,
+                availability.canScaleHorizontally && hasCurrentScaleFrame,
+                availability.canScaleVertically && hasCurrentScaleFrame,
+                availability.canScaleBoth && hasCurrentScaleFrame);
         }
 
         deselectObjectButton.SetActive(show);

@@ -19,17 +19,18 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties:
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _CandidateRadiusPixels: 3
-    - _CurrentRadiusPixels: 6
+    - _CandidateRadiusPixels: 4
+    - _CurrentRadiusPixels: 7
     m_Colors:
-    - _CandidateColor: {r: 0.1, g: 0.7, b: 1, a: 0.8}
     - _CurrentColor: {r: 1, g: 1, b: 1, a: 1}
-    - _OutlineColor: {r: 0, g: 0, b: 0, a: 0.8}
+    - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
+    - _XAxisColor: {r: 1, g: 0, b: 0, a: 0.78431374}
+    - _YAxisColor: {r: 0, g: 1, b: 0, a: 0.78431374}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

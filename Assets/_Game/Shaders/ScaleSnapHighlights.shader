@@ -3,7 +3,8 @@ Shader "Orbit/Scale Snap Highlights"
     Properties
     {
         _CurrentColor ("Current Point Color", Color) = (1, 1, 1, 1)
-        _CandidateColor ("Valid Point Color", Color) = (0.1, 0.7, 1, 0.8)
+        _XAxisColor ("X-Axis Crossing Color", Color) = (0.1, 0.35, 1, 0.8)
+        _YAxisColor ("Y-Axis Crossing Color", Color) = (0.1, 1, 0.2, 0.8)
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 0.8)
         _CurrentRadiusPixels ("Current Point Radius (pixels)", Float) = 6
         _CandidateRadiusPixels ("Valid Point Radius (pixels)", Float) = 3
@@ -23,8 +24,8 @@ Shader "Orbit/Scale Snap Highlights"
             #pragma fragment Fragment
             #include "UnityCG.cginc"
 
-            fixed4 _CurrentColor, _CandidateColor, _OutlineColor;
-            float _CurrentRadiusPixels, _CandidateRadiusPixels, _Spacing;
+            fixed4 _CurrentColor, _XAxisColor, _YAxisColor, _OutlineColor;
+            float _CurrentRadiusPixels, _CandidateRadiusPixels, _Spacing, _ShowCandidates;
             float4 _PathOrigin, _PathDirection, _CurrentPoint;
             float _PathMinimum, _PathMaximum;
 
@@ -70,13 +71,19 @@ Shader "Orbit/Scale Snap Highlights"
 
                 // Keep the current point visible even when dense candidate dots fade out.
                 float lineSpacingPixels = spacing / max(max(abs(direction.x), abs(direction.y)) * worldPerPixel, 0.000001);
-                float candidateFade = smoothstep(6.0, 14.0, lineSpacingPixels);
-                float candidateCoverage = saturate(_CandidateRadiusPixels + 0.5 - candidateDistance) * candidateFade;
+                float candidateFade = smoothstep(6.0, 14.0, lineSpacingPixels) * _ShowCandidates;
+                float xCoverage = saturate(_CandidateRadiusPixels + 0.5 - xDistance) * valid.x;
+                float yCoverage = saturate(_CandidateRadiusPixels + 0.5 - yDistance) * valid.y;
+                float candidateCoverage = max(xCoverage, yCoverage) * candidateFade;
                 float currentCoverage = saturate(_CurrentRadiusPixels + 0.5 - currentDistance);
                 float candidateCore = saturate(_CandidateRadiusPixels - 1.0 - candidateDistance);
                 float currentCore = saturate(_CurrentRadiusPixels - 1.0 - currentDistance);
 
-                fixed4 candidate = lerp(_OutlineColor, _CandidateColor, candidateCore);
+                // A constant-Y line runs along X, and a constant-X line runs along Y.
+                // Combine the colors when both lines produce the same crossing.
+                fixed4 crossingColor = (_XAxisColor * yCoverage + _YAxisColor * xCoverage) /
+                                       max(xCoverage + yCoverage, 0.00001);
+                fixed4 candidate = lerp(_OutlineColor, crossingColor, candidateCore);
                 candidate.a *= candidateCoverage;
                 fixed4 current = lerp(_OutlineColor, _CurrentColor, currentCore);
                 current.a *= currentCoverage;

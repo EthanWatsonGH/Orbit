@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 // Draws only through the active editor camera, so highlights never enter previews.
 public sealed class ScaleSnapHighlightRenderer
@@ -9,13 +10,16 @@ public sealed class ScaleSnapHighlightRenderer
     static readonly int MaximumId = Shader.PropertyToID("_PathMaximum");
     static readonly int SpacingId = Shader.PropertyToID("_Spacing");
     static readonly int CurrentId = Shader.PropertyToID("_CurrentPoint");
+    static readonly int ShowCandidatesId = Shader.PropertyToID("_ShowCandidates");
     static readonly int CurrentRadiusId = Shader.PropertyToID("_CurrentRadiusPixels");
     static readonly int CandidateRadiusId = Shader.PropertyToID("_CandidateRadiusPixels");
 
     readonly Material material;
     readonly MaterialPropertyBlock properties = new MaterialPropertyBlock();
+    readonly CommandBuffer commands = new CommandBuffer { name = "Editor transform highlights" };
     readonly Mesh quad;
     readonly int layer;
+    Camera currentCamera;
 
     public ScaleSnapHighlightRenderer(Material material)
     {
@@ -31,9 +35,40 @@ public sealed class ScaleSnapHighlightRenderer
         quad.RecalculateBounds();
     }
 
+    public void BeginFrame(Camera camera)
+    {
+        if (currentCamera != camera)
+        {
+            Clear();
+            currentCamera = camera;
+            if (currentCamera != null)
+                currentCamera.AddCommandBuffer(CameraEvent.BeforeImageEffects, commands);
+        }
+        commands.Clear();
+    }
+
+    public void Clear()
+    {
+        if (currentCamera != null)
+            currentCamera.RemoveCommandBuffer(CameraEvent.BeforeImageEffects, commands);
+        currentCamera = null;
+        commands.Clear();
+    }
+
     public void Draw(Camera camera, Vector3 origin, Vector3 direction, float minimum, float maximum, float spacing, Vector3 currentPoint)
     {
-        if (camera == null || material == null || layer < 0 || spacing <= 0f)
+        Draw(camera, origin, direction, minimum, maximum, spacing, currentPoint, true);
+    }
+
+    public void DrawPoint(Camera camera, Vector3 point)
+    {
+        Draw(camera, point, Vector3.right, 0f, 0f, 1f, point, false);
+    }
+
+    void Draw(Camera camera, Vector3 origin, Vector3 direction, float minimum, float maximum, float spacing, Vector3 currentPoint, bool showCandidates)
+    {
+        if (camera == null || camera != currentCamera || material == null || layer < 0 ||
+            (camera.cullingMask & (1 << layer)) == 0 || spacing <= 0f)
             return;
 
         float depth = camera.WorldToScreenPoint(Vector3.zero).z;
@@ -84,11 +119,16 @@ public sealed class ScaleSnapHighlightRenderer
         properties.SetFloat(MaximumId, maximum);
         properties.SetFloat(SpacingId, spacing);
         properties.SetVector(CurrentId, currentPoint);
-        Graphics.DrawMesh(quad, matrix, material, layer, camera, 0, properties, false, false);
+        properties.SetFloat(ShowCandidatesId, showCandidates ? 1f : 0f);
+        // Sprite sorting order takes priority over the material's render queue.
+        // Submit after scene geometry so these highlights stay above every object.
+        commands.DrawMesh(quad, matrix, material, 0, 0, properties);
     }
 
     public void Dispose()
     {
+        Clear();
+        commands.Release();
         if (quad != null)
             Object.Destroy(quad);
     }
