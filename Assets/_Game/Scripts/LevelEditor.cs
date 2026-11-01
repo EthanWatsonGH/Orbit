@@ -2582,7 +2582,9 @@ public class LevelEditor : MonoBehaviour
             ? scaleConstrainedTransform.localScale.x
             : scaleConstrainedTransform.localScale.y);
 
-        if (IsSelectedGroup)
+        // Only persistent groups actually parent their members. A multi-selection's
+        // pivot is separate, so its scale is already baked into each selected root.
+        if (IsSelectedPersistentGroup)
         {
             float groupScale = Mathf.Abs(xAxis
                 ? selectedLocalScaleAtStart.x
