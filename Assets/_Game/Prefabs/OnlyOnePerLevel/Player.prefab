@@ -277,6 +277,8 @@ MonoBehaviour:
   startLocation: {fileID: 0}
   startLocationIcon: {fileID: 0}
   pullForce: 50
+  pushForce: 50
+  boostForce: 50
   launchForce: 10
   quickRetryEnabled: 0
   quickLaunchEnabled: 0

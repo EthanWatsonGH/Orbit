@@ -1116,6 +1116,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5290990243053682229, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
+      propertyPath: pullForce
+      value: 50
+      objectReference: {fileID: 0}
+    - target: {fileID: 5290990243053682229, guid: f759b7e1516a34d4c849a6d631d20af9, type: 3}
       propertyPath: winDisplay
       value: 
       objectReference: {fileID: 1751355741}

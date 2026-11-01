@@ -31,8 +31,10 @@ public class Player : MonoBehaviour
     [SerializeField] GameObject startLocation;
     [SerializeField] GameObject startLocationIcon;
     // variables
-    [SerializeField] float pullForce;
-    [SerializeField] float launchForce;
+    [SerializeField] float pullForce = 50f;
+    [SerializeField] float pushForce = 50f;
+    [SerializeField] float boostForce = 50f;
+    [SerializeField] float launchForce = 10f;
     [Header("Quick Play Settings")]
     [SerializeField] ToggleButton quickRetryToggle;
     [SerializeField] ToggleButton quickLaunchToggle;
@@ -333,12 +335,31 @@ public class Player : MonoBehaviour
 
     void OnTriggerStay2D(Collider2D collision)
     {
-        // pull area
-        if (IsLevelInteractionHeld && collision.gameObject.CompareTag("Pull"))
+        if (IsLevelInteractionHeld)
+            ApplyLevelInteraction(collision);
+    }
+
+    void ApplyLevelInteraction(Collider2D area)
+    {
+        Vector2 force;
+        if (area.CompareTag("Pull"))
         {
-            Vector2 pullDirection = collision.transform.position - rb.transform.position;
-            rb.AddForce(pullDirection.normalized * pullForce, ForceMode2D.Force);
+            Vector2 direction = area.transform.position - rb.transform.position;
+            force = direction.normalized * pullForce;
         }
+        else if (area.CompareTag("Push"))
+        {
+            Vector2 direction = rb.transform.position - area.transform.position;
+            force = direction.normalized * pushForce;
+        }
+        else if (area.CompareTag("Boost"))
+        {
+            force = (Vector2)area.transform.up * boostForce;
+        }
+        else
+            return;
+
+        rb.AddForce(force, ForceMode2D.Force);
     }
 
     void OnTriggerEnter2D(Collider2D collision)
