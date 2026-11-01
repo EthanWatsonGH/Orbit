@@ -28,6 +28,7 @@ public class EditorHUD : MonoBehaviour
     public void PlaceFinish() => levelEditor?.PlaceFinish();
     public void PlaceKillCircle() => levelEditor?.PlaceKillCircle();
     public void PlaceKillWall() => levelEditor?.PlaceKillWall();
+    public void PlaceMomentumRedirector() => levelEditor?.PlaceMomentumRedirector();
     public void PlacePuller() => levelEditor?.PlacePuller();
     public void PlacePusher() => levelEditor?.PlacePusher();
     public void PlaceSlipperyWall() => levelEditor?.PlaceSlipperyWall();

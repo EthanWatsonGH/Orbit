@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 7102748565268252621}
   m_Layer: 0
   m_Name: MomentumRedirector
-  m_TagString: Untagged
+  m_TagString: Redirect
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -123,7 +123,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 8
-  m_Sprite: {fileID: 7051197756905671364, guid: 82c5d2f77b1920a41baf503baf750c81, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 3f454b9e101748fca6b5c016079c70ed, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0

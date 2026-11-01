@@ -2476,6 +2476,11 @@ public class LevelEditor : MonoBehaviour
         prefabToPlace = LevelManager.Instance.PusherPrefab;
         StartTryingToPlaceObject();
     }
+    public void PlaceMomentumRedirector()
+    {
+        prefabToPlace = LevelManager.Instance.MomentumRedirectorPrefab;
+        StartTryingToPlaceObject();
+    }
     public void PlaceSlipperyWall()
     {
         prefabToPlace = LevelManager.Instance.SlipperyWallPrefab;

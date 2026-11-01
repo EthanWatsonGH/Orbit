@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -51,6 +52,9 @@ public class Player : MonoBehaviour
     bool isInvincible;
     bool isDraggingLaunchDirectionTarget;
     bool quickSwipeStartedOverUi;
+    readonly List<Collider2D> redirectors = new List<Collider2D>();
+    // Trigger callbacks queue forces for the next physics step.
+    Vector2 queuedInteractionForce;
     Vector3 launchTargetDragOffset = Vector3.zero;
     float timeAtLastRetry;
     bool hasStarted;
@@ -87,27 +91,33 @@ public class Player : MonoBehaviour
                 Launch();
             else
                 EnterAiming(true);
-
-            return;
         }
-
-        switch (state)
+        else
         {
-            case PlayerState.Aiming:
-                UpdateAiming();
-                break;
-            case PlayerState.Playing:
-                UpdatePlaying();
-                break;
-            case PlayerState.Win:
-            case PlayerState.Lose:
-                UpdateFinishedAttempt();
-                break;
+            switch (state)
+            {
+                case PlayerState.Aiming:
+                    UpdateAiming();
+                    break;
+                case PlayerState.Playing:
+                    UpdatePlaying();
+                    break;
+                case PlayerState.Win:
+                case PlayerState.Lose:
+                    UpdateFinishedAttempt();
+                    break;
+            }
         }
+
+        ApplyInteractionForces();
     }
 
     void LateUpdate()
     {
+        speedDisplay.text = state == PlayerState.Aiming
+            ? "0"
+            : rb.linearVelocity.magnitude.ToString("F2");
+
         // Future effect shaders should use this as a global uniform, not a material
         // property, so individual objects need no copies of the input or material.
         Shader.SetGlobalFloat(LevelInteractionHeldShaderId, IsLevelInteractionHeld ? 1f : 0f);
@@ -119,6 +129,42 @@ public class Player : MonoBehaviour
 
         if (state == PlayerState.Aiming)
             UpdateLineRenderer();
+    }
+
+    void ApplyInteractionForces()
+    {
+        Collider2D redirector = null;
+        if (IsLevelInteractionHeld)
+        {
+            for (int i = redirectors.Count - 1; i >= 0; i--)
+            {
+                Collider2D candidate = redirectors[i];
+                if (candidate == null || !candidate.enabled || !candidate.gameObject.activeInHierarchy)
+                {
+                    redirectors.RemoveAt(i);
+                    continue;
+                }
+
+                redirector = candidate;
+                break;
+            }
+        }
+
+        Vector2 force = queuedInteractionForce;
+        queuedInteractionForce = Vector2.zero;
+
+        if (redirector != null)
+        {
+            // Include any forces applied outside this queue before redirecting
+            // momentum, then redirect the combined interaction force.
+            Vector2 velocity = rb.linearVelocity + rb.totalForce * (Time.deltaTime / rb.mass);
+            rb.totalForce = Vector2.zero;
+            rb.linearVelocity = (Vector2)redirector.transform.up * velocity.magnitude;
+            force = (Vector2)redirector.transform.up * force.magnitude;
+        }
+
+        if (force.sqrMagnitude > 0f)
+            rb.AddForce(force, ForceMode2D.Force);
     }
 
     private void OnEnable()
@@ -137,6 +183,8 @@ public class Player : MonoBehaviour
 
     private void OnDisable()
     {
+        redirectors.Clear();
+        queuedInteractionForce = Vector2.zero;
         Shader.SetGlobalFloat(LevelInteractionHeldShaderId, 0f);
         EventManager.Instance.ShowPlayerInWorldUiElementsEvent.RemoveListener(ShowInWorldUiElements);
         EventManager.Instance.HidePlayerInWorldUiElementsEvent.RemoveListener(HideInWorldUiElements);
@@ -151,7 +199,6 @@ public class Player : MonoBehaviour
         retryButton.SetActive(false);
 
         timeDisplay.text = "0";
-        speedDisplay.text = "0";
 
         lr.enabled = true;
         UpdateLineRenderer();
@@ -165,7 +212,6 @@ public class Player : MonoBehaviour
     void UpdatePlaying()
     {
         timeDisplay.text = (Time.time - timeAtLastLaunch).ToString("F3");
-        speedDisplay.text = rb.linearVelocity.magnitude.ToString("F2");
 
         retryButton.SetActive(true);
         launchButton.SetActive(false);
@@ -282,12 +328,15 @@ public class Player : MonoBehaviour
     void EnterAiming(bool allowQuickLaunch)
     {
         timeAtLastRetry = Time.time;
+        redirectors.Clear();
+        queuedInteractionForce = Vector2.zero;
 
         SetState(PlayerState.Aiming);
         playerPressedLaunch = false;
 
         // ensure velocity is zero
         rb.linearVelocity = Vector2.zero;
+        rb.totalForce = Vector2.zero;
 
         // reset to start location, ensuring z = 0
         gameObject.transform.position = new Vector3(startLocation.transform.position.x, startLocation.transform.position.y, 0f);
@@ -335,35 +384,38 @@ public class Player : MonoBehaviour
 
     void OnTriggerStay2D(Collider2D collision)
     {
-        if (IsLevelInteractionHeld)
-            ApplyLevelInteraction(collision);
-    }
+        if (collision.CompareTag("Redirect"))
+        {
+            RegisterRedirector(collision);
+            return;
+        }
 
-    void ApplyLevelInteraction(Collider2D area)
-    {
-        Vector2 force;
-        if (area.CompareTag("Pull"))
-        {
-            Vector2 direction = area.transform.position - rb.transform.position;
-            force = direction.normalized * pullForce;
-        }
-        else if (area.CompareTag("Push"))
-        {
-            Vector2 direction = rb.transform.position - area.transform.position;
-            force = direction.normalized * pushForce;
-        }
-        else if (area.CompareTag("Boost"))
-        {
-            force = (Vector2)area.transform.up * boostForce;
-        }
-        else
+        if (!IsLevelInteractionHeld)
             return;
 
-        rb.AddForce(force, ForceMode2D.Force);
+        if (collision.CompareTag("Pull"))
+            QueueInteractionForce(collision.transform.position - rb.transform.position, pullForce);
+        if (collision.CompareTag("Push"))
+            QueueInteractionForce(rb.transform.position - collision.transform.position, pushForce);
+        if (collision.CompareTag("Boost"))
+            QueueInteractionForce(collision.transform.up, boostForce);
+    }
+
+    void QueueInteractionForce(Vector2 direction, float strength)
+    {
+        queuedInteractionForce += direction.normalized * strength;
+    }
+
+    void RegisterRedirector(Collider2D area)
+    {
+        if (!redirectors.Contains(area))
+            redirectors.Add(area);
     }
 
     void OnTriggerEnter2D(Collider2D collision)
     {
+        if (collision.CompareTag("Redirect"))
+            RegisterRedirector(collision);
         if (state == PlayerState.Playing)
         {
             // kill area
@@ -378,6 +430,11 @@ public class Player : MonoBehaviour
                 Win();
             }
         }
+    }
+
+    void OnTriggerExit2D(Collider2D collision)
+    {
+        redirectors.Remove(collision);
     }
 
     void Win()

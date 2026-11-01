@@ -8,6 +8,7 @@ TagManager:
   - Pull
   - Push
   - Boost
+  - Redirect
   layers:
   - Default
   - TransparentFX
