@@ -1934,6 +1934,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 849191386}
     - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
+      propertyPath: scaleModeToggle
+      value: 
+      objectReference: {fileID: 1447127610}
+    - target: {fileID: 8250178054052875621, guid: b3066e26da42b0e41aaeed792aef4781, type: 3}
       propertyPath: playerStartPoint
       value: 
       objectReference: {fileID: 1981640280}
@@ -2107,6 +2111,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3fe74c24a17544b0976f68f8fede3446, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1447127610 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8918299423319537830, guid: 4824b21244823934e83d45f884726f52, type: 3}
+  m_PrefabInstance: {fileID: 128809842}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9e0c91b723949f3866bdecd156d8f20, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!4 &1536997152 stripped

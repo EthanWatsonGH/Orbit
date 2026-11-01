@@ -54,6 +54,7 @@ public class LevelEditor : MonoBehaviour
 
     [Header("Screen Space UI")]
     [SerializeField] ToggleButton worldTransformToggle;
+    [SerializeField] ToggleButton scaleModeToggle;
     [SerializeField] SelectionControlsUI selectionControlsUI;
     [SerializeField] ScaleFromEdgeControlsUI scaleFromEdgeControlsUI;
     [SerializeField] RectTransform boxSelectionVisual;
@@ -69,6 +70,7 @@ public class LevelEditor : MonoBehaviour
     // promotes this object to the last selected object.
     GameObject deselectedObjectAwaitingReplacement = null;
     bool IsWorldTransform => worldTransformToggle == null || worldTransformToggle.IsOn;
+    bool IsScaleMode => scaleModeToggle != null && scaleModeToggle.IsOn;
     bool IsSelectedPersistentGroup => IsPersistentGroup(selectedObject);
     bool HasMultipleSelection => selectedSelectionRoots.Count > 1;
     bool IsSelectedGroup => HasMultipleSelection || IsSelectedPersistentGroup;
@@ -261,6 +263,9 @@ public class LevelEditor : MonoBehaviour
 
         if (worldTransformToggle == null)
             Debug.LogError("LevelEditor is missing its World Transform Toggle reference. World transform mode will be used until it is assigned.", this);
+
+        if (scaleModeToggle == null)
+            Debug.LogError("LevelEditor is missing its Scale Mode Toggle reference. Assign it to access the scale controls.", this);
 
         if (selectionControlsUI == null)
         {
@@ -1550,7 +1555,7 @@ public class LevelEditor : MonoBehaviour
     // means both the controls and the editor continue to have one owner for object edits.
     public void BeginObjectTransformControl(ObjectTransformControl control, int pointerId, Vector2 screenPosition)
     {
-        if (selectedObject == null || activeTransform != ActiveTransform.None)
+        if (IsScaleMode || selectedObject == null || activeTransform != ActiveTransform.None)
             return;
 
         switch (control)
@@ -1580,7 +1585,7 @@ public class LevelEditor : MonoBehaviour
 
     public void BeginScaleFromEdgeControl(ScaleFromEdgeHandle handle, int pointerId, Vector2 screenPosition)
     {
-        if (selectedObject == null || activeTransform != ActiveTransform.None ||
+        if (!IsScaleMode || selectedObject == null || activeTransform != ActiveTransform.None ||
             !TryGetSelectionControlAvailability(out SelectionControlAvailability availability) ||
             !IsScaleFromEdgeHandleAvailable(handle, availability))
             return;
@@ -2375,7 +2380,7 @@ public class LevelEditor : MonoBehaviour
         // Keep the object active while a UI drag is running, but hide its CanvasGroup. That
         // lets its pointer handler still receive the matching drag and release events.
         selectionControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
-        selectionControlsUI.SetControlsVisible(show);
+        selectionControlsUI.SetControlsVisible(show && !IsScaleMode);
 
         if (scaleFromEdgeControlsUI != null)
         {
@@ -2395,7 +2400,7 @@ public class LevelEditor : MonoBehaviour
             bool hasScaleFromEdgeFrame = selectedObject != null && TryGetScaleFromEdgeFrame(out scaleFromEdgeFrame);
             scaleFromEdgeControlsUI.SetSelectionFrame(hasScaleFromEdgeFrame, scaleFromEdgeFrame);
             scaleFromEdgeControlsUI.SetVisible(selectedObject != null && !isTryingToPlace);
-            scaleFromEdgeControlsUI.SetControlsVisible(show && hasScaleFromEdgeFrame);
+            scaleFromEdgeControlsUI.SetControlsVisible(show && IsScaleMode && hasScaleFromEdgeFrame);
         }
 
         deselectObjectButton.SetActive(show);

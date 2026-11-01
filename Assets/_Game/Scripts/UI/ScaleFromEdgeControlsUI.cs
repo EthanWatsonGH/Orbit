@@ -7,6 +7,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
     [SerializeField] RectTransform controlsRoot;
     [SerializeField] CanvasGroup controlsCanvasGroup;
     [SerializeField, Min(0f)] float minimumHandleSpacingPixels = 72f;
+    [SerializeField, Min(0f)] float handlePadding = 8f;
 
     LevelEditor levelEditor;
     RectTransform overlayRect;
@@ -14,6 +15,7 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
     bool hasSelectionFrame;
     LevelEditor.ScaleFromEdgeFrame selectionFrame;
     readonly Dictionary<ScaleFromEdgeHandle, HandleView> handleViews = new Dictionary<ScaleFromEdgeHandle, HandleView>();
+    readonly Vector3[] handleCorners = new Vector3[4];
 
     struct HandleView
     {
@@ -122,15 +124,14 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
         Vector2 upScreenOffset = (Vector2)activeCamera.WorldToScreenPoint(selectionFrame.GetHandlePosition(ScaleFromEdgeHandle.Up)) - centerScreenPosition2D;
         Vector2 rightScreenDirection = GetScreenDirection(rightScreenOffset, selectionFrame.right);
         Vector2 upScreenDirection = GetScreenDirection(upScreenOffset, selectionFrame.up);
-        float displayedHalfWidth = Mathf.Max(rightScreenOffset.magnitude, minimumHandleSpacingPixels);
-        float displayedHalfHeight = Mathf.Max(upScreenOffset.magnitude, minimumHandleSpacingPixels);
+        float handleSpacing = GetMinimumHandleSpacing(selectionRotation, eventCamera);
+        float displayedHalfWidth = Mathf.Max(rightScreenOffset.magnitude, handleSpacing);
+        float displayedHalfHeight = Mathf.Max(upScreenOffset.magnitude, handleSpacing);
 
         foreach (ScaleFromEdgeHandle handle in System.Enum.GetValues(typeof(ScaleFromEdgeHandle)))
         {
             if (!handleViews.TryGetValue(handle, out HandleView handleView))
                 continue;
-
-            handleView.transform.localRotation = selectionRotation * handleView.baseLocalRotation;
 
             Vector2 handleScreenPosition = GetDisplayedHandleScreenPosition(
                 handle,
@@ -142,6 +143,29 @@ public class ScaleFromEdgeControlsUI : MonoBehaviour
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(overlayRect, handleScreenPosition, eventCamera, out Vector2 handleLocalPosition))
                 handleView.transform.anchoredPosition = handleLocalPosition - centerLocalPosition;
         }
+    }
+
+    float GetMinimumHandleSpacing(Quaternion selectionRotation, Camera eventCamera)
+    {
+        float maxRadius = 0f;
+        foreach (HandleView handleView in handleViews.Values)
+        {
+            handleView.transform.localRotation = selectionRotation * handleView.baseLocalRotation;
+            if (!handleView.transform.gameObject.activeSelf)
+                continue;
+
+            // Use the actual rotated touch rectangles, including canvas scaling.
+            // A bounding circle keeps adjacent targets apart at any object rotation.
+            handleView.transform.GetWorldCorners(handleCorners);
+            Vector2 center = RectTransformUtility.WorldToScreenPoint(eventCamera, handleView.transform.TransformPoint(handleView.transform.rect.center));
+            foreach (Vector3 corner in handleCorners)
+            {
+                Vector2 screenCorner = RectTransformUtility.WorldToScreenPoint(eventCamera, corner);
+                maxRadius = Mathf.Max(maxRadius, Vector2.Distance(center, screenCorner));
+            }
+        }
+
+        return Mathf.Max(minimumHandleSpacingPixels, 2f * maxRadius + handlePadding * parentCanvas.scaleFactor);
     }
 
     static Vector2 GetScreenDirection(Vector2 screenOffset, Vector3 worldFallbackDirection)
