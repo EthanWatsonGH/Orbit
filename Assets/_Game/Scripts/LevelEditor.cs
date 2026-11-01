@@ -40,9 +40,6 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] GameObject snapHorizontalButton;
     [SerializeField] GameObject createPersistentGroupButton;
     [SerializeField] GameObject ungroupPersistentGroupButton;
-    [SerializeField] LineRenderer verticalLine;
-    [SerializeField] LineRenderer horizontalLine;
-    [SerializeField] LineRenderer rotationLine;
     [SerializeField] TMP_Dropdown scaleIncrementDropdown;
     [SerializeField] TMP_Dropdown rotateIncrementDropdown;
     [SerializeField] TMP_Dropdown moveIncrementDropdown;
@@ -59,6 +56,7 @@ public class LevelEditor : MonoBehaviour
     [SerializeField] ScaleFromEdgeControlsUI scaleFromEdgeControlsUI;
     [SerializeField] RectTransform boxSelectionVisual;
     [SerializeField] Material selectionOutlineMaterial;
+    [SerializeField] Material editorGuideMaterial;
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
@@ -96,6 +94,7 @@ public class LevelEditor : MonoBehaviour
     bool hasBoxSelectionWorldPositions;
     readonly List<Transform> selectedSelectionRoots = new List<Transform>();
     SelectionOutlineRenderer selectionOutline;
+    EditorGuideRenderer editorGuides;
     GameObject selectionPivot;
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
@@ -219,7 +218,6 @@ public class LevelEditor : MonoBehaviour
         ScaleFromEdge
     }
 
-    const float MOVE_GUIDE_LINE_HALF_LENGTH = 9999f;
     Vector3 moveOffset;
     Vector3 selectedObjectPositionAtStartMove;
     Vector3 pointerPositionAtStartMove;
@@ -302,6 +300,11 @@ public class LevelEditor : MonoBehaviour
         else
             Debug.LogError("LevelEditor requires a selection outline material and the EditorGuides layer.", this);
 
+        if (editorGuideMaterial != null && LayerMask.NameToLayer("EditorGuides") >= 0)
+            editorGuides = new EditorGuideRenderer(editorGuideMaterial);
+        else
+            Debug.LogError("LevelEditor requires an editor guide material and the EditorGuides layer.", this);
+
         // Scene-authored levels do not necessarily pass through LevelManager's load
         // path, so canonicalize their existing circular roots here as well.
         if (levelObjectsCollection != null)
@@ -356,14 +359,18 @@ public class LevelEditor : MonoBehaviour
     {
         UpdateActiveScreenSpaceTransformControl();
         RefreshBoxSelectionVisualFromWorld();
-        if (selectionOutline != null && CameraViewManager.Instance != null &&
+        if (CameraViewManager.Instance != null &&
             CameraViewManager.Instance.TryGetActiveWorldCamera(out Camera activeCamera))
-            selectionOutline.Draw(activeCamera);
+        {
+            selectionOutline?.Draw(activeCamera);
+            editorGuides?.Draw(activeCamera);
+        }
     }
 
     void OnDestroy()
     {
         selectionOutline?.Dispose();
+        editorGuides?.Dispose();
     }
 
     private void OnEnable()
@@ -379,7 +386,7 @@ public class LevelEditor : MonoBehaviour
         isShiftModeButtonHeld = false;
         isCtrlModeButtonHeld = false;
         SetBoxSelectionVisualVisible(false);
-        SetMoveGuideLinesVisible(false);
+        editorGuides?.HideMoveGuides();
         UnselectObject();
         EventManager.Instance.UnselectObjectEvent.RemoveListener(UnselectObject);
     }
@@ -1870,7 +1877,7 @@ public class LevelEditor : MonoBehaviour
         if (!shouldShowGuides)
         {
             if (wasShiftModeHeldDuringMove)
-                SetMoveGuideLinesVisible(false);
+                editorGuides?.HideMoveGuides();
 
             wasShiftModeHeldDuringMove = false;
             activeShiftMoveConstraint = ShiftMoveConstraint.None;
@@ -1919,11 +1926,7 @@ public class LevelEditor : MonoBehaviour
         shiftMoveGuideUp.Normalize();
         activeShiftMoveConstraint = ShiftMoveConstraint.AlongRight;
 
-        horizontalLine.SetPosition(0, shiftMoveGuideOrigin - shiftMoveGuideRight * MOVE_GUIDE_LINE_HALF_LENGTH);
-        horizontalLine.SetPosition(1, shiftMoveGuideOrigin + shiftMoveGuideRight * MOVE_GUIDE_LINE_HALF_LENGTH);
-        verticalLine.SetPosition(0, shiftMoveGuideOrigin - shiftMoveGuideUp * MOVE_GUIDE_LINE_HALF_LENGTH);
-        verticalLine.SetPosition(1, shiftMoveGuideOrigin + shiftMoveGuideUp * MOVE_GUIDE_LINE_HALF_LENGTH);
-        SetMoveGuideLinesVisible(true);
+        editorGuides?.ShowMoveGuides(shiftMoveGuideOrigin, shiftMoveGuideRight, shiftMoveGuideUp);
     }
 
     Vector3 GetMoveIncrementAlignedPosition(Vector3 position)
@@ -1937,15 +1940,9 @@ public class LevelEditor : MonoBehaviour
             0f);
     }
 
-    void SetMoveGuideLinesVisible(bool visible)
-    {
-        verticalLine.gameObject.SetActive(visible);
-        horizontalLine.gameObject.SetActive(visible);
-    }
-
     void EndMoveSelectedObject(bool deleteMovedObject)
     {
-        SetMoveGuideLinesVisible(false);
+        editorGuides?.HideMoveGuides();
         wasShiftModeHeldDuringMove = false;
         activeShiftMoveConstraint = ShiftMoveConstraint.None;
 
@@ -1999,8 +1996,7 @@ public class LevelEditor : MonoBehaviour
             return false;
         }
 
-        rotationLine.gameObject.SetActive(true);
-        rotationLine.SetPosition(0, selectedObject.transform.position);
+        editorGuides?.SetRotationGuide(selectedObject.transform.position, pointerWorldPosition);
 
         selectedObjectRotationAtStartRotate = selectedObject.transform.localEulerAngles.z;
         selectionPivotRotationAtStartRotate = selectedObject.transform.rotation;
@@ -2030,7 +2026,7 @@ public class LevelEditor : MonoBehaviour
 
         selectedObject.transform.localRotation = Quaternion.Euler(0f, 0f, newRotation);
         ApplyRotationToSelectedRoots();
-        rotationLine.SetPosition(1, pointerWorldPosition);
+        editorGuides?.SetRotationGuide(selectedObject.transform.position, pointerWorldPosition);
     }
 
     void ApplyRotationToSelectedRoots()
@@ -2052,7 +2048,7 @@ public class LevelEditor : MonoBehaviour
 
     void EndRotateSelectedObject()
     {
-        rotationLine.gameObject.SetActive(false);
+        editorGuides?.HideRotationGuide();
 
         NormalizeSelectedRootRotations();
     }
