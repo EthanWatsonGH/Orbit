@@ -1,10 +1,14 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using TMPro;
 
 // One pointer owns an entry gesture until it becomes either scrolling or placement.
 public class PrefabBarEntry : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
     IInitializePotentialDragHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    public const string BuiltInIconResourceFolder = "BaseObjectIcons";
+
     [SerializeField] string builtInType;
     [SerializeField] bool scrollOnly;
     string savedId;
@@ -15,6 +19,7 @@ public class PrefabBarEntry : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     Gesture gesture;
 
     public string BuiltInType => builtInType;
+    public Sprite BuiltInIcon { get; private set; }
 
     void Awake() => bar = GetComponentInParent<PrefabBar>();
 
@@ -22,6 +27,37 @@ public class PrefabBarEntry : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     {
         savedId = id;
         builtInType = null;
+    }
+
+    public void SetBuiltInIcon(Sprite icon)
+    {
+        BuiltInIcon = icon;
+        if (icon == null)
+            return;
+
+        Image background = GetComponent<Image>();
+        if (background != null)
+        {
+            background.color = Color.clear;
+            // The transparent image remains the pointer target for dragging the entry.
+            background.canvasRenderer.cullTransparentMesh = false;
+        }
+        TMP_Text label = GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.gameObject.SetActive(false);
+
+        GameObject iconObject = new GameObject("Built-in Icon", typeof(RectTransform), typeof(Image));
+        iconObject.layer = gameObject.layer;
+        iconObject.transform.SetParent(transform, false);
+        RectTransform rect = (RectTransform)iconObject.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        Image image = iconObject.GetComponent<Image>();
+        image.sprite = icon;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
     }
 
     public void OnPointerDown(PointerEventData eventData)

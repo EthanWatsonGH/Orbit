@@ -334,10 +334,6 @@ public class LevelManager : MonoBehaviour
 
     }
 
-    // TODO(prefab-previews): Render isolated prefab copies on demand with a transparent
-    // background, then cache the results. Review LevelObjectIconCamera for built-in icons
-    // and handle translucent objects correctly in transparent PNGs.
-
     // Saving the JSON is synchronous; only preview capture and disk I/O need the coroutine.
     // Callers that temporarily alter editor-only state may safely restore it once this method
     // invokes onLevelSerialized, before the asynchronous part of the save begins.

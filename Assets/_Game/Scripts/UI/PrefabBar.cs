@@ -40,6 +40,11 @@ public class PrefabBar : MonoBehaviour
         if (!initialized && content != null)
         {
             builtInEntries.AddRange(content.GetComponentsInChildren<PrefabBarEntry>(true));
+            foreach (PrefabBarEntry entry in builtInEntries)
+            {
+                if (entry != null && !string.IsNullOrEmpty(entry.BuiltInType))
+                    entry.SetBuiltInIcon(Resources.Load<Sprite>(PrefabBarEntry.BuiltInIconResourceFolder + "/" + entry.BuiltInType));
+            }
             initialized = true;
         }
         RefreshIfNeeded();

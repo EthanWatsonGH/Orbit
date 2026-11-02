@@ -105,12 +105,20 @@ public static class PrefabPreviewCapture
             staging.SetActive(false);
             RenderTexture.active = previousActive;
             if (camera != null) camera.targetTexture = null;
-            if (cameraObject != null) Object.Destroy(cameraObject);
+            if (cameraObject != null) DestroyTemporary(cameraObject);
             if (target != null) RenderTexture.ReleaseTemporary(target);
-            if (blackImage != null) Object.Destroy(blackImage);
-            if (whiteImage != null) Object.Destroy(whiteImage);
-            if (result != null) Object.Destroy(result);
+            if (blackImage != null) DestroyTemporary(blackImage);
+            if (whiteImage != null) DestroyTemporary(whiteImage);
+            if (result != null) DestroyTemporary(result);
         }
+    }
+
+    static void DestroyTemporary(Object temporary)
+    {
+        if (Application.isPlaying)
+            Object.Destroy(temporary);
+        else
+            Object.DestroyImmediate(temporary);
     }
 
     static Color32 RecoverPixel(Color32 black, Color32 white, bool linearColor)

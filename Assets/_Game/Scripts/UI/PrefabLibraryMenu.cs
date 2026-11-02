@@ -61,12 +61,9 @@ public class PrefabLibraryMenu : MonoBehaviour
         {
             if (item == null || !item.gameObject.activeSelf || string.IsNullOrEmpty(item.BuiltInType))
                 continue;
-            Image icon = item.GetComponent<Image>();
             TMP_Text label = item.GetComponentInChildren<TMP_Text>(true);
             string name = label != null && !string.IsNullOrWhiteSpace(label.text) ? label.text : item.BuiltInType;
-            // The existing text-only buttons use a sliced background, not an object icon.
-            Sprite sprite = icon != null && icon.type == Image.Type.Simple ? icon.sprite : null;
-            entries.Add(new Entry { name = name, builtIn = true, sprite = sprite });
+            entries.Add(new Entry { name = name, builtIn = true, sprite = item.BuiltInIcon });
         }
         List<SavedPrefabRecord> saved = editor.GetSavedPrefabs();
         if (saved == null)
