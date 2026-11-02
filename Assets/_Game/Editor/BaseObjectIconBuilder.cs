@@ -12,10 +12,9 @@ using UnityEngine.Rendering;
 [InitializeOnLoad]
 public sealed class BaseObjectIconBuilder : IPreprocessBuildWithReport
 {
-    const string HudPath = "Assets/_Game/Prefabs/UI/Panels/EditorHUD.prefab";
     const string ManagerPath = "Assets/_Game/Prefabs/OnlyOnePerLevel/Managers/LevelManager.prefab";
     const string CapturePath = "Assets/_Game/Scripts/PrefabPreviewCapture.cs";
-    const string IconDirectory = "Assets/_Game/Resources/" + PrefabBarEntry.BuiltInIconResourceFolder;
+    const string IconDirectory = "Assets/_Game/Resources/" + BaseObjectCatalog.IconResourceFolder;
     const string CachePath = "Library/BaseObjectIconCache.json";
     const string CacheVersion = "1";
 
@@ -52,18 +51,13 @@ public sealed class BaseObjectIconBuilder : IPreprocessBuildWithReport
 
     static void RebuildIcons()
     {
-        GameObject hud = AssetDatabase.LoadAssetAtPath<GameObject>(HudPath);
         GameObject managerObject = AssetDatabase.LoadAssetAtPath<GameObject>(ManagerPath);
         LevelManager manager = managerObject != null ? managerObject.GetComponent<LevelManager>() : null;
-        if (hud == null || manager == null)
-            throw new InvalidOperationException("The editor HUD or level manager prefab is missing.");
+        if (manager == null)
+            throw new InvalidOperationException("The level manager prefab is missing.");
 
-        PrefabBar bar = hud.GetComponentInChildren<PrefabBar>(true);
-        if (bar == null)
-            throw new InvalidOperationException("The editor HUD has no object selection bar.");
-        string[] types = bar.GetComponentsInChildren<PrefabBarEntry>(true)
-            .Where(entry => entry.gameObject.activeSelf && !string.IsNullOrWhiteSpace(entry.BuiltInType))
-            .Select(entry => entry.BuiltInType).Distinct().OrderBy(type => type, StringComparer.Ordinal).ToArray();
+        string[] types = BaseObjectCatalog.All.Select(entry => entry.Type).Distinct()
+            .OrderBy(type => type, StringComparer.Ordinal).ToArray();
         if (types.Length == 0)
             throw new InvalidOperationException("The object selection bar has no active base objects.");
 
@@ -72,7 +66,7 @@ public sealed class BaseObjectIconBuilder : IPreprocessBuildWithReport
         if (!AssetDatabase.IsValidFolder("Assets/_Game/Resources"))
             AssetDatabase.CreateFolder("Assets/_Game", "Resources");
         if (!AssetDatabase.IsValidFolder(IconDirectory))
-            AssetDatabase.CreateFolder("Assets/_Game/Resources", PrefabBarEntry.BuiltInIconResourceFolder);
+            AssetDatabase.CreateFolder("Assets/_Game/Resources", BaseObjectCatalog.IconResourceFolder);
         int generated = 0;
         foreach (string type in types)
         {

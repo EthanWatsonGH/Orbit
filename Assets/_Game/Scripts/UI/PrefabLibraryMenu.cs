@@ -88,13 +88,9 @@ public class PrefabLibraryMenu : MonoBehaviour
     void RebuildEntries()
     {
         ClearEntries();
-        foreach (PrefabBarEntry item in bar.BuiltInEntries)
+        foreach (BaseObjectDefinition item in BaseObjectCatalog.All)
         {
-            if (item == null || !item.gameObject.activeSelf || string.IsNullOrEmpty(item.BuiltInType))
-                continue;
-            TMP_Text label = item.GetComponentInChildren<TMP_Text>(true);
-            string name = label != null && !string.IsNullOrWhiteSpace(label.text) ? label.text : item.BuiltInType;
-            entries.Add(new Entry { key = PrefabOrder.BuiltInKey(item.BuiltInType), name = name, builtIn = true, sprite = item.BuiltInIcon });
+            entries.Add(new Entry { key = PrefabOrder.BuiltInKey(item.Type), name = item.Name, builtIn = true, sprite = item.LoadIcon() });
         }
         List<SavedPrefabRecord> saved = editor.GetSavedPrefabs();
         if (saved != null)

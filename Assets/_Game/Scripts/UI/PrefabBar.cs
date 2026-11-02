@@ -3,7 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Owns the shared row and the runtime-created player-prefab previews.
+// Owns the shared row and the runtime-created prefab entries and previews.
 public class PrefabBar : MonoBehaviour
 {
     [SerializeField] ScrollRect scrollView;
@@ -13,13 +13,11 @@ public class PrefabBar : MonoBehaviour
     [SerializeField, Min(0f)] float dragThresholdPixels = 20f;
     [SerializeField, Min(1f)] float entryWidth = 100f;
 
-    readonly List<PrefabBarEntry> builtInEntries = new List<PrefabBarEntry>();
-    readonly List<GameObject> savedEntries = new List<GameObject>();
+    readonly List<GameObject> createdEntries = new List<GameObject>();
     readonly List<Sprite> savedSprites = new List<Sprite>();
     readonly List<Texture2D> savedTextures = new List<Texture2D>();
     readonly Vector3[] barCorners = new Vector3[4];
     LevelEditor editor;
-    bool initialized;
     bool dirty = true;
     int activePointerId = int.MinValue;
     int visibleEntryCount;
@@ -28,24 +26,12 @@ public class PrefabBar : MonoBehaviour
     public ScrollRect ScrollView => scrollView;
     public float DragThresholdPixels => dragThresholdPixels;
 
-    public IEnumerable<PrefabBarEntry> BuiltInEntries => builtInEntries;
-
     public void Bind(LevelEditor targetEditor)
     {
         if (editor != targetEditor)
         {
             editor = targetEditor;
             dirty = true;
-        }
-        if (!initialized && content != null)
-        {
-            builtInEntries.AddRange(content.GetComponentsInChildren<PrefabBarEntry>(true));
-            foreach (PrefabBarEntry entry in builtInEntries)
-            {
-                if (entry != null && !string.IsNullOrEmpty(entry.BuiltInType))
-                    entry.SetBuiltInIcon(Resources.Load<Sprite>(PrefabBarEntry.BuiltInIconResourceFolder + "/" + entry.BuiltInType));
-            }
-            initialized = true;
         }
         RefreshIfNeeded();
     }
@@ -64,7 +50,7 @@ public class PrefabBar : MonoBehaviour
             UpdateContentWidth();
     }
 
-    void OnDestroy() => ClearSavedEntries();
+    void OnDestroy() => ClearEntries();
 
     public bool BeginGesture(int pointerId)
     {
@@ -106,7 +92,7 @@ public class PrefabBar : MonoBehaviour
 
     void RefreshIfNeeded()
     {
-        if (!dirty || !initialized || !gameObject.activeInHierarchy || activePointerId != int.MinValue ||
+        if (!dirty || !gameObject.activeInHierarchy || activePointerId != int.MinValue ||
             editor == null || content == null || entryTemplate == null || viewport == null)
             return;
 
@@ -114,17 +100,16 @@ public class PrefabBar : MonoBehaviour
         if (records == null)
             return;
 
-        ClearSavedEntries();
+        ClearEntries();
         visibleEntryCount = 0;
         var entriesByKey = new Dictionary<string, PrefabBarEntry>();
         var defaultOrder = new List<string>();
-        foreach (PrefabBarEntry entry in builtInEntries)
+        foreach (BaseObjectDefinition item in BaseObjectCatalog.All)
         {
-            if (entry == null || !entry.gameObject.activeSelf || string.IsNullOrEmpty(entry.BuiltInType))
-                continue;
-            string key = PrefabOrder.BuiltInKey(entry.BuiltInType);
+            string key = PrefabOrder.BuiltInKey(item.Type);
             if (!entriesByKey.ContainsKey(key))
             {
+                PrefabBarEntry entry = CreateEntry(item.Name, item.Type, null, item.LoadIcon());
                 entriesByKey.Add(key, entry);
                 defaultOrder.Add(key);
             }
@@ -134,11 +119,9 @@ public class PrefabBar : MonoBehaviour
         {
             if (record == null || string.IsNullOrEmpty(record.id))
                 continue;
-            PrefabBarEntry entry = Instantiate(entryTemplate, content, false);
-            entry.name = "Saved Prefab " + record.name;
-            entry.ConfigureSaved(record.id);
-            TMP_Text label = entry.GetComponentInChildren<TMP_Text>(true);
-            Image image = entry.GetComponent<Image>();
+            string key = PrefabOrder.PlayerKey(record.id);
+            if (entriesByKey.ContainsKey(key))
+                continue;
             byte[] bytes = editor.GetSavedPrefabPreview(record.id);
             Texture2D texture = null;
             if (bytes != null && bytes.Length > 0)
@@ -159,30 +142,16 @@ public class PrefabBar : MonoBehaviour
                     texture = null;
                 }
             }
-            if (image != null && texture != null)
+            Sprite sprite = null;
+            if (texture != null)
             {
-                Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                image.sprite = sprite;
-                image.type = Image.Type.Simple;
-                image.preserveAspect = true;
+                sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
                 savedSprites.Add(sprite);
                 savedTextures.Add(texture);
-                if (label != null) label.text = string.Empty;
             }
-            else
-            {
-                if (texture != null) Destroy(texture);
-                if (label != null) label.text = record.name;
-            }
-            savedEntries.Add(entry.gameObject);
-            string key = PrefabOrder.PlayerKey(record.id);
-            if (!entriesByKey.ContainsKey(key))
-            {
-                entriesByKey.Add(key, entry);
-                defaultOrder.Add(key);
-            }
-            else
-                entry.gameObject.SetActive(false);
+            PrefabBarEntry entry = CreateEntry(record.name ?? "Unnamed prefab", null, record.id, sprite);
+            entriesByKey.Add(key, entry);
+            defaultOrder.Add(key);
         }
 
         foreach (string key in PrefabOrder.Merge(defaultOrder, editor.GetPrefabOrder()))
@@ -190,6 +159,29 @@ public class PrefabBar : MonoBehaviour
 
         dirty = false;
         UpdateContentWidth();
+    }
+
+    PrefabBarEntry CreateEntry(string name, string builtInType, string savedId, Sprite preview)
+    {
+        PrefabBarEntry entry = Instantiate(entryTemplate, content, false);
+        entry.name = "Prefab " + name;
+        entry.Configure(builtInType, savedId);
+        createdEntries.Add(entry.gameObject);
+
+        TMP_Text label = entry.GetComponentInChildren<TMP_Text>(true);
+        Image image = entry.GetComponent<Image>();
+        if (label != null)
+        {
+            label.text = name;
+            label.gameObject.SetActive(preview == null);
+        }
+        if (image != null && preview != null)
+        {
+            image.sprite = preview;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+        }
+        return entry;
     }
 
     void PositionEntry(RectTransform entry, int index)
@@ -213,9 +205,9 @@ public class PrefabBar : MonoBehaviour
             scrollView.horizontalNormalizedPosition = Mathf.Clamp01(scrollView.horizontalNormalizedPosition);
     }
 
-    void ClearSavedEntries()
+    void ClearEntries()
     {
-        foreach (GameObject entry in savedEntries)
+        foreach (GameObject entry in createdEntries)
         {
             if (entry != null)
             {
@@ -227,7 +219,7 @@ public class PrefabBar : MonoBehaviour
             if (sprite != null) Destroy(sprite);
         foreach (Texture2D texture in savedTextures)
             if (texture != null) Destroy(texture);
-        savedEntries.Clear();
+        createdEntries.Clear();
         savedSprites.Clear();
         savedTextures.Clear();
     }
