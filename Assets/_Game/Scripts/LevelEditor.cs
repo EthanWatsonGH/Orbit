@@ -1103,6 +1103,8 @@ public class LevelEditor : MonoBehaviour
     public byte[] GetSavedPrefabPreview(string id) => GetPrefabStorage().LoadPreview(id);
     public List<string> GetPrefabOrder() => GetPrefabStorage().LoadOrder();
     public bool SavePrefabOrder(List<string> keys) => GetPrefabStorage().SaveOrder(keys);
+    public bool RenameSavedPrefab(string id, string name) => GetPrefabStorage().Rename(id, name);
+    public bool DeleteSavedPrefab(string id) => GetPrefabStorage().Delete(id);
 
     public bool CanSaveSelectedPrefab => selectedObject != null && selectedSelectionRoots.Count > 0 &&
         activeTransform == ActiveTransform.None && !isTryingToPlace &&

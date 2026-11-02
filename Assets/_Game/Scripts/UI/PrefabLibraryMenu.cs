@@ -15,9 +15,12 @@ public class PrefabLibraryMenu : MonoBehaviour
     [SerializeField] PrefabLibraryCard cardTemplate;
     [SerializeField] TMP_Text emptyText;
     [SerializeField] TMP_Text detailsTitle;
-    [SerializeField] TMP_Text detailsType;
-    [SerializeField] Image detailsPreview;
+    [SerializeField] TMP_Text detailsStatus;
     [SerializeField] GameObject detailsPanel;
+    [SerializeField] GameObject playerPrefabActions;
+    [SerializeField] GameObject renamePanel;
+    [SerializeField] TMP_InputField renameInput;
+    [SerializeField] GameObject deleteConfirmationPanel;
     [SerializeField] GameObject reorderPanel;
     [SerializeField] Button reorderButton;
     [SerializeField] TMP_Text reorderTitle;
@@ -48,6 +51,7 @@ public class PrefabLibraryMenu : MonoBehaviour
     {
         public string name;
         public string key;
+        public string id;
         public bool builtIn;
         public Sprite sprite;
     }
@@ -83,6 +87,67 @@ public class PrefabLibraryMenu : MonoBehaviour
         searchInput.ActivateInputField();
     }
 
+    public void StartRename()
+    {
+        if (selectedEntry == null || selectedEntry.builtIn) return;
+        detailsStatus.text = string.Empty;
+        renameInput.SetTextWithoutNotify(selectedEntry.name);
+        SetDetailsActionView(1);
+        renameInput.Select();
+        renameInput.ActivateInputField();
+    }
+
+    public void SubmitRename(string value) => SaveRename();
+
+    public void SaveRename()
+    {
+        if (selectedEntry == null || selectedEntry.builtIn) return;
+        string name = renameInput.text.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            detailsStatus.text = "Enter a name for this prefab.";
+            return;
+        }
+        if (!editor.RenameSavedPrefab(selectedEntry.id, name))
+        {
+            detailsStatus.text = "Could not rename this prefab.";
+            return;
+        }
+        selectedEntry.name = name;
+        bar.MarkDirty();
+        RefreshCards(false);
+        SetDetailsActionView(0);
+        UpdateSelection();
+    }
+
+    public void StartDelete()
+    {
+        detailsStatus.text = string.Empty;
+        if (selectedEntry != null && !selectedEntry.builtIn) SetDetailsActionView(2);
+    }
+
+    public void ConfirmDelete()
+    {
+        if (selectedEntry == null || selectedEntry.builtIn) return;
+        if (!editor.DeleteSavedPrefab(selectedEntry.id))
+        {
+            detailsStatus.text = "Could not delete this prefab.";
+            return;
+        }
+        entries.Remove(selectedEntry);
+        selectedEntry = null;
+        bar.MarkDirty();
+        RefreshCards(false);
+        SetDetailsActionView(0);
+        UpdateSelection();
+    }
+
+    public void CancelPrefabAction()
+    {
+        SetDetailsActionView(0);
+        UpdateSelection();
+    }
+
     public void ToggleReorder()
     {
         if (reordering)
@@ -94,6 +159,7 @@ public class PrefabLibraryMenu : MonoBehaviour
         }
         else if (selectedEntry != null && canReorder)
         {
+            SetDetailsActionView(0);
             searchBeforeReorder = searchInput.text;
             searchScrollBeforeReorder = scrollView.verticalNormalizedPosition;
             searchInput.DeactivateInputField();
@@ -131,7 +197,7 @@ public class PrefabLibraryMenu : MonoBehaviour
             {
                 if (record == null || string.IsNullOrEmpty(record.id))
                     continue;
-                entries.Add(new Entry { key = PrefabOrder.PlayerKey(record.id), name = record.name ?? "Unnamed prefab", sprite = LoadPreview(record.id) });
+                entries.Add(new Entry { id = record.id, key = PrefabOrder.PlayerKey(record.id), name = record.name ?? "Unnamed prefab", sprite = LoadPreview(record.id) });
             }
         }
         List<string> savedOrder = editor.GetPrefabOrder();
@@ -216,8 +282,17 @@ public class PrefabLibraryMenu : MonoBehaviour
     void SelectEntry(Entry entry)
     {
         selectedEntry = entry;
+        SetDetailsActionView(0);
         RefreshCards(false);
         UpdateSelection();
+    }
+
+    void SetDetailsActionView(int view)
+    {
+        bool playerPrefab = selectedEntry != null && !selectedEntry.builtIn;
+        playerPrefabActions.SetActive(playerPrefab && view == 0);
+        renamePanel.SetActive(playerPrefab && view == 1);
+        deleteConfirmationPanel.SetActive(playerPrefab && view == 2);
     }
 
     void SetReorderMode(bool active)
@@ -256,11 +331,10 @@ public class PrefabLibraryMenu : MonoBehaviour
     {
         int index = entries.IndexOf(selectedEntry);
         bool selected = index >= 0;
+        if (!selected) SetDetailsActionView(0);
         reorderButton.interactable = selected && canReorder;
         detailsTitle.text = selected ? selectedEntry.name : "Select a prefab";
-        detailsType.text = selected ? (selectedEntry.builtIn ? "Game prefab" : "Your prefab") : string.Empty;
-        detailsPreview.sprite = selected ? selectedEntry.sprite : null;
-        detailsPreview.enabled = selected && selectedEntry.sprite != null;
+        detailsStatus.text = string.Empty;
         reorderTitle.text = selected ? selectedEntry.name : string.Empty;
         moveToTopButton.interactable = moveUpRowButton.interactable = moveEarlierButton.interactable = selected && index > 0;
         moveLaterButton.interactable = moveDownRowButton.interactable = moveToBottomButton.interactable = selected && index < entries.Count - 1;

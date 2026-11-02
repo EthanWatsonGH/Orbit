@@ -186,6 +186,101 @@ public sealed class PrefabStorage
         }
     }
 
+    public bool Rename(string id, string name)
+    {
+        if (!IsValidId(id) || string.IsNullOrWhiteSpace(name)) return false;
+        name = name.Trim();
+        string catalogPath = Path.Combine(directory, CatalogFileName);
+        string prefabPath = GetPath(id, ".json");
+        string previousCatalog = null;
+        string previousPrefab = null;
+        bool prefabChanged = false;
+        bool catalogChanged = false;
+        try
+        {
+            previousCatalog = File.ReadAllText(catalogPath);
+            SavedPrefabCatalog catalog = JsonUtility.FromJson<SavedPrefabCatalog>(previousCatalog);
+            if (catalog?.prefabs == null || catalog.prefabs.Exists(record => record == null) ||
+                catalog.prefabs.FindAll(record => record.id == id).Count != 1)
+                throw new InvalidDataException("The prefab catalog does not contain one matching entry.");
+            previousPrefab = File.ReadAllText(prefabPath);
+            SavedObjectPrefab prefab = JsonUtility.FromJson<SavedObjectPrefab>(previousPrefab);
+            // Avoid rewriting data from a format this version does not understand.
+            if (prefab == null || prefab.id != id || prefab.loaderVersion != 1 || prefab.objects == null)
+                throw new InvalidDataException("The saved prefab is invalid or uses an unsupported version.");
+            prefab.name = name;
+            catalog.prefabs.Find(record => record.id == id).name = name;
+            prefabChanged = true;
+            File.WriteAllText(prefabPath, JsonUtility.ToJson(prefab, false));
+            catalogChanged = true;
+            File.WriteAllText(catalogPath, JsonUtility.ToJson(catalog, false));
+            RequestSync();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            if (prefabChanged)
+            {
+                try { File.WriteAllText(prefabPath, previousPrefab); }
+                catch (Exception rollbackException) { Debug.LogError("Prefab data could not be restored: " + rollbackException.Message); }
+            }
+            if (catalogChanged)
+            {
+                try { File.WriteAllText(catalogPath, previousCatalog); }
+                catch (Exception rollbackException) { Debug.LogError("Prefab catalog could not be restored: " + rollbackException.Message); }
+            }
+            if (prefabChanged || catalogChanged) RequestSync();
+            Debug.LogError("Prefab could not be renamed: " + exception.Message);
+            return false;
+        }
+    }
+
+    public bool Delete(string id)
+    {
+        if (!IsValidId(id)) return false;
+        string catalogPath = Path.Combine(directory, CatalogFileName);
+        string previousCatalog = null;
+        bool catalogChanged = false;
+        try
+        {
+            previousCatalog = File.ReadAllText(catalogPath);
+            SavedPrefabCatalog catalog = JsonUtility.FromJson<SavedPrefabCatalog>(previousCatalog);
+            if (catalog?.prefabs == null || catalog.prefabs.Exists(record => record == null) ||
+                catalog.prefabs.FindAll(record => record.id == id).Count != 1)
+                throw new InvalidDataException("The prefab catalog does not contain one matching entry.");
+            catalog.prefabs.RemoveAll(record => record.id == id);
+            catalogChanged = true;
+            File.WriteAllText(catalogPath, JsonUtility.ToJson(catalog, false));
+        }
+        catch (Exception exception)
+        {
+            if (catalogChanged)
+            {
+                try { File.WriteAllText(catalogPath, previousCatalog); RequestSync(); }
+                catch (Exception rollbackException) { Debug.LogError("Prefab deletion could not be rolled back: " + rollbackException.Message); }
+            }
+            Debug.LogError("Prefab could not be deleted: " + exception.Message);
+            return false;
+        }
+
+        // The catalog is authoritative; report any leftover files if cleanup fails.
+        foreach (string extension in new[] { ".json", ".png" })
+        {
+            try { File.Delete(GetPath(id, extension)); }
+            catch (Exception exception) { Debug.LogWarning("Deleted prefab file could not be removed: " + exception.Message); }
+        }
+        RequestSync();
+        return true;
+    }
+
+    static void RequestSync()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        try { SyncPrefabStorage(); }
+        catch (Exception exception) { Debug.LogError("Prefab storage sync could not be requested: " + exception.Message); }
+#endif
+    }
+
     public string LoadJson(string id)
     {
         if (!IsValidId(id))
