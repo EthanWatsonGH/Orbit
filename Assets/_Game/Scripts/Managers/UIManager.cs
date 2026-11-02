@@ -59,8 +59,11 @@ public class UIManager : MonoBehaviour
     [SerializeField] LevelSelectionMenu gameLevelSelectionMenu;
     [SerializeField] LevelSelectionMenu playerLevelSelectionMenu;
     [SerializeField] LevelSelectionMenu downloadedLevelSelectionMenu;
+    [SerializeField] PrefabLibraryMenu prefabLibraryPrefab;
 
     LevelSelectionMenu activeMenu;
+    PrefabLibraryMenu prefabLibrary;
+    bool prefabLibraryIsOpen;
     LevelEditor levelEditor;
     WorldMode menuReturnMode;
     int levelRevisionWhenMenuOpened = -1;
@@ -113,6 +116,7 @@ public class UIManager : MonoBehaviour
 
     public void HideAllUI()
     {
+        HideActiveMenuWithoutRestoringWorldMode();
         HideAllLevelSelectionMenus();
         HideWorldHud();
         EventManager.Instance.UnselectObject();
@@ -121,6 +125,8 @@ public class UIManager : MonoBehaviour
 
     void ShowLevelSelectionMenu(LevelSource source)
     {
+        if (prefabLibraryIsOpen)
+            return;
         LevelSelectionMenu menu = GetLevelSelectionMenu(source);
         if (menu == null)
         {
@@ -178,6 +184,32 @@ public class UIManager : MonoBehaviour
         ShowLevelSelectionMenu(LevelSource.DownloadedLevels);
     }
 
+    public void ShowPrefabLibrary()
+    {
+        if (activeMenu != null || prefabLibraryIsOpen || GetActiveWorldMode() != WorldMode.LevelEditor)
+            return;
+
+        LevelEditor editor = GetLevelEditor();
+        EditorHUD hud = levelEditorHUD != null ? levelEditorHUD.GetComponent<EditorHUD>() : null;
+        if (editor == null || hud == null || hud.PrefabBar == null || prefabLibraryPrefab == null ||
+            gameLevelSelectionMenu == null || gameLevelSelectionMenu.transform.parent == null)
+        {
+            Debug.LogError("UIManager is missing a prefab library, editor HUD, or modal menu reference.", this);
+            return;
+        }
+        if (prefabLibrary == null)
+            prefabLibrary = Instantiate(prefabLibraryPrefab, gameLevelSelectionMenu.transform.parent, false);
+        if (CameraViewManager.Instance == null || !CameraViewManager.Instance.ActivateMenuCameraFromCurrentView())
+            return;
+
+        editor.RememberStateBeforeLeavingEditor(true);
+        menuReturnMode = WorldMode.LevelEditor;
+        prefabLibraryIsOpen = true;
+        HideWorldHud();
+        SetWorldModeActive(WorldMode.LevelEditor, false);
+        prefabLibrary.Show(editor, hud.PrefabBar);
+    }
+
     public void ShowPlayerHUD()
     {
         ShowWorldModeUi(WorldMode.Player);
@@ -192,6 +224,17 @@ public class UIManager : MonoBehaviour
 
     void CloseActiveMenu()
     {
+        if (prefabLibraryIsOpen)
+        {
+            prefabLibrary.Hide();
+            prefabLibraryIsOpen = false;
+            CameraViewManager.Instance.DeactivateMenuCamera();
+            SetWorldModeActive(WorldMode.LevelEditor, true);
+            ShowWorldModeUi(WorldMode.LevelEditor);
+            GetLevelEditor()?.RestoreStateAfterReturningToEditor();
+            menuReturnMode = WorldMode.None;
+            return;
+        }
         if (activeMenu == null)
             return;
 
@@ -216,6 +259,9 @@ public class UIManager : MonoBehaviour
 
     void HideActiveMenuWithoutRestoringWorldMode()
     {
+        if (prefabLibraryIsOpen && prefabLibrary != null)
+            prefabLibrary.Hide();
+        prefabLibraryIsOpen = false;
         if (activeMenu != null)
             activeMenu.Hide();
 

@@ -28,6 +28,8 @@ public class PrefabBar : MonoBehaviour
     public ScrollRect ScrollView => scrollView;
     public float DragThresholdPixels => dragThresholdPixels;
 
+    public IEnumerable<PrefabBarEntry> BuiltInEntries => builtInEntries;
+
     public void Bind(LevelEditor targetEditor)
     {
         if (editor != targetEditor)

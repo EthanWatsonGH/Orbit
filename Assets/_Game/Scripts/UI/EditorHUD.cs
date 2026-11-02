@@ -9,6 +9,8 @@ public class EditorHUD : MonoBehaviour
     [SerializeField] Button savePrefabButton;
     [SerializeField] PrefabBar prefabBar;
 
+    public PrefabBar PrefabBar => prefabBar;
+
     void Awake()
     {
         RefreshSelectionButtons();
@@ -55,6 +57,7 @@ public class EditorHUD : MonoBehaviour
     public void SnapSelectedObjectToLastHorizontal() => levelEditor?.SnapSelectedObjectToLastHorizontal();
     public void SnapSelectedObjectToLastVertical() => levelEditor?.SnapSelectedObjectToLastVertical();
     public void DeselectObject() => levelEditor?.DeselectObject();
+    public void OpenPrefabLibrary() => UIManager.Instance?.ShowPrefabLibrary();
     public void DeleteSelectedObjects() => levelEditor?.DeleteSelectedObjects();
     public void CreatePersistentGroup() => levelEditor?.CreatePersistentGroup();
     public void UngroupSelectedPersistentGroup() => levelEditor?.UngroupSelectedPersistentGroup();

@@ -14,6 +14,8 @@ public class PrefabBarEntry : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     enum Gesture { Undecided, Scroll, Upward, Place, Rejected }
     Gesture gesture;
 
+    public string BuiltInType => builtInType;
+
     void Awake() => bar = GetComponentInParent<PrefabBar>();
 
     public void ConfigureSaved(string id)

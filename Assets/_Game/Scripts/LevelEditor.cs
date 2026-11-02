@@ -102,6 +102,9 @@ public class LevelEditor : MonoBehaviour
     GameObject selectionPivot;
     readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
+    GameObject rememberedLastSelectedObject;
+    GameObject rememberedDeselectedObject;
+    bool preserveSelectionHistoryOnReturn;
     bool isSelectionSuspendedForSave;
     int levelRevisionWhenEditorWasLeft = -1;
     bool hasRememberedEditorState;
@@ -1786,9 +1789,12 @@ public class LevelEditor : MonoBehaviour
 
     // UIManager calls this before it disables the editor. Only real selected roots
     // are remembered; the editor-only selection pivot is recreated when returning.
-    public void RememberStateBeforeLeavingEditor()
+    public void RememberStateBeforeLeavingEditor(bool preserveSelectionHistory = false)
     {
         CancelSuspendedSelectionRestore();
+        preserveSelectionHistoryOnReturn = preserveSelectionHistory;
+        rememberedLastSelectedObject = preserveSelectionHistory ? lastSelectedObject : null;
+        rememberedDeselectedObject = preserveSelectionHistory ? deselectedObjectAwaitingReplacement : null;
         selectionObjectsBeforeLeavingEditor.Clear();
 
         foreach (Transform selectionRoot in selectedSelectionRoots)
@@ -1820,6 +1826,9 @@ public class LevelEditor : MonoBehaviour
         {
             selectionObjectsBeforeLeavingEditor.Clear();
             ClearSelectionHistory();
+            preserveSelectionHistoryOnReturn = false;
+            rememberedLastSelectedObject = null;
+            rememberedDeselectedObject = null;
             return true;
         }
 
@@ -1827,6 +1836,15 @@ public class LevelEditor : MonoBehaviour
         selectionObjectsBeforeLeavingEditor.Clear();
         if (objectsToRestore.Count > 0)
             SelectObjects(objectsToRestore);
+
+        if (preserveSelectionHistoryOnReturn)
+        {
+            lastSelectedObject = rememberedLastSelectedObject;
+            deselectedObjectAwaitingReplacement = rememberedDeselectedObject;
+        }
+        preserveSelectionHistoryOnReturn = false;
+        rememberedLastSelectedObject = null;
+        rememberedDeselectedObject = null;
 
         return false;
     }
