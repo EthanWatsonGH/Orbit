@@ -116,10 +116,18 @@ public class PrefabBar : MonoBehaviour
 
         ClearSavedEntries();
         visibleEntryCount = 0;
+        var entriesByKey = new Dictionary<string, PrefabBarEntry>();
+        var defaultOrder = new List<string>();
         foreach (PrefabBarEntry entry in builtInEntries)
         {
-            if (entry != null && entry.gameObject.activeSelf)
-                PositionEntry(entry.transform as RectTransform, visibleEntryCount++);
+            if (entry == null || !entry.gameObject.activeSelf || string.IsNullOrEmpty(entry.BuiltInType))
+                continue;
+            string key = PrefabOrder.BuiltInKey(entry.BuiltInType);
+            if (!entriesByKey.ContainsKey(key))
+            {
+                entriesByKey.Add(key, entry);
+                defaultOrder.Add(key);
+            }
         }
 
         foreach (SavedPrefabRecord record in records)
@@ -167,8 +175,18 @@ public class PrefabBar : MonoBehaviour
                 if (label != null) label.text = record.name;
             }
             savedEntries.Add(entry.gameObject);
-            PositionEntry(entry.transform as RectTransform, visibleEntryCount++);
+            string key = PrefabOrder.PlayerKey(record.id);
+            if (!entriesByKey.ContainsKey(key))
+            {
+                entriesByKey.Add(key, entry);
+                defaultOrder.Add(key);
+            }
+            else
+                entry.gameObject.SetActive(false);
         }
+
+        foreach (string key in PrefabOrder.Merge(defaultOrder, editor.GetPrefabOrder()))
+            PositionEntry(entriesByKey[key].transform as RectTransform, visibleEntryCount++);
 
         dirty = false;
         UpdateContentWidth();

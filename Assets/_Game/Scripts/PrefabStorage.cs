@@ -30,6 +30,32 @@ sealed class SavedPrefabCatalog
     public List<SavedPrefabRecord> prefabs = new List<SavedPrefabRecord>();
 }
 
+[Serializable]
+sealed class SavedPrefabOrder
+{
+    public List<string> keys = new List<string>();
+}
+
+// The same order is used by the object bar and the library. New entries are
+// appended, and missing entries are ignored without changing the stored order.
+public static class PrefabOrder
+{
+    public static string BuiltInKey(string type) => "base:" + type;
+    public static string PlayerKey(string id) => "player:" + id;
+
+    public static List<string> Merge(IEnumerable<string> available, IEnumerable<string> saved)
+    {
+        var remaining = new HashSet<string>(available);
+        var result = new List<string>();
+        if (saved != null)
+            foreach (string key in saved)
+                if (key != null && remaining.Remove(key)) result.Add(key);
+        foreach (string key in available)
+            if (key != null && remaining.Remove(key)) result.Add(key);
+        return result;
+    }
+}
+
 // Player prefabs have their own catalog and files; level catalogs remain unchanged.
 public sealed class PrefabStorage
 {
@@ -38,6 +64,7 @@ public sealed class PrefabStorage
     static extern void SyncPrefabStorage();
 #endif
     const string CatalogFileName = "prefab-catalog.json";
+    const string OrderFileName = "prefab-order.json";
     readonly string directory;
 
     public PrefabStorage(string directory)
@@ -65,6 +92,44 @@ public sealed class PrefabStorage
         {
             Debug.LogError("Prefab catalog could not be loaded: " + exception.Message);
             return null;
+        }
+    }
+
+    public List<string> LoadOrder()
+    {
+        string path = Path.Combine(directory, OrderFileName);
+        if (!File.Exists(path)) return new List<string>();
+        try
+        {
+            SavedPrefabOrder order = JsonUtility.FromJson<SavedPrefabOrder>(File.ReadAllText(path));
+            if (order?.keys == null) throw new InvalidDataException("Invalid prefab order.");
+            return order.keys;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError("Prefab order could not be loaded: " + exception.Message);
+            return null;
+        }
+    }
+
+    public bool SaveOrder(List<string> keys)
+    {
+        if (keys == null) return false;
+        try
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, OrderFileName),
+                JsonUtility.ToJson(new SavedPrefabOrder { keys = keys }, false));
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { SyncPrefabStorage(); }
+            catch (Exception exception) { Debug.LogError("Prefab storage sync could not be requested: " + exception.Message); }
+#endif
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError("Prefab order could not be saved: " + exception.Message);
+            return false;
         }
     }
 

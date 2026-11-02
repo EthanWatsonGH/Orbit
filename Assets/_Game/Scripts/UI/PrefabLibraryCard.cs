@@ -8,8 +8,9 @@ public class PrefabLibraryCard : MonoBehaviour
     [SerializeField] Image preview;
     [SerializeField] TMP_Text title;
     [SerializeField] GameObject gameBadge;
+    [SerializeField] GameObject selectionHighlight;
 
-    public void Configure(string displayName, Sprite sprite, bool builtIn, System.Action onSelect)
+    public void Configure(string displayName, Sprite sprite, bool builtIn, bool selected, System.Action onSelect)
     {
         title.text = displayName;
         title.enableAutoSizing = true;
@@ -22,6 +23,7 @@ public class PrefabLibraryCard : MonoBehaviour
         preview.sprite = sprite;
         preview.enabled = sprite != null;
         gameBadge.SetActive(builtIn);
+        selectionHighlight.SetActive(selected);
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => onSelect());
     }
