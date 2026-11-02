@@ -49,6 +49,15 @@ public class EditorHUD : MonoBehaviour
     public void DeleteSelectedObjects() => levelEditor?.DeleteSelectedObjects();
     public void CreatePersistentGroup() => levelEditor?.CreatePersistentGroup();
     public void UngroupSelectedPersistentGroup() => levelEditor?.UngroupSelectedPersistentGroup();
+    public void SaveSelectedPrefab()
+    {
+        string name = "Custom Prefab " + System.DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
+        if (levelEditor != null && levelEditor.TrySaveSelectedPrefab(name, out string id))
+            Debug.Log("Saved prefab: " + id);
+        else
+            Debug.LogWarning("Prefab could not be saved from the current selection.");
+    }
+    public void PlaceSavedPrefab(string id) => levelEditor?.PlaceSavedPrefab(id);
     public void LoadLevelFromClipboard() => levelEditor?.LoadLevelFromClipboard();
     public void DeleteAllLevelObjects() => levelEditor?.DeleteAllLevelObjects();
     public void SwitchToPlayMode() => levelEditor?.SwitchToPlayMode();

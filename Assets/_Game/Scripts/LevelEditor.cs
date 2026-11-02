@@ -59,6 +59,8 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
+    SavedObjectPrefab savedPrefabToPlace;
+    PrefabStorage prefabStorage;
     RectTransform objectSelectionBar;
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
@@ -653,7 +655,20 @@ public class LevelEditor : MonoBehaviour
             !IsOverObjectSelectionBar(pointer.ScreenPosition) && !UiHitTest.IsScreenPositionOverUi(pointer.ScreenPosition) &&
             pointer.TryGetWorldPositionNoDepth(pointer.ScreenPosition, out Vector3 initialPosition))
         {
-            objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, initialPosition, Quaternion.identity, levelObjectsCollection.transform);
+            if (savedPrefabToPlace != null)
+            {
+                if (LevelManager.Instance == null ||
+                    !LevelManager.Instance.TryInstantiatePrefab(savedPrefabToPlace, levelObjectsCollection.transform, out objectCurrentlyTryingToPlace))
+                {
+                    Debug.LogError("The saved prefab could not be placed.");
+                    CancelPlacement();
+                    pointerInteraction = EditorPointerInteraction.None;
+                    return;
+                }
+                objectCurrentlyTryingToPlace.transform.position = initialPosition;
+            }
+            else
+                objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, initialPosition, Quaternion.identity, levelObjectsCollection.transform);
         }
 
         if (objectCurrentlyTryingToPlace != null && pointer.TryGetWorldPositionNoDepth(pointer.ScreenPosition, out Vector3 pointerWorldPosition))
@@ -668,6 +683,7 @@ public class LevelEditor : MonoBehaviour
                 ConfigureSelectionControlsForSelectedObject();
             }
             objectCurrentlyTryingToPlace = null;
+            savedPrefabToPlace = null;
         }
     }
 
@@ -676,6 +692,7 @@ public class LevelEditor : MonoBehaviour
         if (objectCurrentlyTryingToPlace != null)
             Destroy(objectCurrentlyTryingToPlace);
         objectCurrentlyTryingToPlace = null;
+        savedPrefabToPlace = null;
         isTryingToPlace = false;
     }
 
@@ -962,7 +979,7 @@ public class LevelEditor : MonoBehaviour
         if (activeTransform != ActiveTransform.None || !CanCreatePersistentGroup())
             return;
 
-        List<Transform> groupingMembers = GetGroupingMembers();
+        List<Transform> groupingMembers = GetGroupingMembers(selectedSelectionRoots);
         if (groupingMembers.Count < 2)
             return;
 
@@ -971,16 +988,7 @@ public class LevelEditor : MonoBehaviour
         // and reparent level-object roots while preserving their world transforms.
         // Existing selected Groups contribute their children, never the Group itself,
         // so this action cannot create nested Groups.
-        GameObject persistentGroup = new GameObject(LevelManager.GroupObjectType);
-        persistentGroup.transform.SetParent(levelObjectsCollection.transform, false);
-        persistentGroup.transform.SetPositionAndRotation(selectionPivot.transform.position, selectionPivot.transform.rotation);
-        persistentGroup.transform.localScale = selectionPivot.transform.localScale;
-
-        foreach (Transform groupingMember in groupingMembers)
-        {
-            if (groupingMember != null)
-                groupingMember.SetParent(persistentGroup.transform, true);
-        }
+        GameObject persistentGroup = CreateGroup(levelObjectsCollection.transform, selectionPivot.transform, groupingMembers);
 
         NormalizePersistentGroups();
 
@@ -994,13 +1002,27 @@ public class LevelEditor : MonoBehaviour
 
     bool CanCreatePersistentGroup()
     {
-        return HasMultipleSelection && GetGroupingMembers().Count >= 2;
+        return HasMultipleSelection && GetGroupingMembers(selectedSelectionRoots).Count >= 2;
     }
 
-    List<Transform> GetGroupingMembers()
+    static GameObject CreateGroup(Transform parent, Transform frame, IEnumerable<Transform> members)
+    {
+        GameObject group = new GameObject(LevelManager.GroupObjectType);
+        group.transform.SetParent(parent, false);
+        group.transform.SetPositionAndRotation(frame.position, frame.rotation);
+        group.transform.localScale = frame.localScale;
+        foreach (Transform member in members)
+        {
+            if (member != null)
+                member.SetParent(group.transform, true);
+        }
+        return group;
+    }
+
+    static List<Transform> GetGroupingMembers(IEnumerable<Transform> selectionRoots)
     {
         List<Transform> groupingMembers = new List<Transform>();
-        foreach (Transform selectionRoot in selectedSelectionRoots)
+        foreach (Transform selectionRoot in selectionRoots)
         {
             if (selectionRoot == null)
                 continue;
@@ -1026,6 +1048,97 @@ public class LevelEditor : MonoBehaviour
         }
 
         return groupingMembers;
+    }
+
+    PrefabStorage GetPrefabStorage()
+    {
+        if (prefabStorage == null)
+            prefabStorage = new PrefabStorage(System.IO.Path.Combine(Application.persistentDataPath, "playerPrefabs"));
+        return prefabStorage;
+    }
+
+    public List<SavedPrefabRecord> GetSavedPrefabs() => GetPrefabStorage().LoadCatalog();
+    public byte[] GetSavedPrefabPreview(string id) => GetPrefabStorage().LoadPreview(id);
+
+    public bool TrySaveSelectedPrefab(string displayName, out string id)
+    {
+        id = null;
+        if (selectedObject == null || activeTransform != ActiveTransform.None || isTryingToPlace ||
+            pointerInteraction == EditorPointerInteraction.BoxSelection ||
+            LevelManager.Instance == null || (playerStartPoint != null && selectedObject == playerStartPoint))
+            return false;
+
+        List<Transform> members = GetGroupingMembers(selectedSelectionRoots);
+        if (members.Count == 0)
+            return false;
+
+        GameObject staging = new GameObject("Prefab Capture") { hideFlags = HideFlags.HideAndDontSave };
+        staging.SetActive(false);
+        staging.transform.position = selectedObject.transform.position;
+        try
+        {
+            List<Transform> copies = new List<Transform>(members.Count);
+            foreach (Transform member in members)
+            {
+                GameObject copy = Instantiate(member.gameObject, staging.transform, true);
+                // Preserve the original name: Instantiate adds another (Clone) suffix.
+                copy.name = member.name;
+                // Instantiate's world-space option guarantees position and rotation;
+                // staging has unit scale, so copy the member's effective world scale too.
+                copy.transform.localScale = member.lossyScale;
+                copies.Add(copy.transform);
+            }
+
+            if (copies.Count > 1)
+                CreateGroup(staging.transform, selectedObject.transform, copies);
+
+            if (!LevelManager.Instance.TryCaptureObjects(staging.transform, out List<LevelObjectV1> objects))
+                return false;
+
+            SavedObjectPrefab prefab = new SavedObjectPrefab
+            {
+                id = System.Guid.NewGuid().ToString("N"),
+                loaderVersion = 1,
+                name = string.IsNullOrWhiteSpace(displayName) ? "Custom Prefab" : displayName.Trim(),
+                savedAtUtcTicks = System.DateTime.UtcNow.Ticks,
+                objects = objects
+            };
+            // Use the same validation that placement will use before committing a save.
+            if (!LevelManager.Instance.TryReadPrefab(JsonUtility.ToJson(prefab, false), out _))
+                return false;
+
+            byte[] preview = PrefabPreviewCapture.Capture(staging);
+            if (preview == null || !GetPrefabStorage().Save(prefab, preview))
+                return false;
+
+            id = prefab.id;
+            return true;
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError("Prefab could not be saved: " + exception.Message);
+            return false;
+        }
+        finally
+        {
+            Destroy(staging);
+        }
+    }
+
+    public void PlaceSavedPrefab(string id)
+    {
+        if (isTryingToPlace || activeTransform != ActiveTransform.None || LevelManager.Instance == null)
+            return;
+
+        string json = GetPrefabStorage().LoadJson(id);
+        if (!LevelManager.Instance.TryReadPrefab(json, out SavedObjectPrefab prefab))
+        {
+            Debug.LogError("The saved prefab could not be loaded for placement.");
+            return;
+        }
+
+        savedPrefabToPlace = prefab;
+        StartTryingToPlaceObject();
     }
 
     public void UngroupSelectedPersistentGroup()

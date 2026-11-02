@@ -149,12 +149,97 @@ public class LevelManager : MonoBehaviour
         level.startX = playerStartPoint.transform.position.x;
         level.startY = playerStartPoint.transform.position.y;
 
-        if (!LevelObjectSerialization.TryCaptureChildren(levelObjectsContainer.transform, IsSupportedLevelObjectType, out level.levelObjects))
+        if (!TryCaptureObjects(levelObjectsContainer.transform, out level.levelObjects))
         {
             level = default;
             return false;
         }
 
+        return true;
+    }
+
+    public bool TryCaptureObjects(Transform parent, out List<LevelObjectV1> objects)
+    {
+        return LevelObjectSerialization.TryCaptureChildren(parent, IsSupportedLevelObjectType, out objects);
+    }
+
+    public bool TryReadPrefab(string json, out SavedObjectPrefab prefab)
+    {
+        prefab = null;
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+
+        try
+        {
+            LevelHeader header = JsonUtility.FromJson<LevelHeader>(json);
+            switch (header.loaderVersion)
+            {
+                case 1:
+                    prefab = JsonUtility.FromJson<SavedObjectPrefab>(json);
+                    break;
+                default:
+                    Debug.LogError("Prefab could not be loaded because loader version " + header.loaderVersion + " is not supported.");
+                    return false;
+            }
+
+            if (prefab == null || !IsValidPrefabObjects(prefab.objects))
+            {
+                prefab = null;
+                Debug.LogError("Prefab could not be loaded because its object collection is invalid.");
+                return false;
+            }
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError("Prefab could not be loaded because its JSON is invalid. " + exception.Message);
+            prefab = null;
+            return false;
+        }
+    }
+
+    bool IsValidPrefabObjects(List<LevelObjectV1> objects)
+    {
+        if (objects == null || objects.Count == 0 || objects[0].p != -1)
+            return false;
+
+        bool group = objects[0].t == GroupObjectType;
+        if ((group && objects.Count < 3) || (!group && objects.Count != 1))
+            return false;
+
+        for (int index = 0; index < objects.Count; index++)
+        {
+            LevelObjectV1 record = objects[index];
+            if (!IsSupportedLevelObjectType(record.t) || (index > 0 && (record.p != 0 || record.t == GroupObjectType)) ||
+                float.IsNaN(record.x) || float.IsInfinity(record.x) || float.IsNaN(record.y) || float.IsInfinity(record.y) ||
+                float.IsNaN(record.sx) || float.IsInfinity(record.sx) || float.IsNaN(record.sy) || float.IsInfinity(record.sy) ||
+                float.IsNaN(record.r) || float.IsInfinity(record.r))
+                return false;
+        }
+        return true;
+    }
+
+    public bool TryInstantiatePrefab(SavedObjectPrefab prefab, Transform parent, out GameObject root)
+    {
+        root = null;
+        if (prefab == null || prefab.loaderVersion != 1 || parent == null || !IsValidPrefabObjects(prefab.objects))
+            return false;
+
+        List<Transform> created = LevelObjectSerialization.InstantiateObjects(prefab.objects, parent, CreateLevelObject);
+        if (created.Count != prefab.objects.Count || created.Any(item => item == null))
+        {
+            foreach (Transform item in created)
+            {
+                if (item != null && item.parent == parent)
+                {
+                    item.SetParent(null, true);
+                    Destroy(item.gameObject);
+                }
+            }
+            return false;
+        }
+
+        root = created[0].gameObject;
         return true;
     }
 
