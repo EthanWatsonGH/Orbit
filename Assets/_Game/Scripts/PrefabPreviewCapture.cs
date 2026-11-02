@@ -6,6 +6,7 @@ public static class PrefabPreviewCapture
 {
     const int ImageSize = 512;
     const float FramingPadding = 1.1f;
+    const float MinimumPreviewWorldSize = 4f;
 
     public static byte[] Capture(GameObject staging)
     {
@@ -74,7 +75,9 @@ public static class PrefabPreviewCapture
             camera = cameraObject.AddComponent<Camera>();
             camera.enabled = false;
             camera.orthographic = true;
-            camera.orthographicSize = Mathf.Max(bounds.size.x, bounds.size.y) * 0.5f * FramingPadding;
+            float frameSize = Mathf.Max(MinimumPreviewWorldSize,
+                Mathf.Max(bounds.size.x, bounds.size.y) * FramingPadding);
+            camera.orthographicSize = frameSize * 0.5f;
             camera.aspect = 1f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.cullingMask = 1 << previewLayer;
