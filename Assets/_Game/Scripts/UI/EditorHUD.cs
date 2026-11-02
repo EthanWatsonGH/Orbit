@@ -1,36 +1,43 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class EditorHUD : MonoBehaviour
 {
     [SerializeField] LevelEditor levelEditor;
     [SerializeField] GameObject deleteSelectedObjectsButton;
     [SerializeField] RectTransform objectSelectionBar;
+    [SerializeField] Button savePrefabButton;
+    [SerializeField] PrefabBar prefabBar;
 
     void Awake()
     {
-        RefreshDeleteSelectedObjectsButton();
+        RefreshSelectionButtons();
     }
 
     void OnEnable()
     {
         if (levelEditor != null)
             levelEditor.SetObjectSelectionBar(objectSelectionBar);
-        RefreshDeleteSelectedObjectsButton();
+        if (prefabBar != null)
+            prefabBar.Bind(levelEditor);
+        RefreshSelectionButtons();
     }
 
     void Update()
     {
-        RefreshDeleteSelectedObjectsButton();
+        RefreshSelectionButtons();
     }
 
-    void RefreshDeleteSelectedObjectsButton()
+    void RefreshSelectionButtons()
     {
-        if (deleteSelectedObjectsButton == null)
-            return;
-
-        bool show = levelEditor != null && levelEditor.CanDeleteSelectedObjects;
-        if (deleteSelectedObjectsButton.activeSelf != show)
-            deleteSelectedObjectsButton.SetActive(show);
+        if (deleteSelectedObjectsButton != null)
+        {
+            bool show = levelEditor != null && levelEditor.CanDeleteSelectedObjects;
+            if (deleteSelectedObjectsButton.activeSelf != show)
+                deleteSelectedObjectsButton.SetActive(show);
+        }
+        if (savePrefabButton != null)
+            savePrefabButton.interactable = levelEditor != null && levelEditor.CanSaveSelectedPrefab;
     }
 
     public void Bind(LevelEditor targetLevelEditor)
@@ -38,7 +45,9 @@ public class EditorHUD : MonoBehaviour
         levelEditor = targetLevelEditor;
         if (levelEditor != null && isActiveAndEnabled)
             levelEditor.SetObjectSelectionBar(objectSelectionBar);
-        RefreshDeleteSelectedObjectsButton();
+        if (prefabBar != null && isActiveAndEnabled)
+            prefabBar.Bind(levelEditor);
+        RefreshSelectionButtons();
     }
 
     public void CopyLevelCodeToClipboard() => levelEditor?.CopyLevelCodeToClipboard();
@@ -53,7 +62,11 @@ public class EditorHUD : MonoBehaviour
     {
         string name = "Custom Prefab " + System.DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
         if (levelEditor != null && levelEditor.TrySaveSelectedPrefab(name, out string id))
+        {
+            if (prefabBar != null)
+                prefabBar.MarkDirty();
             Debug.Log("Saved prefab: " + id);
+        }
         else
             Debug.LogWarning("Prefab could not be saved from the current selection.");
     }

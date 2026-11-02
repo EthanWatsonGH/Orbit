@@ -556,7 +556,7 @@ public class LevelManager : MonoBehaviour
         return type == GroupObjectType || GetPrefabForType(type) != null;
     }
 
-    GameObject GetPrefabForType(string type)
+    public GameObject GetPrefabForType(string type)
     {
         switch (type)
         {

@@ -60,6 +60,8 @@ public class LevelEditor : MonoBehaviour
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
     SavedObjectPrefab savedPrefabToPlace;
+    int prefabBarPointerId = int.MinValue;
+    int missingPrefabBarPointerFrames;
     PrefabStorage prefabStorage;
     RectTransform objectSelectionBar;
     GameObject selectedObject = null;
@@ -643,17 +645,43 @@ public class LevelEditor : MonoBehaviour
             return;
 
         PointerInput pointer = PointerInput.Instance;
+        if (prefabBarPointerId != int.MinValue)
+        {
+            if (pointer.TryGetScreenPosition(prefabBarPointerId, out Vector2 position))
+            {
+                missingPrefabBarPointerFrames = 0;
+                UpdatePrefabPlacement(position);
+            }
+            else if (++missingPrefabBarPointerFrames > 1)
+            {
+                CancelPlacement();
+                if (!pointer.IsHeld)
+                    pointerInteraction = EditorPointerInteraction.None;
+            }
+            return;
+        }
+
         if (pointer.WasCanceledThisFrame)
         {
             CancelPlacement();
             return;
         }
 
+        if (pointer.IsHeld || pointer.WasReleasedThisFrame)
+            UpdatePrefabPlacement(pointer.ScreenPosition);
+
+        if (pointer.WasReleasedThisFrame)
+            CompletePrefabPlacement();
+    }
+
+    void UpdatePrefabPlacement(Vector2 screenPosition)
+    {
+        PointerInput pointer = PointerInput.Instance;
         // Wait until the drag first reaches the world before creating anything.
         // Once created, the object stays visible even if the pointer returns to the bar.
-        if (objectCurrentlyTryingToPlace == null && (pointer.IsHeld || pointer.WasReleasedThisFrame) &&
-            !IsOverObjectSelectionBar(pointer.ScreenPosition) && !UiHitTest.IsScreenPositionOverUi(pointer.ScreenPosition) &&
-            pointer.TryGetWorldPositionNoDepth(pointer.ScreenPosition, out Vector3 initialPosition))
+        if (objectCurrentlyTryingToPlace == null && !IsOverObjectSelectionBar(screenPosition) &&
+            !UiHitTest.IsScreenPositionOverUi(screenPosition) &&
+            pointer.TryGetWorldPositionNoDepth(screenPosition, out Vector3 initialPosition))
         {
             if (savedPrefabToPlace != null)
             {
@@ -671,20 +699,22 @@ public class LevelEditor : MonoBehaviour
                 objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, initialPosition, Quaternion.identity, levelObjectsCollection.transform);
         }
 
-        if (objectCurrentlyTryingToPlace != null && pointer.TryGetWorldPositionNoDepth(pointer.ScreenPosition, out Vector3 pointerWorldPosition))
+        if (objectCurrentlyTryingToPlace != null && pointer.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPosition))
             objectCurrentlyTryingToPlace.transform.position = pointerWorldPosition;
+    }
 
-        if (pointer.WasReleasedThisFrame)
+    void CompletePrefabPlacement()
+    {
+        isTryingToPlace = false;
+        if (objectCurrentlyTryingToPlace != null)
         {
-            isTryingToPlace = false;
-            if (objectCurrentlyTryingToPlace != null)
-            {
-                SelectObject(objectCurrentlyTryingToPlace);
-                ConfigureSelectionControlsForSelectedObject();
-            }
-            objectCurrentlyTryingToPlace = null;
-            savedPrefabToPlace = null;
+            SelectObject(objectCurrentlyTryingToPlace);
+            ConfigureSelectionControlsForSelectedObject();
         }
+        objectCurrentlyTryingToPlace = null;
+        savedPrefabToPlace = null;
+        prefabBarPointerId = int.MinValue;
+        missingPrefabBarPointerFrames = 0;
     }
 
     void CancelPlacement()
@@ -693,6 +723,8 @@ public class LevelEditor : MonoBehaviour
             Destroy(objectCurrentlyTryingToPlace);
         objectCurrentlyTryingToPlace = null;
         savedPrefabToPlace = null;
+        prefabBarPointerId = int.MinValue;
+        missingPrefabBarPointerFrames = 0;
         isTryingToPlace = false;
     }
 
@@ -705,6 +737,13 @@ public class LevelEditor : MonoBehaviour
             EditorPointerInteraction interactionAtRelease = pointerInteraction;
             hasSelectionDragExceededThreshold = false;
             SetBoxSelectionVisualVisible(false);
+
+            if (interactionAtRelease == EditorPointerInteraction.PlaceObject &&
+                isTryingToPlace && prefabBarPointerId != int.MinValue)
+            {
+                hasBoxSelectionWorldPositions = false;
+                return;
+            }
 
             // A transform may be driven by a second touch after the primary
             // gameplay pointer releases. Keep its ownership until that control
@@ -1060,12 +1099,15 @@ public class LevelEditor : MonoBehaviour
     public List<SavedPrefabRecord> GetSavedPrefabs() => GetPrefabStorage().LoadCatalog();
     public byte[] GetSavedPrefabPreview(string id) => GetPrefabStorage().LoadPreview(id);
 
+    public bool CanSaveSelectedPrefab => selectedObject != null && selectedSelectionRoots.Count > 0 &&
+        activeTransform == ActiveTransform.None && !isTryingToPlace &&
+        pointerInteraction != EditorPointerInteraction.BoxSelection && LevelManager.Instance != null &&
+        (playerStartPoint == null || selectedObject != playerStartPoint);
+
     public bool TrySaveSelectedPrefab(string displayName, out string id)
     {
         id = null;
-        if (selectedObject == null || activeTransform != ActiveTransform.None || isTryingToPlace ||
-            pointerInteraction == EditorPointerInteraction.BoxSelection ||
-            LevelManager.Instance == null || (playerStartPoint != null && selectedObject == playerStartPoint))
+        if (!CanSaveSelectedPrefab)
             return false;
 
         List<Transform> members = GetGroupingMembers(selectedSelectionRoots);
@@ -1139,6 +1181,56 @@ public class LevelEditor : MonoBehaviour
 
         savedPrefabToPlace = prefab;
         StartTryingToPlaceObject();
+    }
+
+    public bool BeginPrefabBarPlacement(string builtInType, string savedId, int pointerId, Vector2 screenPosition)
+    {
+        if (isTryingToPlace || activeTransform != ActiveTransform.None || LevelManager.Instance == null)
+            return false;
+
+        SavedObjectPrefab saved = null;
+        GameObject builtIn = null;
+        if (!string.IsNullOrEmpty(savedId))
+        {
+            if (!LevelManager.Instance.TryReadPrefab(GetPrefabStorage().LoadJson(savedId), out saved))
+                return false;
+        }
+        else
+        {
+            builtIn = LevelManager.Instance.GetPrefabForType(builtInType);
+            if (builtIn == null)
+            {
+                Debug.LogError("The built-in prefab '" + builtInType + "' is unavailable.");
+                return false;
+            }
+        }
+
+        prefabToPlace = builtIn;
+        savedPrefabToPlace = saved;
+        prefabBarPointerId = pointerId;
+        missingPrefabBarPointerFrames = 0;
+        isTryingToPlace = true;
+        pointerInteraction = EditorPointerInteraction.PlaceObject;
+        UpdatePrefabPlacement(screenPosition);
+        return isTryingToPlace;
+    }
+
+    public void EndPrefabBarPlacement(int pointerId, Vector2 screenPosition, bool canceled)
+    {
+        if (!isTryingToPlace || prefabBarPointerId != pointerId)
+            return;
+
+        if (canceled)
+            CancelPlacement();
+        else
+        {
+            UpdatePrefabPlacement(screenPosition);
+            if (isTryingToPlace)
+                CompletePrefabPlacement();
+        }
+
+        if (PointerInput.Instance == null || !PointerInput.Instance.IsHeld)
+            pointerInteraction = EditorPointerInteraction.None;
     }
 
     public void UngroupSelectedPersistentGroup()

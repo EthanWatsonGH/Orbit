@@ -22,4 +22,20 @@ public static class UiHitTest
         EventSystem.current.RaycastAll(pointerEventData, raycastResults);
         return raycastResults.Count > 0;
     }
+
+    public static bool IsScreenPositionOver<T>(Vector2 screenPosition) where T : Component
+    {
+        if (EventSystem.current == null)
+            return false;
+
+        PointerEventData pointerEventData = new PointerEventData(EventSystem.current) { position = screenPosition };
+        raycastResults.Clear();
+        EventSystem.current.RaycastAll(pointerEventData, raycastResults);
+        foreach (RaycastResult result in raycastResults)
+        {
+            if (result.gameObject != null && result.gameObject.GetComponentInParent<T>() != null)
+                return true;
+        }
+        return false;
+    }
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(Camera))]
 public class CameraZoom : MonoBehaviour
@@ -32,6 +33,10 @@ public class CameraZoom : MonoBehaviour
 
         float scrollInput = Input.GetAxisRaw("Mouse ScrollWheel");
         if (Mathf.Approximately(scrollInput, 0f))
+            return;
+
+        // Scrollable UI consumes the wheel while the pointer is over it.
+        if (UiHitTest.IsScreenPositionOver<ScrollRect>(Input.mousePosition))
             return;
 
         float zoomRatio = cam.orthographicSize / GameManager.Instance.DefaultCameraZoom;
