@@ -7,9 +7,11 @@ using UnityEngine.UI;
 public class PrefabLibraryMenu : MonoBehaviour
 {
     [SerializeField] TMP_InputField searchInput;
+    [SerializeField] Button clearSearchButton;
     [SerializeField] ScrollRect scrollView;
     [SerializeField] RectTransform viewport;
     [SerializeField] GridLayoutGroup grid;
+    [SerializeField, Min(1)] int columnCount = 5;
     [SerializeField] PrefabLibraryCard cardTemplate;
     [SerializeField] TMP_Text emptyText;
     [SerializeField] TMP_Text detailsTitle;
@@ -20,10 +22,10 @@ public class PrefabLibraryMenu : MonoBehaviour
     [SerializeField] Button reorderButton;
     [SerializeField] TMP_Text reorderTitle;
     [SerializeField] Button moveToTopButton;
-    [SerializeField] Button moveUpFiveButton;
-    [SerializeField] Button moveUpButton;
-    [SerializeField] Button moveDownButton;
-    [SerializeField] Button moveDownFiveButton;
+    [SerializeField] Button moveUpRowButton;
+    [SerializeField] Button moveEarlierButton;
+    [SerializeField] Button moveLaterButton;
+    [SerializeField] Button moveDownRowButton;
     [SerializeField] Button moveToBottomButton;
 
     readonly List<GameObject> cards = new List<GameObject>();
@@ -33,6 +35,12 @@ public class PrefabLibraryMenu : MonoBehaviour
     LevelEditor editor;
     PrefabBar bar;
     float lastWidth = -1;
+    float cardHeightToWidth;
+    float searchScrollBeforeReorder;
+    string searchBeforeReorder;
+    bool reordering;
+    ColorBlock reorderButtonColors;
+    readonly Vector3[] cardCorners = new Vector3[4];
     Entry selectedEntry;
     bool canReorder;
 
@@ -44,15 +52,22 @@ public class PrefabLibraryMenu : MonoBehaviour
         public Sprite sprite;
     }
 
+    void Awake()
+    {
+        cardHeightToWidth = grid.cellSize.x > 0 ? grid.cellSize.y / grid.cellSize.x : 1f;
+        reorderButtonColors = reorderButton.colors;
+    }
+
     public void Show(LevelEditor targetEditor, PrefabBar targetBar)
     {
         editor = targetEditor;
         bar = targetBar;
         gameObject.SetActive(true);
         searchInput.SetTextWithoutNotify(string.Empty);
+        selectedEntry = null;
+        reordering = false;
         RebuildEntries();
         RefreshCards();
-        selectedEntry = null;
         SetReorderMode(false);
         UpdateSelection();
     }
@@ -68,13 +83,30 @@ public class PrefabLibraryMenu : MonoBehaviour
         searchInput.ActivateInputField();
     }
 
-    public void OpenReorder() { if (selectedEntry != null && canReorder) SetReorderMode(true); }
-    public void CloseReorder() => SetReorderMode(false);
+    public void ToggleReorder()
+    {
+        if (reordering)
+        {
+            SetReorderMode(false);
+            searchInput.SetTextWithoutNotify(searchBeforeReorder ?? string.Empty);
+            RefreshCards();
+            scrollView.verticalNormalizedPosition = searchScrollBeforeReorder;
+        }
+        else if (selectedEntry != null && canReorder)
+        {
+            searchBeforeReorder = searchInput.text;
+            searchScrollBeforeReorder = scrollView.verticalNormalizedPosition;
+            searchInput.DeactivateInputField();
+            searchInput.SetTextWithoutNotify(string.Empty);
+            SetReorderMode(true);
+            RefreshCards();
+        }
+    }
     public void MoveToTop() => MoveSelected(0);
-    public void MoveUpFive() => MoveSelected(entries.IndexOf(selectedEntry) - 5);
-    public void MoveUp() => MoveSelected(entries.IndexOf(selectedEntry) - 1);
-    public void MoveDown() => MoveSelected(entries.IndexOf(selectedEntry) + 1);
-    public void MoveDownFive() => MoveSelected(entries.IndexOf(selectedEntry) + 5);
+    public void MoveUpRow() => MoveSelected(entries.IndexOf(selectedEntry) - grid.constraintCount);
+    public void MoveEarlier() => MoveSelected(entries.IndexOf(selectedEntry) - 1);
+    public void MoveLater() => MoveSelected(entries.IndexOf(selectedEntry) + 1);
+    public void MoveDownRow() => MoveSelected(entries.IndexOf(selectedEntry) + grid.constraintCount);
     public void MoveToBottom() => MoveSelected(entries.Count - 1);
 
     void LateUpdate()
@@ -167,15 +199,18 @@ public class PrefabLibraryMenu : MonoBehaviour
         UpdateColumns();
         Canvas.ForceUpdateCanvases();
         scrollView.verticalNormalizedPosition = resetScroll ? 1 : scrollPosition;
+        if (reordering) KeepSelectionVisible();
     }
 
     void UpdateColumns()
     {
         lastWidth = viewport.rect.width;
-        float width = lastWidth - grid.padding.horizontal;
-        float columnWidth = grid.cellSize.x + grid.spacing.x;
+        int columns = Mathf.Max(1, columnCount);
+        float width = lastWidth - grid.padding.horizontal - grid.spacing.x * (columns - 1);
+        float cardWidth = Mathf.Max(1, width / columns);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = Mathf.Max(1, Mathf.FloorToInt((width + grid.spacing.x) / columnWidth));
+        grid.constraintCount = columns;
+        grid.cellSize = new Vector2(cardWidth, cardWidth * cardHeightToWidth);
     }
 
     void SelectEntry(Entry entry)
@@ -187,8 +222,34 @@ public class PrefabLibraryMenu : MonoBehaviour
 
     void SetReorderMode(bool active)
     {
+        reordering = active;
         detailsPanel.SetActive(!active);
         reorderPanel.SetActive(active);
+        searchInput.interactable = !active;
+        clearSearchButton.interactable = !active;
+        ColorBlock colors = reorderButtonColors;
+        if (active)
+        {
+            colors.normalColor = new Color(.55f, .75f, 1f, 1f);
+            colors.highlightedColor = colors.normalColor;
+            colors.selectedColor = colors.normalColor;
+        }
+        reorderButton.colors = colors;
+    }
+
+    void KeepSelectionVisible()
+    {
+        int index = entries.IndexOf(selectedEntry);
+        if (index < 0 || index >= cards.Count) return;
+        var card = cards[index].transform as RectTransform;
+        if (card == null) return;
+        card.GetWorldCorners(cardCorners);
+        float bottom = viewport.InverseTransformPoint(cardCorners[0]).y;
+        float top = viewport.InverseTransformPoint(cardCorners[1]).y;
+        float adjustment = bottom < viewport.rect.yMin ? viewport.rect.yMin - bottom :
+            top > viewport.rect.yMax ? viewport.rect.yMax - top : 0f;
+        if (!Mathf.Approximately(adjustment, 0f))
+            scrollView.content.anchoredPosition += new Vector2(0f, adjustment);
     }
 
     void UpdateSelection()
@@ -201,8 +262,8 @@ public class PrefabLibraryMenu : MonoBehaviour
         detailsPreview.sprite = selected ? selectedEntry.sprite : null;
         detailsPreview.enabled = selected && selectedEntry.sprite != null;
         reorderTitle.text = selected ? selectedEntry.name : string.Empty;
-        moveToTopButton.interactable = moveUpFiveButton.interactable = moveUpButton.interactable = selected && index > 0;
-        moveDownButton.interactable = moveDownFiveButton.interactable = moveToBottomButton.interactable = selected && index < entries.Count - 1;
+        moveToTopButton.interactable = moveUpRowButton.interactable = moveEarlierButton.interactable = selected && index > 0;
+        moveLaterButton.interactable = moveDownRowButton.interactable = moveToBottomButton.interactable = selected && index < entries.Count - 1;
     }
 
     void MoveSelected(int destination)
