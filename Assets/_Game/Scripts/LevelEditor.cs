@@ -1101,10 +1101,43 @@ public class LevelEditor : MonoBehaviour
 
     public List<SavedPrefabRecord> GetSavedPrefabs() => GetPrefabStorage().LoadCatalog();
     public byte[] GetSavedPrefabPreview(string id) => GetPrefabStorage().LoadPreview(id);
+    public string GetSavedPrefabCode(string id) => GetPrefabStorage().LoadJson(id);
     public List<string> GetPrefabOrder() => GetPrefabStorage().LoadOrder();
     public bool SavePrefabOrder(List<string> keys) => GetPrefabStorage().SaveOrder(keys);
     public bool RenameSavedPrefab(string id, string name) => GetPrefabStorage().Rename(id, name);
     public bool DeleteSavedPrefab(string id) => GetPrefabStorage().Delete(id);
+
+    public bool TryImportPrefab(string code, out string id)
+    {
+        id = null;
+        if (LevelManager.Instance == null || !LevelManager.Instance.TryReadPrefab(code, out SavedObjectPrefab prefab))
+            return false;
+
+        prefab.id = System.Guid.NewGuid().ToString("N");
+        prefab.name = string.IsNullOrWhiteSpace(prefab.name) ? "Imported Prefab" : prefab.name.Trim();
+        prefab.savedAtUtcTicks = System.DateTime.UtcNow.Ticks;
+        GameObject staging = new GameObject("Prefab Import Preview") { hideFlags = HideFlags.HideAndDontSave };
+        staging.SetActive(false);
+        try
+        {
+            if (!LevelManager.Instance.TryInstantiatePrefab(prefab, staging.transform, out _))
+                return false;
+            byte[] preview = PrefabPreviewCapture.Capture(staging);
+            if (preview == null || !GetPrefabStorage().Save(prefab, preview))
+                return false;
+            id = prefab.id;
+            return true;
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError("Prefab could not be imported: " + exception.Message);
+            return false;
+        }
+        finally
+        {
+            Destroy(staging);
+        }
+    }
 
     public bool CanSaveSelectedPrefab => selectedObject != null && selectedSelectionRoots.Count > 0 &&
         activeTransform == ActiveTransform.None && !isTryingToPlace &&

@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_WEBGL && !UNITY_EDITOR
+using System.Runtime.InteropServices;
+#endif
 
 public class PrefabLibraryMenu : MonoBehaviour
 {
@@ -21,6 +24,9 @@ public class PrefabLibraryMenu : MonoBehaviour
     [SerializeField] GameObject renamePanel;
     [SerializeField] TMP_InputField renameInput;
     [SerializeField] GameObject deleteConfirmationPanel;
+    [SerializeField] GameObject importPanel;
+    [SerializeField] TMP_InputField importInput;
+    [SerializeField] TMP_Text importStatus;
     [SerializeField] GameObject reorderPanel;
     [SerializeField] Button reorderButton;
     [SerializeField] TMP_Text reorderTitle;
@@ -46,6 +52,14 @@ public class PrefabLibraryMenu : MonoBehaviour
     readonly Vector3[] cardCorners = new Vector3[4];
     Entry selectedEntry;
     bool canReorder;
+    int pasteRequestId;
+    int copyRequestId;
+    string copyingPrefabId;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")] static extern void ReadPrefabClipboard(string target, int requestId);
+    [DllImport("__Internal")] static extern void CopyPrefabClipboard(string target, int requestId, string code);
+#endif
 
     sealed class Entry
     {
@@ -70,6 +84,7 @@ public class PrefabLibraryMenu : MonoBehaviour
         searchInput.SetTextWithoutNotify(string.Empty);
         selectedEntry = null;
         reordering = false;
+        importPanel.SetActive(false);
         RebuildEntries();
         RefreshCards();
         SetReorderMode(false);
@@ -148,8 +163,121 @@ public class PrefabLibraryMenu : MonoBehaviour
         UpdateSelection();
     }
 
+    public void CopyPrefabCode()
+    {
+        if (selectedEntry == null || selectedEntry.builtIn) return;
+        string code = editor.GetSavedPrefabCode(selectedEntry.id);
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            detailsStatus.text = "Could not read this prefab's code.";
+            return;
+        }
+        try
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            copyingPrefabId = selectedEntry.id;
+            detailsStatus.text = "Copying code...";
+            CopyPrefabClipboard(gameObject.name, ++copyRequestId, code);
+#else
+            GUIUtility.systemCopyBuffer = code;
+            detailsStatus.text = "Code copied.";
+#endif
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Prefab code could not be copied: " + exception.Message);
+            detailsStatus.text = "Could not copy prefab code.";
+        }
+    }
+
+    public void OpenImport()
+    {
+        if (importPanel.activeSelf) return;
+        if (reordering) ToggleReorder();
+        SetDetailsActionView(0);
+        detailsPanel.SetActive(false);
+        importPanel.SetActive(true);
+        importInput.SetTextWithoutNotify(string.Empty);
+        importStatus.text = string.Empty;
+        ++pasteRequestId;
+    }
+
+    public void CancelImport()
+    {
+        ++pasteRequestId;
+        importPanel.SetActive(false);
+        detailsPanel.SetActive(true);
+        UpdateSelection();
+    }
+
+    public void PasteImportCode()
+    {
+        if (!importPanel.activeInHierarchy) return;
+        try
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            importStatus.text = "Reading clipboard...";
+            ReadPrefabClipboard(gameObject.name, ++pasteRequestId);
+#else
+            importInput.text = GUIUtility.systemCopyBuffer;
+            importStatus.text = string.Empty;
+#endif
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Clipboard could not be read: " + exception.Message);
+            importStatus.text = "Could not read clipboard. Paste into the field instead.";
+        }
+    }
+
+    // WebGL clipboard calls finish asynchronously and may return after the menu changes.
+    public void ReceivePrefabClipboard(string result)
+    {
+        int separator = result.IndexOf('\n');
+        if (separator < 0 || !int.TryParse(result.Substring(0, separator), out int requestId) ||
+            requestId != pasteRequestId || !importPanel.activeInHierarchy) return;
+        string value = result.Substring(separator + 1);
+        if (value.StartsWith("ok:", StringComparison.Ordinal))
+        {
+            importInput.text = value.Substring(3);
+            importStatus.text = string.Empty;
+        }
+        else
+            importStatus.text = "Could not read clipboard. Paste into the field instead.";
+    }
+
+    public void ReceivePrefabCopyResult(string result)
+    {
+        int separator = result.IndexOf('\n');
+        if (separator < 0 || !int.TryParse(result.Substring(0, separator), out int requestId) ||
+            requestId != copyRequestId || selectedEntry == null || selectedEntry.id != copyingPrefabId ||
+            !detailsPanel.activeInHierarchy) return;
+        detailsStatus.text = result.Substring(separator + 1) == "ok" ? "Code copied." : "Could not copy prefab code.";
+    }
+
+    public void ImportPrefab()
+    {
+        if (!importPanel.activeInHierarchy) return;
+        if (!editor.TryImportPrefab(importInput.text, out string id))
+        {
+            importStatus.text = "Could not import this prefab. Check the code and try again.";
+            return;
+        }
+        bar.MarkDirty();
+        CancelImport();
+        searchInput.SetTextWithoutNotify(string.Empty);
+        RebuildEntries();
+        selectedEntry = entries.Find(entry => entry.id == id);
+        SetDetailsActionView(0);
+        RefreshCards();
+        KeepSelectionVisible();
+        UpdateSelection();
+        if (selectedEntry != null) detailsStatus.text = "Prefab imported.";
+    }
+
     public void ToggleReorder()
     {
+        if (importPanel.activeSelf) CancelImport();
         if (reordering)
         {
             SetReorderMode(false);
@@ -281,6 +409,8 @@ public class PrefabLibraryMenu : MonoBehaviour
 
     void SelectEntry(Entry entry)
     {
+        if (importPanel.activeSelf) CancelImport();
+        ++copyRequestId;
         selectedEntry = entry;
         SetDetailsActionView(0);
         RefreshCards(false);
