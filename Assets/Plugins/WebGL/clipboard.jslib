@@ -12,27 +12,47 @@ mergeInto(LibraryManager.library, {
       console.error("Failed to read clipboard: ", err);
     });
   },
-  ReadPrefabClipboard: function (targetPtr, requestId) {
+  ReadCodeClipboard: function (targetPtr, request) {
     const target = UTF8ToString(targetPtr);
-    function reply(value) { SendMessage(target, "ReceivePrefabClipboard", requestId + "\n" + value); }
+    const pending = Module.orbitCodeClipboard || (Module.orbitCodeClipboard = {});
+    const state = pending[target] || (pending[target] = {});
+    state.read = request;
+    function reply(value) {
+      if (pending[target] !== state || state.read !== request) return;
+      delete state.read;
+      SendMessage(target, "ReceiveCodeClipboardRead", request + "\n" + value);
+    }
     if (!navigator.clipboard || !navigator.clipboard.readText) {
-      reply("error");
+      Promise.resolve().then(function() { reply("error"); });
       return;
     }
-    navigator.clipboard.readText().then(function(text) {
-      reply("ok:" + text);
-    }).catch(function() { reply("error"); });
+    try {
+      navigator.clipboard.readText().then(function(text) { reply("ok:" + text); })
+        .catch(function() { reply("error"); });
+    } catch (error) { Promise.resolve().then(function() { reply("error"); }); }
   },
-  CopyPrefabClipboard: function (targetPtr, requestId, codePtr) {
+  WriteCodeClipboard: function (targetPtr, request, textPtr) {
     const target = UTF8ToString(targetPtr);
-    const code = UTF8ToString(codePtr);
-    function reply(value) { SendMessage(target, "ReceivePrefabCopyResult", requestId + "\n" + value); }
+    const text = UTF8ToString(textPtr);
+    const pending = Module.orbitCodeClipboard || (Module.orbitCodeClipboard = {});
+    const state = pending[target] || (pending[target] = {});
+    state.write = request;
+    function reply(value) {
+      if (pending[target] !== state || state.write !== request) return;
+      delete state.write;
+      SendMessage(target, "ReceiveCodeClipboardWrite", request + "\n" + value);
+    }
     if (!navigator.clipboard || !navigator.clipboard.writeText) {
-      reply("error");
+      Promise.resolve().then(function() { reply("error"); });
       return;
     }
-    navigator.clipboard.writeText(code).then(function() {
-      reply("ok");
-    }).catch(function() { reply("error"); });
+    try {
+      navigator.clipboard.writeText(text).then(function() { reply("ok"); })
+        .catch(function() { reply("error"); });
+    } catch (error) { Promise.resolve().then(function() { reply("error"); }); }
+  },
+  CancelCodeClipboard: function (targetPtr) {
+    if (Module.orbitCodeClipboard)
+      delete Module.orbitCodeClipboard[UTF8ToString(targetPtr)];
   }
 });
