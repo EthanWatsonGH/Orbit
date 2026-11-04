@@ -1,52 +1,47 @@
-using System.Collections.Generic;
+using System;
 using UnityEngine;
-using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
+[Flags]
 public enum EditorModifier
 {
-    Shift,
-    Ctrl
+    None = 0,
+    Shift = 1,
+    Ctrl = 2,
+    Alt = 4
 }
 
-// Add this to a held Shift or Ctrl screen button. PointerInput recognizes this
-// component too, so the finger holding the modifier does not become a world
-// gesture or interfere with the finger editing the level.
-public class EditorModifierButton : PointerGestureExclusion, IPointerDownHandler, IPointerUpHandler
+// Identifies both the modifiers under a pointer and a touch that should not
+// become a gameplay gesture when it begins on this control.
+public class EditorModifierButton : PointerGestureExclusion
 {
-    [SerializeField] EditorModifier modifier;
-    [SerializeField] EditorHUD editorHUD;
-
-    readonly HashSet<int> heldPointerIds = new HashSet<int>();
+    [SerializeField] EditorModifier modifiers;
+    Button button;
+    Graphic targetGraphic;
+    Color normalColor;
 
     void Awake()
     {
-        if (editorHUD == null)
-            editorHUD = GetComponentInParent<EditorHUD>();
-
-        if (editorHUD == null)
-            Debug.LogError("EditorModifierButton requires an EditorHUD reference.", this);
+        button = GetComponent<Button>();
+        if (button != null && button.transition == Selectable.Transition.ColorTint && button.targetGraphic != null)
+        {
+            targetGraphic = button.targetGraphic;
+            normalColor = targetGraphic.color;
+            // The normal Button press state follows where a drag began. These controls
+            // show the current pointer location instead, including when fingers slide.
+            button.transition = Selectable.Transition.None;
+        }
     }
 
-    public void OnPointerDown(PointerEventData eventData)
+    public EditorModifier Modifiers => isActiveAndEnabled && (button == null || (button.isActiveAndEnabled && button.IsInteractable()))
+        ? modifiers
+        : EditorModifier.None;
+
+    public void SetPointerOver(bool pointerOver)
     {
-        heldPointerIds.Add(eventData.pointerId);
-        SetHeldState();
+        if (targetGraphic != null)
+            targetGraphic.color = pointerOver ? normalColor * button.colors.pressedColor : normalColor;
     }
 
-    public void OnPointerUp(PointerEventData eventData)
-    {
-        heldPointerIds.Remove(eventData.pointerId);
-        SetHeldState();
-    }
-
-    void OnDisable()
-    {
-        heldPointerIds.Clear();
-        SetHeldState();
-    }
-
-    void SetHeldState()
-    {
-        editorHUD?.SetModifierButtonHeld(modifier, heldPointerIds.Count > 0);
-    }
+    void OnDisable() => SetPointerOver(false);
 }

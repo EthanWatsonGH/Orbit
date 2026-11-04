@@ -267,8 +267,7 @@ public class LevelEditor : MonoBehaviour
     bool selectionContainsCircularObject;
     bool hasCurrentScaleFrame;
     ScaleFromEdgeFrame currentScaleFrame;
-    bool isShiftModeButtonHeld;
-    bool isCtrlModeButtonHeld;
+    EditorModifier screenModifiers;
 
     ActiveTransform activeTransform;
     ObjectTransformControl activeMoveControl;
@@ -516,8 +515,7 @@ public class LevelEditor : MonoBehaviour
         CancelActiveTransform();
         pointerInteraction = EditorPointerInteraction.None;
         hasBoxSelectionWorldPositions = false;
-        isShiftModeButtonHeld = false;
-        isCtrlModeButtonHeld = false;
+        screenModifiers = EditorModifier.None;
         SetBoxSelectionVisualVisible(false);
         editorGuides?.HideMoveGuides();
         UnselectObject();
@@ -1591,7 +1589,7 @@ public class LevelEditor : MonoBehaviour
 
     bool IsIndividualSelectionModifierHeld()
     {
-        return Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+        return IsAltModeHeld;
     }
 
     // All pointer selection goes through the same target resolution, whether it
@@ -1963,28 +1961,15 @@ public class LevelEditor : MonoBehaviour
         CompleteActiveTransform();
     }
 
-    // These combine the physical keyboard keys with the matching held screen button.
-    // Keep consumers dependent on the modes rather than on either input source.
-    public bool IsShiftModeHeld => isShiftModeButtonHeld ||
-                                   Input.GetKey(KeyCode.LeftShift) ||
-                                   Input.GetKey(KeyCode.RightShift);
+    // The editor consumes the same modes whether they come from a keyboard or the screen.
+    public bool IsShiftModeHeld => (screenModifiers & EditorModifier.Shift) != 0 ||
+                                   Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+    public bool IsCtrlModeHeld => (screenModifiers & EditorModifier.Ctrl) != 0 ||
+                                  Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+    public bool IsAltModeHeld => (screenModifiers & EditorModifier.Alt) != 0 ||
+                                 Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
 
-    public bool IsCtrlModeHeld => isCtrlModeButtonHeld ||
-                                  Input.GetKey(KeyCode.LeftControl) ||
-                                  Input.GetKey(KeyCode.RightControl);
-
-    public void SetModifierButtonHeld(EditorModifier modifier, bool isHeld)
-    {
-        switch (modifier)
-        {
-            case EditorModifier.Shift:
-                isShiftModeButtonHeld = isHeld;
-                break;
-            case EditorModifier.Ctrl:
-                isCtrlModeButtonHeld = isHeld;
-                break;
-        }
-    }
+    public void SetScreenModifiers(EditorModifier modifiers) => screenModifiers = modifiers;
 
     static bool IsScaleFromEdgeHandleAvailable(ScaleFromEdgeHandle handle, SelectionControlAvailability availability)
     {
