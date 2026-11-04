@@ -46,11 +46,6 @@ public class ButtonEventCaller : MonoBehaviour
             UIManager.Instance.ShowLastActiveUiBeforeOpeningMainMenu();
     }
 
-    public void LoadLevelFromLevelCodeInput()
-    {
-        LevelManager.Instance.LoadLevelFromLevelCodeInput();
-    }
-
     public void StartScalingFromEdge()
     {
         

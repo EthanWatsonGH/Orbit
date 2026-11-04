@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 158043100173931896}
   - component: {fileID: 7136256148920094115}
   - component: {fileID: 7491228592018146149}
+  - component: {fileID: 8793920011000000002}
   m_Layer: 5
   m_Name: Content
   m_TagString: Untagged
@@ -75,6 +76,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
+--- !u!114 &8793920011000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 377035340487164456}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e0c551da09d45b9a84628e225ecf681, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  viewport: {fileID: 4240112468369935209}
+  columnCount: 5
 --- !u!1 &446273235978013497
 GameObject:
   m_ObjectHideFlags: 0
@@ -179,7 +194,7 @@ MonoBehaviour:
   scrollView: {fileID: 1151511116193048511}
   viewport: {fileID: 4240112468369935209}
   grid: {fileID: 7136256148920094115}
-  columnCount: 5
+  cardGrid: {fileID: 8793920011000000002}
   cardTemplate: {fileID: 8341509255034188107}
   emptyText: {fileID: 7755613550736819772}
   detailsTitle: {fileID: 5987102132227522363}

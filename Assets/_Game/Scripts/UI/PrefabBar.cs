@@ -14,8 +14,6 @@ public class PrefabBar : MonoBehaviour
     [SerializeField, Min(1f)] float entryWidth = 100f;
 
     readonly List<GameObject> createdEntries = new List<GameObject>();
-    readonly List<Sprite> savedSprites = new List<Sprite>();
-    readonly List<Texture2D> savedTextures = new List<Texture2D>();
     readonly Vector3[] barCorners = new Vector3[4];
     LevelEditor editor;
     bool dirty = true;
@@ -96,7 +94,7 @@ public class PrefabBar : MonoBehaviour
             editor == null || content == null || entryTemplate == null || viewport == null)
             return;
 
-        List<SavedPrefabRecord> records = editor.GetSavedPrefabs();
+        List<ContentRecord> records = editor.GetSavedPrefabs();
         if (records == null)
             return;
 
@@ -104,52 +102,27 @@ public class PrefabBar : MonoBehaviour
         visibleEntryCount = 0;
         var entriesByKey = new Dictionary<string, PrefabBarEntry>();
         var defaultOrder = new List<string>();
-        foreach (BaseObjectDefinition item in BaseObjectCatalog.All)
+        foreach (ContentRecord item in LevelManager.Instance.Content.LocalEntries(ContentCollection.GamePrefabs))
         {
-            string key = PrefabOrder.BuiltInKey(item.Type);
+            string key = PrefabOrder.BuiltInKey(item.id);
             if (!entriesByKey.ContainsKey(key))
             {
-                PrefabBarEntry entry = CreateEntry(item.Name, item.Type, null, item.LoadIcon());
+                PrefabBarEntry entry = CreateEntry(item.displayName, item.id, null,
+                    LevelManager.Instance.Content.LocalPreview(ContentCollection.GamePrefabs, item));
                 entriesByKey.Add(key, entry);
                 defaultOrder.Add(key);
             }
         }
 
-        foreach (SavedPrefabRecord record in records)
+        foreach (ContentRecord record in records)
         {
             if (record == null || string.IsNullOrEmpty(record.id))
                 continue;
             string key = PrefabOrder.PlayerKey(record.id);
             if (entriesByKey.ContainsKey(key))
                 continue;
-            byte[] bytes = editor.GetSavedPrefabPreview(record.id);
-            Texture2D texture = null;
-            if (bytes != null && bytes.Length > 0)
-            {
-                texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                try
-                {
-                    if (!texture.LoadImage(bytes))
-                    {
-                        Destroy(texture);
-                        texture = null;
-                    }
-                }
-                catch (System.Exception exception)
-                {
-                    Debug.LogWarning("Prefab preview could not be displayed: " + exception.Message);
-                    Destroy(texture);
-                    texture = null;
-                }
-            }
-            Sprite sprite = null;
-            if (texture != null)
-            {
-                sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                savedSprites.Add(sprite);
-                savedTextures.Add(texture);
-            }
-            PrefabBarEntry entry = CreateEntry(record.name ?? "Unnamed prefab", null, record.id, sprite);
+            Sprite sprite = editor.GetSavedPrefabPreview(record);
+            PrefabBarEntry entry = CreateEntry(record.displayName ?? "Unnamed prefab", null, record.id, sprite);
             entriesByKey.Add(key, entry);
             defaultOrder.Add(key);
         }
@@ -215,12 +188,6 @@ public class PrefabBar : MonoBehaviour
                 Destroy(entry);
             }
         }
-        foreach (Sprite sprite in savedSprites)
-            if (sprite != null) Destroy(sprite);
-        foreach (Texture2D texture in savedTextures)
-            if (texture != null) Destroy(texture);
         createdEntries.Clear();
-        savedSprites.Clear();
-        savedTextures.Clear();
     }
 }

@@ -74,7 +74,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   rb: {fileID: 3842154369221639303}
-  prefabToPlace: {fileID: 0}
   startLocationIcon: {fileID: 0}
   localTransformButton: {fileID: 0}
   worldTransformButton: {fileID: 0}

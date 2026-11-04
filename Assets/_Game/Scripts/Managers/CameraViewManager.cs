@@ -85,8 +85,10 @@ public class CameraViewManager : MonoBehaviour
     {
         previewCamera = levelPreviewCamera;
         if (!TryGetActiveWorldCamera(out worldCamera))
+            worldCamera = menuCamera != null && menuCamera.isActiveAndEnabled ? menuCamera : null;
+        if (worldCamera == null)
         {
-            Debug.LogError("CameraViewManager cannot capture a level preview without an active world camera.", this);
+            Debug.LogError("CameraViewManager cannot capture a level preview without an active view camera.", this);
             return false;
         }
 

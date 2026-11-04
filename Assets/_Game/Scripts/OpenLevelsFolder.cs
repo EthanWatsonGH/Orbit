@@ -20,7 +20,16 @@ public class OpenLevelsFolder : MonoBehaviour
     {
         if (Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
         {
-            System.Diagnostics.Process.Start("explorer.exe", LevelManager.Instance.playerLevelsDirectory.Replace("/", "\\"));
+            string directory = LevelManager.Instance.playerLevelsDirectory;
+            try
+            {
+                System.IO.Directory.CreateDirectory(directory);
+                System.Diagnostics.Process.Start("explorer.exe", directory.Replace("/", "\\"));
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError("Could not open the levels folder: " + exception.Message);
+            }
         }
     }
 }

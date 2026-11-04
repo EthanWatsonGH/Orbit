@@ -52,12 +52,11 @@ public class EditorHUD : MonoBehaviour
         RefreshSelectionButtons();
     }
 
-    public void CopyLevelCodeToClipboard() => levelEditor?.CopyLevelCodeToClipboard();
-    public void SaveLevel() => levelEditor?.SaveLevel();
     public void SnapSelectedObjectToLastHorizontal() => levelEditor?.SnapSelectedObjectToLastHorizontal();
     public void SnapSelectedObjectToLastVertical() => levelEditor?.SnapSelectedObjectToLastVertical();
     public void DeselectObject() => levelEditor?.DeselectObject();
     public void OpenPrefabLibrary() => UIManager.Instance?.ShowPrefabLibrary();
+    public void OpenLevelManagement() => UIManager.Instance?.ShowLevelManagement();
     public void DeleteSelectedObjects() => levelEditor?.DeleteSelectedObjects();
     public void CreatePersistentGroup() => levelEditor?.CreatePersistentGroup();
     public void UngroupSelectedPersistentGroup() => levelEditor?.UngroupSelectedPersistentGroup();
@@ -73,20 +72,7 @@ public class EditorHUD : MonoBehaviour
         else
             Debug.LogWarning("Prefab could not be saved from the current selection.");
     }
-    public void PlaceSavedPrefab(string id) => levelEditor?.PlaceSavedPrefab(id);
-    public void LoadLevelFromClipboard() => levelEditor?.LoadLevelFromClipboard();
     public void DeleteAllLevelObjects() => levelEditor?.DeleteAllLevelObjects();
     public void SwitchToPlayMode() => levelEditor?.SwitchToPlayMode();
-    public void PlaceBooster() => levelEditor?.PlaceBooster();
-    public void PlaceBouncyWall() => levelEditor?.PlaceBouncyWall();
-    public void PlaceConstantPuller() => levelEditor?.PlaceConstantPuller();
-    public void PlaceConstantPusher() => levelEditor?.PlaceConstantPusher();
-    public void PlaceFinish() => levelEditor?.PlaceFinish();
-    public void PlaceKillCircle() => levelEditor?.PlaceKillCircle();
-    public void PlaceKillWall() => levelEditor?.PlaceKillWall();
-    public void PlaceMomentumRedirector() => levelEditor?.PlaceMomentumRedirector();
-    public void PlacePuller() => levelEditor?.PlacePuller();
-    public void PlacePusher() => levelEditor?.PlacePusher();
-    public void PlaceSlipperyWall() => levelEditor?.PlaceSlipperyWall();
     public void SetModifierButtonHeld(EditorModifier modifier, bool isHeld) => levelEditor?.SetModifierButtonHeld(modifier, isHeld);
 }

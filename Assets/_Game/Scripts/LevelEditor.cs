@@ -33,7 +33,6 @@ public class LevelEditor : MonoBehaviour
 
     // self object references
     [SerializeField] Rigidbody2D rb;
-    [SerializeField] GameObject prefabToPlace;
     [SerializeField] GameObject startLocationIcon;
     [SerializeField] GameObject deselectObjectButton;
     [SerializeField] GameObject snapVerticalButton;
@@ -59,10 +58,9 @@ public class LevelEditor : MonoBehaviour
 
     bool isTryingToPlace = false;
     GameObject objectCurrentlyTryingToPlace = null;
-    SavedObjectPrefab savedPrefabToPlace;
+    ContentData savedPrefabToPlace;
     int prefabBarPointerId = int.MinValue;
     int missingPrefabBarPointerFrames;
-    PrefabStorage prefabStorage;
     RectTransform objectSelectionBar;
     GameObject selectedObject = null;
     GameObject lastSelectedObject = null;
@@ -100,12 +98,10 @@ public class LevelEditor : MonoBehaviour
     EditorGridRenderer editorGrid;
     ScaleSnapHighlightRenderer scaleSnapHighlights;
     GameObject selectionPivot;
-    readonly List<GameObject> suspendedSelectionObjects = new List<GameObject>();
     readonly List<GameObject> selectionObjectsBeforeLeavingEditor = new List<GameObject>();
     GameObject rememberedLastSelectedObject;
     GameObject rememberedDeselectedObject;
     bool preserveSelectionHistoryOnReturn;
-    bool isSelectionSuspendedForSave;
     int levelRevisionWhenEditorWasLeft = -1;
     bool hasRememberedEditorState;
     Canvas boxSelectionCanvas;
@@ -686,20 +682,15 @@ public class LevelEditor : MonoBehaviour
             !UiHitTest.IsScreenPositionOverUi(screenPosition) &&
             pointer.TryGetWorldPositionNoDepth(screenPosition, out Vector3 initialPosition))
         {
-            if (savedPrefabToPlace != null)
+            if (LevelManager.Instance == null ||
+                !LevelManager.Instance.TryInstantiatePrefab(savedPrefabToPlace, levelObjectsCollection.transform, out objectCurrentlyTryingToPlace))
             {
-                if (LevelManager.Instance == null ||
-                    !LevelManager.Instance.TryInstantiatePrefab(savedPrefabToPlace, levelObjectsCollection.transform, out objectCurrentlyTryingToPlace))
-                {
-                    Debug.LogError("The saved prefab could not be placed.");
-                    CancelPlacement();
-                    pointerInteraction = EditorPointerInteraction.None;
-                    return;
-                }
-                objectCurrentlyTryingToPlace.transform.position = initialPosition;
+                Debug.LogError("The prefab could not be placed.");
+                CancelPlacement();
+                pointerInteraction = EditorPointerInteraction.None;
+                return;
             }
-            else
-                objectCurrentlyTryingToPlace = Instantiate(prefabToPlace, initialPosition, Quaternion.identity, levelObjectsCollection.transform);
+            objectCurrentlyTryingToPlace.transform.position = initialPosition;
         }
 
         if (objectCurrentlyTryingToPlace != null && pointer.TryGetWorldPositionNoDepth(screenPosition, out Vector3 pointerWorldPosition))
@@ -1092,25 +1083,23 @@ public class LevelEditor : MonoBehaviour
         return groupingMembers;
     }
 
-    PrefabStorage GetPrefabStorage()
+    ContentStorage Content => LevelManager.Instance != null ? LevelManager.Instance.Content : null;
+    public List<ContentRecord> GetSavedPrefabs() => Content?.LocalEntries(ContentCollection.PlayerPrefabs);
+    public Sprite GetSavedPrefabPreview(ContentRecord record) => Content?.LocalPreview(ContentCollection.PlayerPrefabs, record);
+    public string GetSavedPrefabCode(string id)
     {
-        if (prefabStorage == null)
-            prefabStorage = new PrefabStorage(System.IO.Path.Combine(Application.persistentDataPath, "playerPrefabs"));
-        return prefabStorage;
+        ContentRecord record = GetSavedPrefabs()?.Find(item => item.id == id);
+        return record == null ? null : Content.LocalCode(ContentCollection.PlayerPrefabs, record);
     }
-
-    public List<SavedPrefabRecord> GetSavedPrefabs() => GetPrefabStorage().LoadCatalog();
-    public byte[] GetSavedPrefabPreview(string id) => GetPrefabStorage().LoadPreview(id);
-    public string GetSavedPrefabCode(string id) => GetPrefabStorage().LoadJson(id);
-    public List<string> GetPrefabOrder() => GetPrefabStorage().LoadOrder();
-    public bool SavePrefabOrder(List<string> keys) => GetPrefabStorage().SaveOrder(keys);
-    public bool RenameSavedPrefab(string id, string name) => GetPrefabStorage().Rename(id, name);
-    public bool DeleteSavedPrefab(string id) => GetPrefabStorage().Delete(id);
+    public List<string> GetPrefabOrder() => Content?.LoadPrefabOrder();
+    public bool SavePrefabOrder(List<string> keys) => Content != null && Content.SavePrefabOrder(keys);
+    public bool RenameSavedPrefab(string id, string name) => Content != null && Content.Rename(ContentCollection.PlayerPrefabs, id, name);
+    public bool DeleteSavedPrefab(string id) => Content != null && Content.Delete(ContentCollection.PlayerPrefabs, id);
 
     public bool TryImportPrefab(string code, out string id)
     {
         id = null;
-        if (LevelManager.Instance == null || !LevelManager.Instance.TryReadPrefab(code, out SavedObjectPrefab prefab))
+        if (LevelManager.Instance == null || !LevelManager.Instance.TryReadContent(code, ContentKind.Prefab, out ContentData prefab))
             return false;
 
         prefab.id = System.Guid.NewGuid().ToString("N");
@@ -1123,7 +1112,7 @@ public class LevelEditor : MonoBehaviour
             if (!LevelManager.Instance.TryInstantiatePrefab(prefab, staging.transform, out _))
                 return false;
             byte[] preview = PrefabPreviewCapture.Capture(staging);
-            if (preview == null || !GetPrefabStorage().Save(prefab, preview))
+            if (preview == null || !Content.Save(ContentCollection.PlayerPrefabs, prefab, preview))
                 return false;
             id = prefab.id;
             return true;
@@ -1177,20 +1166,21 @@ public class LevelEditor : MonoBehaviour
             if (!LevelManager.Instance.TryCaptureObjects(staging.transform, out List<LevelObjectV1> objects))
                 return false;
 
-            SavedObjectPrefab prefab = new SavedObjectPrefab
+            ContentData prefab = new ContentData
             {
                 id = System.Guid.NewGuid().ToString("N"),
                 loaderVersion = 1,
+                kind = ContentKind.Prefab,
                 name = string.IsNullOrWhiteSpace(displayName) ? "Custom Prefab" : displayName.Trim(),
                 savedAtUtcTicks = System.DateTime.UtcNow.Ticks,
                 objects = objects
             };
             // Use the same validation that placement will use before committing a save.
-            if (!LevelManager.Instance.TryReadPrefab(JsonUtility.ToJson(prefab, false), out _))
+            if (!LevelManager.Instance.TryReadContent(JsonUtility.ToJson(prefab, false), ContentKind.Prefab, out _))
                 return false;
 
             byte[] preview = PrefabPreviewCapture.Capture(staging);
-            if (preview == null || !GetPrefabStorage().Save(prefab, preview))
+            if (preview == null || !Content.Save(ContentCollection.PlayerPrefabs, prefab, preview))
                 return false;
 
             id = prefab.id;
@@ -1207,45 +1197,21 @@ public class LevelEditor : MonoBehaviour
         }
     }
 
-    public void PlaceSavedPrefab(string id)
-    {
-        if (isTryingToPlace || activeTransform != ActiveTransform.None || LevelManager.Instance == null)
-            return;
-
-        string json = GetPrefabStorage().LoadJson(id);
-        if (!LevelManager.Instance.TryReadPrefab(json, out SavedObjectPrefab prefab))
-        {
-            Debug.LogError("The saved prefab could not be loaded for placement.");
-            return;
-        }
-
-        savedPrefabToPlace = prefab;
-        StartTryingToPlaceObject();
-    }
-
     public bool BeginPrefabBarPlacement(string builtInType, string savedId, int pointerId, Vector2 screenPosition)
     {
         if (isTryingToPlace || activeTransform != ActiveTransform.None || LevelManager.Instance == null)
             return false;
 
-        SavedObjectPrefab saved = null;
-        GameObject builtIn = null;
+        ContentData saved;
         if (!string.IsNullOrEmpty(savedId))
         {
-            if (!LevelManager.Instance.TryReadPrefab(GetPrefabStorage().LoadJson(savedId), out saved))
-                return false;
+            if (!LevelManager.Instance.TryReadContent(GetSavedPrefabCode(savedId), ContentKind.Prefab, out saved)) return false;
         }
         else
         {
-            builtIn = LevelManager.Instance.GetPrefabForType(builtInType);
-            if (builtIn == null)
-            {
-                Debug.LogError("The built-in prefab '" + builtInType + "' is unavailable.");
-                return false;
-            }
+            ContentRecord record = Content.LocalEntries(ContentCollection.GamePrefabs)?.Find(item => item.id == builtInType);
+            if (!LevelManager.Instance.TryReadContent(Content.LocalCode(ContentCollection.GamePrefabs, record), ContentKind.Prefab, out saved)) return false;
         }
-
-        prefabToPlace = builtIn;
         savedPrefabToPlace = saved;
         prefabBarPointerId = pointerId;
         missingPrefabBarPointerFrames = 0;
@@ -1613,12 +1579,6 @@ public class LevelEditor : MonoBehaviour
         deselectedObjectAwaitingReplacement = null;
     }
 
-    void CancelSuspendedSelectionRestore()
-    {
-        isSelectionSuspendedForSave = false;
-        suspendedSelectionObjects.Clear();
-    }
-
     bool IsAddSelectionModifierHeld()
     {
         return IsShiftModeHeld;
@@ -1784,51 +1744,10 @@ public class LevelEditor : MonoBehaviour
             ungroupPersistentGroupButton.SetActive(false);
     }
 
-    void SuspendSelectionForSave()
-    {
-        if (isSelectionSuspendedForSave)
-            return;
-
-        suspendedSelectionObjects.Clear();
-        foreach (Transform selectionRoot in selectedSelectionRoots)
-        {
-            if (selectionRoot != null)
-                suspendedSelectionObjects.Add(selectionRoot.gameObject);
-        }
-
-        ClearSelectedSelectionRoots();
-        DestroySelectionPivot();
-        SetSelectedObject(null, false);
-        HideSelectionControls();
-        isSelectionSuspendedForSave = suspendedSelectionObjects.Count > 0;
-    }
-
-    void RestoreSelectionAfterSave()
-    {
-        if (!isSelectionSuspendedForSave)
-            return;
-
-        isSelectionSuspendedForSave = false;
-
-        List<GameObject> objectsToRestore = new List<GameObject>();
-        foreach (GameObject selectedObjectBeforeSave in suspendedSelectionObjects)
-        {
-            if (selectedObjectBeforeSave != null)
-                objectsToRestore.Add(selectedObjectBeforeSave);
-        }
-        suspendedSelectionObjects.Clear();
-
-        if (objectsToRestore.Count == 0)
-            return;
-
-        SelectObjects(objectsToRestore);
-    }
-
     // UIManager calls this before it disables the editor. Only real selected roots
     // are remembered; the editor-only selection pivot is recreated when returning.
     public void RememberStateBeforeLeavingEditor(bool preserveSelectionHistory = false)
     {
-        CancelSuspendedSelectionRestore();
         preserveSelectionHistoryOnReturn = preserveSelectionHistory;
         rememberedLastSelectedObject = preserveSelectionHistory ? lastSelectedObject : null;
         rememberedDeselectedObject = preserveSelectionHistory ? deselectedObjectAwaitingReplacement : null;
@@ -3013,77 +2932,6 @@ public class LevelEditor : MonoBehaviour
         UIManager.Instance.SwitchToPlayerMode();
     }
 
-    #region Object Place Functions
-    void StartTryingToPlaceObject()
-    {
-        if (isTryingToPlace || activeTransform != ActiveTransform.None)
-            return;
-
-        isTryingToPlace = true;
-        pointerInteraction = EditorPointerInteraction.PlaceObject;
-    }
-    public void PlaceBooster()
-    {
-        prefabToPlace = LevelManager.Instance.BoosterPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceBouncyWall()
-    {
-        prefabToPlace = LevelManager.Instance.BouncyWallPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceConstantBooster()
-    {
-        prefabToPlace = LevelManager.Instance.ConstantBoosterPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceConstantPuller()
-    {
-        prefabToPlace = LevelManager.Instance.ConstantPullerPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceConstantPusher()
-    {
-        prefabToPlace = LevelManager.Instance.ConstantPusherPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceFinish()
-    {
-        prefabToPlace = LevelManager.Instance.FinishPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceKillCircle()
-    {
-        prefabToPlace = LevelManager.Instance.KillCirclePrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceKillWall()
-    {
-        prefabToPlace = LevelManager.Instance.KillWallPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlacePuller()
-    {
-        prefabToPlace = LevelManager.Instance.PullerPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlacePusher()
-    {
-        prefabToPlace = LevelManager.Instance.PusherPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceMomentumRedirector()
-    {
-        prefabToPlace = LevelManager.Instance.MomentumRedirectorPrefab;
-        StartTryingToPlaceObject();
-    }
-    public void PlaceSlipperyWall()
-    {
-        prefabToPlace = LevelManager.Instance.SlipperyWallPrefab;
-        StartTryingToPlaceObject();
-    }
-    #endregion
-
     public void SetObjectSelectionBar(RectTransform bar)
     {
         objectSelectionBar = bar;
@@ -3099,44 +2947,12 @@ public class LevelEditor : MonoBehaviour
         return RectTransformUtility.RectangleContainsScreenPoint(objectSelectionBar, screenPosition, eventCamera);
     }
 
-    // TODO: move these to ButtonEventCaller
-    // expose level manager functions for level editor UI buttons
-    public void SaveLevel()
-    {
-        if (LevelManager.Instance == null || LevelManager.Instance.IsSavingLevel)
-            return;
-
-        SuspendSelectionForSave();
-        LevelManager.Instance.SaveLevel(RestoreSelectionAfterSave);
-    }
     public void DeleteAllLevelObjects()
     {
-        CancelSuspendedSelectionRestore();
         UnselectObject();
         ClearSelectionHistory();
         LevelManager.Instance.DestroyAllExistingLevelObjects();
     }
-    public void CopyLevelCodeToClipboard()
-    {
-        SuspendSelectionForSave();
-        try
-        {
-            LevelManager.Instance.CopyLevelCodeToClipboard();
-        }
-        finally
-        {
-            RestoreSelectionAfterSave();
-        }
-    }
-    public void LoadLevelFromClipboard()
-    {
-        CancelSuspendedSelectionRestore();
-        UnselectObject();
-        ClearSelectionHistory();
-        LevelManager.Instance.GetLevelJsonFromClipboard();
-        LevelManager.Instance.LoadLevel();
-    }
-
     public void DeselectObject()
     {
         UnselectObject();

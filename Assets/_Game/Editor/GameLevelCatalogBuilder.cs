@@ -12,13 +12,6 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
     const string GameLevelsDirectory = "Assets/StreamingAssets/gameLevels";
     const string CatalogFileName = "content-catalog.json";
 
-    [Serializable]
-    class LevelMetadata
-    {
-        public string levelName;
-        public string levelAuthor;
-    }
-
     static GameLevelCatalogBuilder()
     {
         EditorApplication.playModeStateChanged -= RebuildBeforeEnteringPlayMode;
@@ -42,7 +35,7 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
             return;
         }
 
-        LevelCatalog catalog = new LevelCatalog();
+        ContentCatalog catalog = new ContentCatalog();
         string[] levelPaths = Directory.GetFiles(GameLevelsDirectory, "*.json", SearchOption.TopDirectoryOnly)
             .Where(path => !string.Equals(Path.GetFileName(path), CatalogFileName, StringComparison.OrdinalIgnoreCase))
             .OrderBy(path => Path.GetFileName(path), StringComparer.Ordinal)
@@ -52,26 +45,27 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
         {
             string levelPath = levelPaths[index];
             string payloadFileName = Path.GetFileName(levelPath);
-            string levelId = Path.GetFileNameWithoutExtension(levelPath);
-            LevelMetadata metadata = JsonUtility.FromJson<LevelMetadata>(File.ReadAllText(levelPath));
-            string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
-
-            if (metadata == null || string.IsNullOrWhiteSpace(metadata.levelName))
+            ContentData metadata;
+            try { metadata = JsonUtility.FromJson<ContentData>(File.ReadAllText(levelPath)); }
+            catch (Exception exception) { Debug.LogWarning("Game level is invalid: " + payloadFileName + ": " + exception.Message); continue; }
+            if (metadata == null || metadata.loaderVersion != 1 || metadata.kind != ContentKind.Level || metadata.objects == null || string.IsNullOrWhiteSpace(metadata.id))
             {
-                Debug.LogWarning("WARNING: Game level has no levelName and will use its file name: " + payloadFileName);
-                metadata = metadata ?? new LevelMetadata();
-                metadata.levelName = levelId;
+                Debug.LogWarning("Game level uses an unsupported content format: " + payloadFileName);
+                continue;
             }
-
-            if (!File.Exists(Path.Combine(GameLevelsDirectory, previewFileName)))
-                Debug.LogWarning("WARNING: Game level preview image could not be found: " + previewFileName);
-
-            catalog.levels.Add(new LevelCatalogRecord
+            if (catalog.entries.Any(entry => entry.id == metadata.id))
             {
-                id = levelId,
-                contentType = "level",
-                displayName = metadata.levelName,
-                author = metadata.levelAuthor,
+                Debug.LogWarning("Game level has a duplicate content ID: " + payloadFileName);
+                continue;
+            }
+            string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
+            if (!File.Exists(Path.Combine(GameLevelsDirectory, previewFileName)))
+                Debug.LogWarning("Game level preview image could not be found: " + previewFileName);
+            catalog.entries.Add(new ContentRecord
+            {
+                id = metadata.id,
+                displayName = string.IsNullOrWhiteSpace(metadata.name) ? Path.GetFileNameWithoutExtension(levelPath) : metadata.name,
+                author = metadata.author,
                 payloadFileName = payloadFileName,
                 previewFileName = previewFileName,
                 sortOrder = index + 1
@@ -85,7 +79,7 @@ public sealed class GameLevelCatalogBuilder : IPreprocessBuildWithReport
 
         File.WriteAllText(catalogPath, catalogJson);
         AssetDatabase.ImportAsset(catalogPath);
-        Debug.Log("Rebuilt game level catalog with " + catalog.levels.Count + " level(s).");
+        Debug.Log("Rebuilt game level catalog with " + catalog.entries.Count + " level(s).");
     }
 
     public void OnPreprocessBuild(BuildReport report)

@@ -3,12 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using TMPro;
 using UnityEngine;
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-using System.Runtime.InteropServices;
-#endif
 
 [DefaultExecutionOrder(-100)]
 public class LevelManager : MonoBehaviour
@@ -26,36 +21,16 @@ public class LevelManager : MonoBehaviour
         }
 
         Instance = this;
-        InitializeLevelStorage();
+        InitializeContentStorage();
     }
 
     private void OnDestroy()
     {
         if (Instance == this)
+        {
+            Content?.Dispose();
             Instance = null;
-    }
-    #endregion
-
-    #region Level File Formats
-    [System.Serializable]
-    struct LevelHeader
-    {
-        public byte loaderVersion;
-    }
-
-    // Version 1 stores objects in parent-first order. p is the only hierarchy data needed
-    // -1 means the level root, otherwise it points to an earlier object.
-    [System.Serializable]
-    struct LevelV1
-    {
-        public string contentId;
-        public byte loaderVersion;
-        public string levelName;
-        public string levelAuthor;
-        public long savedAtUtcTicks;
-        public float startX;
-        public float startY;
-        public List<LevelObjectV1> levelObjects;
+        }
     }
     #endregion
 
@@ -78,9 +53,7 @@ public class LevelManager : MonoBehaviour
     public const string GroupObjectType = "Group";
     public const byte LOADER_VERSION = 1;
     public string playerLevelsDirectory { get; private set; }
-    LevelStorage levelStorage;
-    string levelLoadJson;
-    string lastSavedLevelJson = string.Empty;
+    public ContentStorage Content { get; private set; }
     bool isSavingLevel;
     int currentLevelRevision;
 
@@ -92,16 +65,11 @@ public class LevelManager : MonoBehaviour
     [Header("World Object References")]
     [SerializeField] GameObject levelObjectsContainer;
     [SerializeField] GameObject playerStartPoint;
-    [SerializeField] TMP_InputField levelSaveNameInput;
-    [SerializeField] TMP_InputField levelCodeToCopyInput;
-    [SerializeField] TMP_InputField levelCodeInput;
 
-    void InitializeLevelStorage()
+    void InitializeContentStorage()
     {
-        playerLevelsDirectory = Application.persistentDataPath + "/playerLevels";
-        string downloadedLevelsDirectory = Application.persistentDataPath + "/downloadedLevels";
-        levelStorage = new LevelStorage(playerLevelsDirectory, downloadedLevelsDirectory);
-        levelStorage.EnsureLocalContentDirectories();
+        playerLevelsDirectory = System.IO.Path.Combine(Application.persistentDataPath, "content-v1", "playerLevels");
+        Content = new ContentStorage(Application.persistentDataPath);
     }
 
     public void DestroyAllExistingLevelObjects()
@@ -119,43 +87,27 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    public void SetLevelCodeToCopyInputToLastSavedLevelJson()
-    {
-        levelCodeToCopyInput.text = lastSavedLevelJson;
-    }
-
-    public void LoadLevelFromLevelCodeInput()
-    {
-        levelLoadJson = levelCodeInput.text;
-        LoadLevel();
-    }
-
     #region Saving
-    bool TryGenerateLevelObject(out LevelV1 level)
+    bool TryGenerateLevelObject(string name, out ContentData level)
     {
-        level = new LevelV1();
-
-        // get level name input, or just create one if nothing was input
-        string levelName = "Custom Level " + DateTime.Now.ToString("MMM dd yyyy h-mm-sstt");
-        if (levelSaveNameInput != null && levelSaveNameInput.text != string.Empty)
-            levelName = levelSaveNameInput.text.Trim();
-
-        // set values to save
-        level.contentId = Guid.NewGuid().ToString();
-        level.levelName = levelName;
-        level.levelAuthor = "TODO";
-        level.loaderVersion = LOADER_VERSION;
-        level.savedAtUtcTicks = DateTime.UtcNow.Ticks;
-        level.startX = playerStartPoint.transform.position.x;
-        level.startY = playerStartPoint.transform.position.y;
-
-        if (!TryCaptureObjects(levelObjectsContainer.transform, out level.levelObjects))
+        level = new ContentData
         {
-            level = default;
-            return false;
+            loaderVersion = LOADER_VERSION,
+            kind = ContentKind.Level,
+            id = Guid.NewGuid().ToString("N"),
+            name = string.IsNullOrWhiteSpace(name) ? "Custom Level " + DateTime.Now.ToString("MMM dd yyyy h-mm-sstt") : name.Trim(),
+            author = "TODO",
+            savedAtUtcTicks = DateTime.UtcNow.Ticks,
+            startX = playerStartPoint.transform.position.x,
+            startY = playerStartPoint.transform.position.y
+        };
+        if (TryCaptureObjects(levelObjectsContainer.transform, out List<LevelObjectV1> objects))
+        {
+            level.objects = objects;
+            if (ValidateContent(level)) return true;
         }
-
-        return true;
+        level = null;
+        return false;
     }
 
     public bool TryCaptureObjects(Transform parent, out List<LevelObjectV1> objects)
@@ -163,106 +115,52 @@ public class LevelManager : MonoBehaviour
         return LevelObjectSerialization.TryCaptureChildren(parent, IsSupportedLevelObjectType, out objects);
     }
 
-    public bool TryReadPrefab(string json, out SavedObjectPrefab prefab)
+    public bool TryReadContent(string json, ContentKind expectedKind, out ContentData data)
     {
-        prefab = null;
-        if (string.IsNullOrWhiteSpace(json))
-            return false;
+        return ContentSerialization.TryRead(json, expectedKind, IsSupportedLevelObjectType, out data);
+    }
 
+    bool ValidateContent(ContentData data) => ContentSerialization.Validate(data, IsSupportedLevelObjectType);
+
+    bool TryInstantiateContent(ContentData data, Transform parent, out List<Transform> created)
+    {
+        created = null;
+        if (data == null || parent == null || !ValidateContent(data)) return false;
+        GameObject staging = new GameObject("Content Load Staging") { hideFlags = HideFlags.HideAndDontSave };
+        staging.SetActive(false);
+        staging.transform.SetParent(parent, false);
         try
         {
-            LevelHeader header = JsonUtility.FromJson<LevelHeader>(json);
-            switch (header.loaderVersion)
-            {
-                case 1:
-                    prefab = JsonUtility.FromJson<SavedObjectPrefab>(json);
-                    break;
-                default:
-                    Debug.LogError("Prefab could not be loaded because loader version " + header.loaderVersion + " is not supported.");
-                    return false;
-            }
-
-            if (prefab == null || !IsValidPrefabObjects(prefab.objects))
-            {
-                prefab = null;
-                Debug.LogError("Prefab could not be loaded because its object collection is invalid.");
-                return false;
-            }
+            List<Transform> items = LevelObjectSerialization.InstantiateObjects(data.objects, staging.transform, CreateLevelObject);
+            if (items.Count != data.objects.Count || items.Any(item => item == null)) return false;
+            foreach (Transform item in items)
+                if (item.parent == staging.transform) item.SetParent(parent, false);
+            created = items;
             return true;
         }
         catch (Exception exception)
         {
-            Debug.LogError("Prefab could not be loaded because its JSON is invalid. " + exception.Message);
-            prefab = null;
+            Debug.LogError("Content objects could not be created: " + exception.Message);
             return false;
         }
+        finally { staging.transform.SetParent(null, false); Destroy(staging); }
     }
 
-    bool IsValidPrefabObjects(List<LevelObjectV1> objects)
-    {
-        if (objects == null || objects.Count == 0 || objects[0].p != -1)
-            return false;
-
-        bool group = objects[0].t == GroupObjectType;
-        if ((group && objects.Count < 3) || (!group && objects.Count != 1))
-            return false;
-
-        for (int index = 0; index < objects.Count; index++)
-        {
-            LevelObjectV1 record = objects[index];
-            if (!IsSupportedLevelObjectType(record.t) || (index > 0 && (record.p != 0 || record.t == GroupObjectType)) ||
-                float.IsNaN(record.x) || float.IsInfinity(record.x) || float.IsNaN(record.y) || float.IsInfinity(record.y) ||
-                float.IsNaN(record.sx) || float.IsInfinity(record.sx) || float.IsNaN(record.sy) || float.IsInfinity(record.sy) ||
-                float.IsNaN(record.r) || float.IsInfinity(record.r))
-                return false;
-        }
-        return true;
-    }
-
-    public bool TryInstantiatePrefab(SavedObjectPrefab prefab, Transform parent, out GameObject root)
+    public bool TryInstantiatePrefab(ContentData prefab, Transform parent, out GameObject root)
     {
         root = null;
-        if (prefab == null || prefab.loaderVersion != 1 || parent == null || !IsValidPrefabObjects(prefab.objects))
-            return false;
-
-        List<Transform> created = LevelObjectSerialization.InstantiateObjects(prefab.objects, parent, CreateLevelObject);
-        if (created.Count != prefab.objects.Count || created.Any(item => item == null))
-        {
-            foreach (Transform item in created)
-            {
-                if (item != null && item.parent == parent)
-                {
-                    item.SetParent(null, true);
-                    Destroy(item.gameObject);
-                }
-            }
-            return false;
-        }
-
+        if (prefab == null || prefab.kind != ContentKind.Prefab || !TryInstantiateContent(prefab, parent, out List<Transform> created) || created.Count == 0) return false;
         root = created[0].gameObject;
         return true;
     }
 
-    #region Copy Level To Clipboard
-    #if UNITY_WEBGL && !UNITY_EDITOR
-            [System.Runtime.InteropServices.DllImport("__Internal")]
-            private static extern void CopyToClipboard(string str);
-    #endif
-
-    public void CopyLevelCodeToClipboard()
+    public bool TryGetCurrentLevelCode(out string code)
     {
-        if (!TryGenerateLevelObject(out LevelV1 level))
-            return;
-
-        string json = JsonUtility.ToJson(level, false);
-
-        #if UNITY_WEBGL && !UNITY_EDITOR
-            CopyToClipboard(json);
-        #else
-            GUIUtility.systemCopyBuffer = json;
-        #endif
+        code = null;
+        if (!TryGenerateLevelObject(null, out ContentData level)) return false;
+        code = JsonUtility.ToJson(level, false);
+        return true;
     }
-    #endregion
 
     IEnumerator CaptureLevelPreview(Action<byte[]> onComplete)
     {
@@ -334,183 +232,70 @@ public class LevelManager : MonoBehaviour
 
     }
 
-    // Saving the JSON is synchronous; only preview capture and disk I/O need the coroutine.
-    // Callers that temporarily alter editor-only state may safely restore it once this method
-    // invokes onLevelSerialized, before the asynchronous part of the save begins.
-    public void SaveLevel(Action onLevelSerialized = null)
+    public bool SaveLevel(string name, Action<bool> onComplete = null)
     {
         if (isSavingLevel)
-        {
-            Debug.LogWarning("Level save was ignored because another save is already in progress.");
-            return;
-        }
+            return false;
+
+        if (!TryGenerateLevelObject(name, out ContentData level))
+            return false;
 
         isSavingLevel = true;
-        LevelV1 level;
-        bool didGenerateLevel;
-        try
-        {
-            didGenerateLevel = TryGenerateLevelObject(out level);
-        }
-        catch
-        {
-            isSavingLevel = false;
-            throw;
-        }
-        finally
-        {
-            onLevelSerialized?.Invoke();
-        }
-
-        if (!didGenerateLevel)
-        {
-            isSavingLevel = false;
-            return;
-        }
-
-        StartCoroutine(SaveLevelWithPreview(level));
+        StartCoroutine(SaveLevelWithPreview(level, onComplete));
+        return true;
     }
 
-    IEnumerator SaveLevelWithPreview(LevelV1 level)
+    IEnumerator SaveLevelWithPreview(ContentData level, Action<bool> onComplete)
     {
+        bool didSave = false;
         try
         {
-            string json = JsonUtility.ToJson(level, false);
-
-            string payloadFileName = levelStorage.CreateFileName(level.levelName, level.contentId, ".json");
-            string previewFileName = Path.ChangeExtension(payloadFileName, ".png");
             byte[] previewImageBytes = null;
             yield return CaptureLevelPreview(capturedImageBytes => previewImageBytes = capturedImageBytes);
+            didSave = Content.Save(ContentCollection.PlayerLevels, level, previewImageBytes);
 
-            bool didSave = levelStorage.SaveLevel(LevelSource.PlayerLevels, new LevelCatalogRecord
-            {
-                id = level.contentId,
-                contentType = "level",
-                displayName = level.levelName,
-                author = level.levelAuthor,
-                payloadFileName = payloadFileName,
-                previewFileName = previewFileName,
-                createdAtUtcTicks = level.savedAtUtcTicks,
-                updatedAtUtcTicks = level.savedAtUtcTicks,
-                sortOrder = 0
-            }, json, previewImageBytes);
-
-            if (!didSave)
-                yield break;
-
-            MarkLevelSourceDirty(LevelSource.PlayerLevels);
-            lastSavedLevelJson = json;
-
-            SetLevelCodeToCopyInputToLastSavedLevelJson();
-
-            // TODO: display a message in game
-            Debug.Log("Saved level.");
+            if (didSave)
+                MarkLevelSourceDirty(LevelSource.PlayerLevels);
         }
         finally
         {
             isSavingLevel = false;
+            onComplete?.Invoke(didSave);
         }
     }
     #endregion
 
     #region Loading
 
-    #region Load From Clipboard
-    #if UNITY_WEBGL && !UNITY_EDITOR
-            [DllImport("__Internal")]
-            private static extern void ReadFromClipboard();
-    #endif
-
-    public void ReceiveClipboardText(string text)
-    {
-        levelLoadJson = text;
-        Debug.Log("Clipboard text received: " + text);
-    }
-
-    public void GetLevelJsonFromClipboard()
-    {
-        #if UNITY_WEBGL && !UNITY_EDITOR
-            ReadFromClipboard();
-        #else
-            levelLoadJson = GUIUtility.systemCopyBuffer;
-        #endif
-    }
-    #endregion
-
     public IEnumerator LoadLevelFromPreview(LevelSource source, string contentId, Action<bool> onComplete)
     {
-        if (string.IsNullOrEmpty(contentId))
-        {
-            Debug.Log("ERROR: Level preview ID is not valid.");
-            onComplete?.Invoke(false);
-            yield break;
-        }
-
-        List<LevelCatalogRecord> records = null;
-        yield return levelStorage.LoadCatalog(source, loadedRecords => records = loadedRecords);
-        LevelCatalogRecord record = records?.FirstOrDefault(candidate => candidate.id == contentId);
-        if (record == null)
-        {
-            Debug.Log("ERROR: Content catalog entry could not be found. ID: " + contentId);
-            onComplete?.Invoke(false);
-            yield break;
-        }
-
-        string json = null;
-        yield return levelStorage.LoadPayload(source, record, loadedJson => json = loadedJson);
-        if (string.IsNullOrEmpty(json))
-        {
-            onComplete?.Invoke(false);
-            yield break;
-        }
-
-        levelLoadJson = json;
-
-        LoadLevel();
-        onComplete?.Invoke(true);
+        ContentCollection collection = ContentStorage.ForLevelSource(source);
+        List<ContentRecord> records = null;
+        yield return Content.LoadCatalog(collection, result => records = result);
+        ContentRecord record = records?.FirstOrDefault(item => item.id == contentId);
+        if (record == null) { onComplete?.Invoke(false); yield break; }
+        string code = null;
+        yield return Content.LoadCode(collection, record, result => code = result);
+        onComplete?.Invoke(TryLoadLevelCode(code));
     }
 
-    public void LoadLevel()
+    public bool TryLoadLevelCode(string json)
     {
-        if (string.IsNullOrWhiteSpace(levelLoadJson))
-        {
-            Debug.LogError("Level could not be loaded because its JSON is empty.");
-            return;
-        }
-
+        if (!TryReadContent(json, ContentKind.Level, out ContentData level)) return false;
+        // Prepare everything before touching the current world.
+        GameObject staging = new GameObject("Level Load Staging") { hideFlags = HideFlags.HideAndDontSave };
+        staging.SetActive(false);
         try
         {
-            if (TryParseLevel(levelLoadJson, out LevelV1 level))
-                LoadLevelVersionOne(level);
+            if (!TryInstantiateContent(level, staging.transform, out List<Transform> created)) return false;
+            BeginLoadingLevel(level.startX, level.startY);
+            foreach (Transform item in created)
+                if (item != null && item.parent == staging.transform)
+                    item.SetParent(levelObjectsContainer.transform, false);
+            FinishLoadingLevel();
+            return true;
         }
-        catch (Exception exception)
-        {
-            Debug.LogError("Level could not be loaded because its JSON is invalid. " + exception.Message);
-        }
-    }
-
-    static bool TryParseLevel(string json, out LevelV1 level)
-    {
-        LevelHeader header = JsonUtility.FromJson<LevelHeader>(json);
-        switch (header.loaderVersion)
-        {
-            case 1:
-                level = JsonUtility.FromJson<LevelV1>(json);
-                return true;
-            default:
-                Debug.LogError("Level could not be loaded because loader version " + header.loaderVersion + " is not supported.");
-                level = default;
-                return false;
-        }
-    }
-
-    void LoadLevelVersionOne(LevelV1 loadedLevel)
-    {
-        BeginLoadingLevel(loadedLevel.startX, loadedLevel.startY);
-
-        LevelObjectSerialization.InstantiateObjects(loadedLevel.levelObjects, levelObjectsContainer.transform, CreateLevelObject);
-
-        FinishLoadingLevel();
+        finally { Destroy(staging); }
     }
 
     void BeginLoadingLevel(float playerStartXPosition, float playerStartYPosition)
@@ -554,49 +339,27 @@ public class LevelManager : MonoBehaviour
 
     public GameObject GetPrefabForType(string type)
     {
-        switch (type)
-        {
-            case "Booster":
-                return BoosterPrefab;
-            case "BouncyWall":
-                return BouncyWallPrefab;
-            case "ConstantBooster":
-                return ConstantBoosterPrefab;
-            case "ConstantMomentumRedirector":
-                return ConstantMomentumRedirectorPrefab;
-            case "ConstantPuller":
-                return ConstantPullerPrefab;
-            case "ConstantPusher":
-                return ConstantPusherPrefab;
-            case "Finish":
-                return FinishPrefab;
-            case "KillCircle":
-                return KillCirclePrefab;
-            case "KillWall":
-                return KillWallPrefab;
-            case "MomentumRedirector":
-                return MomentumRedirectorPrefab;
-            case "Puller":
-                return PullerPrefab;
-            case "Pusher":
-                return PusherPrefab;
-            case "SlipperyWall":
-                return SlipperyWallPrefab;
-            case "Text":
-                return TextPrefab;
-            default:
-                return null;
-        }
+        return BaseObjectCatalog.Find(type)?.GetPrefab(this);
     }
 
-    public IEnumerator LoadLevelCatalog(LevelSource source, Action<List<LevelCatalogRecord>> onLoaded)
+    public IEnumerator LoadLevelCatalog(LevelSource source, Action<List<ContentRecord>> onLoaded, bool useCatalogOrder = false)
     {
-        yield return levelStorage.LoadCatalog(source, onLoaded);
+        List<ContentRecord> records = null;
+        yield return Content.LoadCatalog(ContentStorage.ForLevelSource(source), result => records = result);
+        if (!useCatalogOrder && records != null)
+            records = source == LevelSource.Game ? records.OrderBy(item => item.sortOrder).ThenBy(item => item.displayName).ToList()
+                : records.OrderByDescending(item => item.updatedAtUtcTicks).ThenBy(item => item.displayName).ToList();
+        onLoaded?.Invoke(records);
     }
 
-    public IEnumerator LoadLevelPreview(LevelSource source, LevelCatalogRecord record, Action<Texture2D> onLoaded)
+    public IEnumerator LoadLevelCode(LevelSource source, ContentRecord record, Action<string> onLoaded)
     {
-        yield return levelStorage.LoadPreview(source, record, onLoaded);
+        yield return Content.LoadCode(ContentStorage.ForLevelSource(source), record, onLoaded);
+    }
+
+    public IEnumerator LoadLevelPreview(LevelSource source, ContentRecord record, Action<Sprite> onLoaded)
+    {
+        yield return Content.LoadPreview(ContentStorage.ForLevelSource(source), record, onLoaded);
     }
 
     public void MarkLevelSourceDirty(LevelSource source)

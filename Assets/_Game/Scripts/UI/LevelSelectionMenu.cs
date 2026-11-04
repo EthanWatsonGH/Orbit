@@ -8,12 +8,19 @@ public class LevelSelectionMenu : MonoBehaviour
 {
     [Header("Level Source")]
     [SerializeField] LevelSource source;
-
     [Header("Preview References")]
     [SerializeField] GameObject levelPreviewPrefab;
     [SerializeField] Transform levelsPreviewPanel;
     [SerializeField] TMP_Text noLevelsFoundText;
 
+    sealed class Entry
+    {
+        public ContentRecord record;
+        public Sprite sprite;
+        public bool previewLoaded;
+    }
+    readonly List<Entry> entries = new List<Entry>();
+    ContentEntryList<Entry, Transform> views;
     int catalogVersion;
     int displayedCatalogVersion = -1;
     bool isRefreshing;
@@ -21,122 +28,89 @@ public class LevelSelectionMenu : MonoBehaviour
     public LevelSource Source => source;
     public bool IsOpen => gameObject.activeSelf;
 
-    public void Show()
+    void Awake()
     {
-        gameObject.SetActive(true);
-        RefreshIfNeeded();
+        views = new ContentEntryList<Entry, Transform>(
+            () => Instantiate(levelPreviewPrefab, levelsPreviewPanel, false).transform,
+            entry => entry.record.displayName ?? string.Empty, BindPreview);
     }
 
-    public void Hide()
-    {
-        gameObject.SetActive(false);
-    }
-
-    void OnDisable()
-    {
-        // Disabling a GameObject stops its coroutines immediately. Reset this state so a
-        // catalog marked dirty while the menu is closed can refresh the next time it opens.
-        isRefreshing = false;
-    }
-
+    public void Show() { gameObject.SetActive(true); RefreshIfNeeded(); }
+    public void Hide() { gameObject.SetActive(false); }
+    void OnDisable() { isRefreshing = false; }
+    void OnDestroy() { views?.Clear(); }
     public void MarkDirty()
     {
         catalogVersion++;
-
-        if (gameObject.activeInHierarchy)
-            RefreshIfNeeded();
+        if (gameObject.activeInHierarchy) RefreshIfNeeded();
     }
-
     void RefreshIfNeeded()
     {
         if (!isRefreshing && displayedCatalogVersion != catalogVersion)
             StartCoroutine(RefreshLevelPreviews());
     }
-
     IEnumerator RefreshLevelPreviews()
     {
         if (levelPreviewPrefab == null || levelsPreviewPanel == null || noLevelsFoundText == null)
         {
-            Debug.LogError("ERROR: LevelSelectionMenu is missing one or more preview references.", this);
+            Debug.LogError("LevelSelectionMenu is missing one or more preview references.", this);
             yield break;
         }
-
         isRefreshing = true;
-
         do
         {
-            int versionBeingDisplayed = catalogVersion;
-            ResetLevelPreviews();
-
-            List<LevelCatalogRecord> records = null;
-            yield return LevelManager.Instance.LoadLevelCatalog(source, loadedRecords => records = loadedRecords);
-
-            int previewCount = 0;
-            foreach (LevelCatalogRecord record in records ?? new List<LevelCatalogRecord>())
+            int version = catalogVersion;
+            List<ContentRecord> records = null;
+            yield return LevelManager.Instance.LoadLevelCatalog(source, loaded => records = loaded);
+            if (records == null)
             {
-                GameObject levelPreview = CreateLevelPreview(record);
-                Texture2D previewTexture = null;
-                yield return LevelManager.Instance.LoadLevelPreview(source, record, loadedTexture => previewTexture = loadedTexture);
-
-                if (previewTexture == null)
-                    ShowPreviewImageError(levelPreview, "Image not found");
-                else
-                    SetPreviewImage(levelPreview, previewTexture);
-
-                previewCount++;
+                noLevelsFoundText.text = "Could not load levels.";
+                isRefreshing = false;
+                yield break;
             }
-
-            if (previewCount == 0)
-                ShowNoLevelsFound();
-
-            displayedCatalogVersion = versionBeingDisplayed;
+            var previous = new Dictionary<string, Entry>();
+            foreach (Entry entry in entries)
+                if (!previous.ContainsKey(entry.record.id)) previous.Add(entry.record.id, entry);
+            var next = new List<Entry>();
+            foreach (ContentRecord record in records)
+            {
+                if (record == null || string.IsNullOrEmpty(record.id)) continue;
+                if (!previous.TryGetValue(record.id, out Entry entry)) entry = new Entry();
+                entry.record = record;
+                next.Add(entry);
+            }
+            entries.Clear();
+            entries.AddRange(next);
+            views.Refresh(entries, string.Empty, null);
+            noLevelsFoundText.text = entries.Count == 0 ? "No levels found" : string.Empty;
+            foreach (Entry entry in entries)
+            {
+                if (entry.previewLoaded) continue;
+                yield return LevelManager.Instance.LoadLevelPreview(source, entry.record, loaded => entry.sprite = loaded);
+                entry.previewLoaded = true;
+                views.Update(entry, null);
+            }
+            displayedCatalogVersion = version;
         }
         while (gameObject.activeInHierarchy && displayedCatalogVersion != catalogVersion);
-
         isRefreshing = false;
     }
-
-    void ResetLevelPreviews()
+    void BindPreview(Entry entry, Transform preview, bool selected)
     {
-        foreach (Transform levelPreview in levelsPreviewPanel)
-            Destroy(levelPreview.gameObject);
-
-        noLevelsFoundText.text = string.Empty;
-    }
-
-    void ShowNoLevelsFound()
-    {
-        noLevelsFoundText.text = "No levels found";
-        noLevelsFoundText.color = Color.white;
-    }
-
-    GameObject CreateLevelPreview(LevelCatalogRecord record)
-    {
-        GameObject levelPreview = Instantiate(levelPreviewPrefab, levelsPreviewPanel);
-        Transform previewContent = levelPreview.transform.GetChild(0);
-
-        previewContent.Find("LevelName").GetComponent<TMP_Text>().text = record.displayName;
-        previewContent.Find("LevelAuthor").GetComponent<TMP_Text>().text = record.author;
-
-        ButtonEventCaller buttonEventCaller = levelPreview.GetComponentInChildren<ButtonEventCaller>(true);
-        if (buttonEventCaller == null)
-            Debug.LogError("ERROR: Level preview prefab is missing ButtonEventCaller.");
-        else
-            buttonEventCaller.ConfigureLevelPreview(source, record.id);
-
-        return levelPreview;
-    }
-
-    void ShowPreviewImageError(GameObject levelPreview, string message)
-    {
-        Transform imageTransform = levelPreview.transform.GetChild(0).Find("Image");
-        imageTransform.GetChild(0).GetComponent<TMP_Text>().text = message;
-        imageTransform.GetComponent<Image>().color = Color.grey;
-    }
-
-    void SetPreviewImage(GameObject levelPreview, Texture2D imageTexture)
-    {
-        Sprite imageSprite = Sprite.Create(imageTexture, new Rect(0, 0, imageTexture.width, imageTexture.height), new Vector2(0.5f, 0.5f));
-        levelPreview.transform.GetChild(0).Find("Image").GetComponent<Image>().sprite = imageSprite;
+        Transform content = preview.GetChild(0);
+        content.Find("LevelName").GetComponent<TMP_Text>().text = entry.record.displayName;
+        content.Find("LevelAuthor").GetComponent<TMP_Text>().text = entry.record.author;
+        ButtonEventCaller caller = preview.GetComponentInChildren<ButtonEventCaller>(true);
+        if (caller != null) caller.ConfigureLevelPreview(source, entry.record.id);
+        else Debug.LogError("Level preview prefab is missing ButtonEventCaller.", preview);
+        if (!entry.previewLoaded) return;
+        Transform imageTransform = content.Find("Image");
+        Image image = imageTransform.GetComponent<Image>();
+        if (entry.sprite == null)
+        {
+            imageTransform.GetChild(0).GetComponent<TMP_Text>().text = "Image not found";
+            image.color = Color.grey;
+        }
+        else image.sprite = entry.sprite;
     }
 }

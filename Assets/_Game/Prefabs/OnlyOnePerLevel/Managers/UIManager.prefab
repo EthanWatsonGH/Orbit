@@ -52,3 +52,4 @@ MonoBehaviour:
   playerLevelSelectionMenu: {fileID: 0}
   downloadedLevelSelectionMenu: {fileID: 0}
   prefabLibraryPrefab: {fileID: 9021395197531939158, guid: 2aee52dba6ca28345aa99f66a86177a6, type: 3}
+  levelManagementPrefab: {fileID: 9021395197531939158, guid: 4e3d5b0c63a641458437129833105b06, type: 3}

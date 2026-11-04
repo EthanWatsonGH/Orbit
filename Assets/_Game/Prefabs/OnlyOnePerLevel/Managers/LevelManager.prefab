@@ -60,6 +60,3 @@ MonoBehaviour:
   TextPrefab: {fileID: 8677926276078410191, guid: 786d61b027477c14ca3e13bd065d7d30, type: 3}
   levelObjectsContainer: {fileID: 0}
   playerStartPoint: {fileID: 0}
-  levelSaveNameInput: {fileID: 0}
-  levelCodeToCopyInput: {fileID: 0}
-  levelCodeInput: {fileID: 0}

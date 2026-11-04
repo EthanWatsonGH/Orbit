@@ -11,7 +11,7 @@ public class PrefabLibraryMenu : MonoBehaviour
     [SerializeField] ScrollRect scrollView;
     [SerializeField] RectTransform viewport;
     [SerializeField] GridLayoutGroup grid;
-    [SerializeField, Min(1)] int columnCount = 5;
+    [SerializeField] ResponsiveCardGrid cardGrid;
     [SerializeField] PrefabLibraryCard cardTemplate;
     [SerializeField] TMP_Text emptyText;
     [SerializeField] TMP_Text detailsTitle;
@@ -37,16 +37,12 @@ public class PrefabLibraryMenu : MonoBehaviour
     [SerializeField] Button moveDownRowButton;
     [SerializeField] Button moveToBottomButton;
 
-    readonly List<GameObject> cards = new List<GameObject>();
-    readonly List<Sprite> createdSprites = new List<Sprite>();
-    readonly List<Texture2D> createdTextures = new List<Texture2D>();
     readonly List<Entry> entries = new List<Entry>();
     LevelEditor editor;
     PrefabBar bar;
     CodeImportPanel importPanel;
     CodeExportPanel exportPanel;
-    float lastWidth = -1;
-    float cardHeightToWidth;
+    ContentCardList<Entry> cards;
     float searchScrollBeforeReorder;
     string searchBeforeReorder;
     bool reordering;
@@ -54,6 +50,7 @@ public class PrefabLibraryMenu : MonoBehaviour
     readonly Vector3[] cardCorners = new Vector3[4];
     Entry selectedEntry;
     bool canReorder;
+    int displayedRevision = -1;
     sealed class Entry
     {
         public string name;
@@ -65,7 +62,8 @@ public class PrefabLibraryMenu : MonoBehaviour
 
     void Awake()
     {
-        cardHeightToWidth = grid.cellSize.x > 0 ? grid.cellSize.y / grid.cellSize.x : 1f;
+        cards = new ContentCardList<Entry>(cardTemplate, grid.transform, entry => entry.name,
+            entry => entry.sprite, entry => entry.builtIn, SelectEntry);
         reorderButtonColors = reorderButton.colors;
         importPanel = Instantiate(importPanelPrefab, codePanelContent, false);
         exportPanel = Instantiate(exportPanelPrefab, exportPanelContent, false);
@@ -82,7 +80,7 @@ public class PrefabLibraryMenu : MonoBehaviour
         importPanel.Hide();
         exportPanel.Hide();
         codePanelContainer.SetActive(false);
-        RebuildEntries();
+        if (displayedRevision != LevelManager.Instance.Content.Revision(ContentCollection.PlayerPrefabs)) RebuildEntries();
         RefreshCards();
         SetReorderMode(false);
         UpdateSelection();
@@ -133,6 +131,7 @@ public class PrefabLibraryMenu : MonoBehaviour
         }
         selectedEntry.name = name;
         bar.MarkDirty();
+        displayedRevision = LevelManager.Instance.Content.Revision(ContentCollection.PlayerPrefabs);
         RefreshCards(false);
         SetDetailsActionView(0);
         UpdateSelection();
@@ -152,9 +151,11 @@ public class PrefabLibraryMenu : MonoBehaviour
             detailsStatus.text = "Could not delete this prefab.";
             return;
         }
+        cards.Remove(selectedEntry);
         entries.Remove(selectedEntry);
         selectedEntry = null;
         bar.MarkDirty();
+        displayedRevision = LevelManager.Instance.Content.Revision(ContentCollection.PlayerPrefabs);
         RefreshCards(false);
         SetDetailsActionView(0);
         UpdateSelection();
@@ -233,108 +234,51 @@ public class PrefabLibraryMenu : MonoBehaviour
     public void MoveDownRow() => MoveSelected(entries.IndexOf(selectedEntry) + grid.constraintCount);
     public void MoveToBottom() => MoveSelected(entries.Count - 1);
 
-    void LateUpdate()
-    {
-        if (viewport != null && grid != null && !Mathf.Approximately(lastWidth, viewport.rect.width))
-            UpdateColumns();
-    }
-
     void OnDestroy() => ClearEntries();
 
     void RebuildEntries()
     {
-        ClearEntries();
-        foreach (BaseObjectDefinition item in BaseObjectCatalog.All)
-        {
-            entries.Add(new Entry { key = PrefabOrder.BuiltInKey(item.Type), name = item.Name, builtIn = true, sprite = item.LoadIcon() });
-        }
-        List<SavedPrefabRecord> saved = editor.GetSavedPrefabs();
-        if (saved != null)
-        {
-            foreach (SavedPrefabRecord record in saved)
-            {
-                if (record == null || string.IsNullOrEmpty(record.id))
-                    continue;
-                entries.Add(new Entry { id = record.id, key = PrefabOrder.PlayerKey(record.id), name = record.name ?? "Unnamed prefab", sprite = LoadPreview(record.id) });
-            }
-        }
-        List<string> savedOrder = editor.GetPrefabOrder();
-        canReorder = saved != null && savedOrder != null;
+        var previous = new Dictionary<string, Entry>();
+        foreach (Entry entry in entries)
+            if (!previous.ContainsKey(entry.key)) previous.Add(entry.key, entry);
         var entriesByKey = new Dictionary<string, Entry>();
         var defaultOrder = new List<string>();
-        foreach (Entry entry in entries)
-            if (!entriesByKey.ContainsKey(entry.key))
+        foreach (ContentRecord item in LevelManager.Instance.Content.LocalEntries(ContentCollection.GamePrefabs))
+        {
+            string key = PrefabOrder.BuiltInKey(item.id);
+            if (!previous.TryGetValue(key, out Entry entry)) entry = new Entry();
+            entry.key = key; entry.name = item.displayName; entry.builtIn = true;
+            entry.sprite = LevelManager.Instance.Content.LocalPreview(ContentCollection.GamePrefabs, item);
+            if (!entriesByKey.ContainsKey(key)) { entriesByKey.Add(key, entry); defaultOrder.Add(key); }
+        }
+        List<ContentRecord> saved = editor.GetSavedPrefabs();
+        if (saved != null)
+            foreach (ContentRecord record in saved)
             {
-                entriesByKey.Add(entry.key, entry);
-                defaultOrder.Add(entry.key);
+                if (record == null || string.IsNullOrEmpty(record.id)) continue;
+                string key = PrefabOrder.PlayerKey(record.id);
+                if (!previous.TryGetValue(key, out Entry entry)) entry = new Entry();
+                entry.key = key; entry.id = record.id; entry.name = record.displayName ?? "Unnamed prefab";
+                entry.builtIn = false; entry.sprite = editor.GetSavedPrefabPreview(record);
+                if (!entriesByKey.ContainsKey(key)) { entriesByKey.Add(key, entry); defaultOrder.Add(key); }
             }
+        List<string> savedOrder = editor.GetPrefabOrder();
+        canReorder = saved != null && savedOrder != null;
         entries.Clear();
-        foreach (string key in PrefabOrder.Merge(defaultOrder, savedOrder))
-            entries.Add(entriesByKey[key]);
-    }
-
-    Sprite LoadPreview(string id)
-    {
-        byte[] bytes = editor.GetSavedPrefabPreview(id);
-        if (bytes == null || bytes.Length == 0)
-            return null;
-        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        try
-        {
-            if (texture.LoadImage(bytes))
-            {
-                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.5f, .5f));
-                createdTextures.Add(texture);
-                createdSprites.Add(sprite);
-                return sprite;
-            }
-        }
-        catch (Exception exception)
-        {
-            Debug.LogWarning("Prefab preview could not be displayed: " + exception.Message);
-        }
-        Destroy(texture);
-        return null;
+        foreach (string key in PrefabOrder.Merge(defaultOrder, savedOrder)) entries.Add(entriesByKey[key]);
+        displayedRevision = LevelManager.Instance.Content.Revision(ContentCollection.PlayerPrefabs);
     }
 
     void RefreshCards(bool resetScroll = true)
     {
         float scrollPosition = scrollView.verticalNormalizedPosition;
-        foreach (GameObject card in cards)
-        {
-            if (card != null)
-            {
-                card.SetActive(false);
-                Destroy(card);
-            }
-        }
-        cards.Clear();
         string query = searchInput.text.Trim();
-        foreach (Entry entry in entries)
-        {
-            if (entry.name.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
-                continue;
-            PrefabLibraryCard card = Instantiate(cardTemplate, grid.transform, false);
-            card.gameObject.SetActive(true);
-            card.Configure(entry.name, entry.sprite, entry.builtIn, entry == selectedEntry, () => SelectEntry(entry));
-            cards.Add(card.gameObject);
-        }
-        emptyText.gameObject.SetActive(cards.Count == 0);
-        UpdateColumns();
+        int visibleCount = cards.Refresh(entries, query, selectedEntry);
+        emptyText.gameObject.SetActive(visibleCount == 0);
+        cardGrid.Refresh();
         Canvas.ForceUpdateCanvases();
         scrollView.verticalNormalizedPosition = resetScroll ? 1 : scrollPosition;
         if (reordering) KeepSelectionVisible();
-    }
-
-    void UpdateColumns()
-    {
-        lastWidth = viewport.rect.width;
-        int columns = Mathf.Max(1, columnCount);
-        float width = lastWidth - grid.padding.horizontal - grid.spacing.x * (columns - 1);
-        float cardWidth = Mathf.Max(1, width / columns);
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = columns;
-        grid.cellSize = new Vector2(cardWidth, cardWidth * cardHeightToWidth);
     }
 
     void SelectEntry(Entry entry)
@@ -373,9 +317,9 @@ public class PrefabLibraryMenu : MonoBehaviour
 
     void KeepSelectionVisible()
     {
-        int index = entries.IndexOf(selectedEntry);
-        if (index < 0 || index >= cards.Count) return;
-        var card = cards[index].transform as RectTransform;
+        PrefabLibraryCard selectedCard = cards.Get(selectedEntry);
+        if (selectedCard == null || !selectedCard.gameObject.activeSelf) return;
+        var card = selectedCard.transform as RectTransform;
         if (card == null) return;
         card.GetWorldCorners(cardCorners);
         float bottom = viewport.InverseTransformPoint(cardCorners[0]).y;
@@ -429,16 +373,14 @@ public class PrefabLibraryMenu : MonoBehaviour
             return;
         }
         bar.MarkDirty();
+        displayedRevision = LevelManager.Instance.Content.Revision(ContentCollection.PlayerPrefabs);
         RefreshCards(false);
         UpdateSelection();
     }
 
     void ClearEntries()
     {
-        foreach (Sprite sprite in createdSprites) if (sprite != null) Destroy(sprite);
-        foreach (Texture2D texture in createdTextures) if (texture != null) Destroy(texture);
-        createdSprites.Clear();
-        createdTextures.Clear();
+        cards?.Clear();
         entries.Clear();
     }
 }
